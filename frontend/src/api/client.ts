@@ -219,6 +219,25 @@ export interface Health {
   scenario: string;
 }
 
+// Advisory memo drafted from a selected advice option. Prose only — the /memo
+// endpoint never advances the turn or mutates state. With AI disabled (the
+// default) `source` is always "system".
+export interface MemoContent {
+  recommendation: string;
+  rationale: string;
+  operational_steps: string[];
+  communications: string;
+  likely_opposition: string[];
+  second_order_risks: string[];
+  fallback_plan: string;
+}
+
+export interface MemoDraft {
+  status: "ok" | "fallback";
+  source: "ai" | "system";
+  draft: MemoContent;
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(path, {
     headers: { "Content-Type": "application/json" },
@@ -253,6 +272,11 @@ export const api = {
     request<CurrentTurn>(`/api/campaigns/${id}/current`),
   submitAdvice: (id: string, adviceId: string) =>
     request<TurnResult>(`/api/campaigns/${id}/advice`, {
+      method: "POST",
+      body: JSON.stringify({ advice_id: adviceId }),
+    }),
+  draftMemo: (id: string, adviceId: string) =>
+    request<MemoDraft>(`/api/campaigns/${id}/memo`, {
       method: "POST",
       body: JSON.stringify({ advice_id: adviceId }),
     }),
