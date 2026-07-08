@@ -3,6 +3,7 @@ import { api } from "./api/client";
 import type {
   CampaignSummary,
   CurrentTurn,
+  MemoDraft,
   TurnHistory,
   TurnResult,
 } from "./api/client";
@@ -11,6 +12,7 @@ import IntroScreen from "./components/IntroScreen";
 import ContinuityHeader from "./components/ContinuityHeader";
 import GuidedTurn from "./components/GuidedTurn";
 import CaseFile from "./components/CaseFile";
+import MemoModal from "./components/MemoModal";
 
 /**
  * Continuity Desk — Guided Intake.
@@ -33,6 +35,13 @@ export default function App() {
   const [history, setHistory] = useState<TurnHistory | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [caseFileOpen, setCaseFileOpen] = useState(false);
+
+  // Advisory memo drawer state. The memo is read-only: it never sends advice
+  // or advances the turn.
+  const [memoOpen, setMemoOpen] = useState(false);
+  const [memoLoading, setMemoLoading] = useState(false);
+  const [memo, setMemo] = useState<MemoDraft | null>(null);
+  const [memoError, setMemoError] = useState<string | null>(null);
 
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -84,6 +93,23 @@ export default function App() {
       setSubmitting(false);
     }
   }, [campaignId, selected, refreshCurrent, refreshHistory]);
+
+  const handleDraftMemo = useCallback(async () => {
+    if (!campaignId || !selected) return;
+    // Open the modal immediately in a loading state, then fill it in. This is
+    // advisory only — no turn is advanced and no state changes.
+    setMemoOpen(true);
+    setMemoLoading(true);
+    setMemo(null);
+    setMemoError(null);
+    try {
+      setMemo(await api.draftMemo(campaignId, selected));
+    } catch (e) {
+      setMemoError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setMemoLoading(false);
+    }
+  }, [campaignId, selected]);
 
   const handleNextCall = useCallback(() => {
     // `current` was already refreshed after submit and now holds the next call.
@@ -150,6 +176,8 @@ export default function App() {
         onSelect={setSelected}
         onGoto={setPhase}
         onSendAdvice={handleSendAdvice}
+        onDraftMemo={handleDraftMemo}
+        memoBusy={memoLoading}
         onNextCall={handleNextCall}
         onRestart={startCampaign}
         onOpenCaseFile={() => setCaseFileOpen(true)}
@@ -161,6 +189,18 @@ export default function App() {
         campaignId={campaignId}
         current={current}
         history={history}
+      />
+
+      <MemoModal
+        open={memoOpen}
+        loading={memoLoading}
+        memo={memo}
+        error={memoError}
+        optionTitle={(() => {
+          const opt = current?.advice_options.find((o) => o.id === selected);
+          return opt?.title || opt?.label || null;
+        })()}
+        onClose={() => setMemoOpen(false)}
       />
     </div>
   );

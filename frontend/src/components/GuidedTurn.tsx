@@ -19,9 +19,11 @@ interface Props {
   terminal: boolean;
   selected: string | null;
   submitting: boolean;
+  memoBusy: boolean;
   onSelect: (id: string) => void;
   onGoto: (phase: Phase) => void;
   onSendAdvice: () => void;
+  onDraftMemo: () => void;
   onNextCall: () => void;
   onRestart: () => void;
   onOpenCaseFile: () => void;
@@ -42,9 +44,11 @@ export default function GuidedTurn(props: Props) {
     terminal,
     selected,
     submitting,
+    memoBusy,
     onSelect,
     onGoto,
     onSendAdvice,
+    onDraftMemo,
     onNextCall,
     onRestart,
     onOpenCaseFile,
@@ -113,12 +117,15 @@ export default function GuidedTurn(props: Props) {
           label="Send Advice"
           hint={
             selected
-              ? "Transmit your recommendation. The client decides what to do with it."
+              ? "Transmit your recommendation, or draft a memo first. The client decides what to do with it."
               : "Select a recommendation to send."
           }
           onClick={onSendAdvice}
           disabled={!selected}
           busy={submitting}
+          secondaryLabel={memoBusy ? "Drafting…" : "Draft Memo"}
+          onSecondary={onDraftMemo}
+          secondaryDisabled={!selected || memoBusy}
         />
       );
       break;

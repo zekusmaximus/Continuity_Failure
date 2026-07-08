@@ -839,6 +839,22 @@ body {
 .cd-modal-close { font-size: 14px; padding: 4px 10px; }
 .cd-modal-body { padding: 16px 18px 20px; overflow-y: auto; }
 
+/* Advisory memo provenance badge — honest about AI vs deterministic source. */
+.cd-memo-badge {
+  display: inline-block;
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 3px 9px;
+  border-radius: 2px;
+  border: 1px solid var(--border-strong);
+}
+.cd-memo-badge-ai { color: var(--accent); border-color: var(--accent-dim); background: rgba(217,164,65,0.06); }
+.cd-memo-badge-system { color: var(--text-dim); border-color: var(--border-strong); }
+.cd-memo-steps { margin: 0; padding-left: 18px; color: var(--text); }
+.cd-memo-steps li { margin-bottom: 6px; }
+
 /* ============================ Case File drawer ============================ */
 .cd-drawer-overlay {
   position: fixed; inset: 0;
