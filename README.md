@@ -83,20 +83,26 @@ The frontend should feel like an in-world crisis-consulting workstation: a degra
 
 ## Repository Status
 
-The **deterministic Northbridge MVP** is implemented and playable end to end:
+The **deterministic Northbridge MVP** is implemented and playable end to end,
+now with a document-rich, diegetic **Continuity Desk** workstation:
 
 * A framework-free `engine/` package resolves every state change through
   explicit, explainable rules.
 * A FastAPI `backend/` exposes the campaign endpoints.
-* A React + TypeScript + Vite `frontend/` renders a diegetic crisis-consulting
-  workstation.
+* A React + TypeScript + Vite `frontend/` renders a crisis-consulting
+  workstation — client call, crisis brief, evidence board, faction panel,
+  advice workbench with surfaced tradeoffs, consequence stack, applied-diff
+  record, canon/open-thread archive, and a Markdown campaign dossier export.
 * A 10-turn Northbridge campaign can be started, played, won, or lost, with
-  full turn history and an applied-diff record.
+  per-turn documents, a deterministic consequence stack, full turn history,
+  and an exportable case-file dossier.
 
 **AI integration is intentionally not implemented yet.** There are no model
 calls, agent frameworks, or vector databases in this slice. Per `AGENTS.md`,
 the deterministic engine is the only authority over world state; AI systems
-will be layered on top of this foundation in a later milestone.
+will be layered on top of this foundation in a later milestone. The
+workstation surfaces a nonfunctional "AI systems unavailable in current build"
+indicator to support the visual direction without fabricating model output.
 
 > Pre-merge review of this branch: see `docs/branch-review.md`. Enforced design
 > invariants: see `AGENTS.md` § "Design Invariants".
@@ -104,11 +110,11 @@ will be layered on top of this foundation in a later milestone.
 ## Repository Layout
 
 ```text
-frontend/   React + TypeScript + Vite crisis-consulting workstation
+frontend/   React + TypeScript + Vite Continuity Desk workstation
 backend/    FastAPI orchestration layer (Pydantic, in-memory persistence)
 engine/     Deterministic simulation engine (no web dependencies)
 memory/     In-memory persistence (durable canon store is a later milestone)
-tests/      pytest suite for engine invariants and the turn loop
+tests/      pytest suite for engine invariants, content, and the turn loop
 evals/      Reserved for future model-output evaluation harnesses
 docs/       Design documents
 prompts/    Reserved for versioned prompts (no prompts exist yet)
@@ -175,22 +181,35 @@ The engine tests exercise only the `engine` package and require no web server.
 
 Implemented:
 
-* Northbridge seed scenario: 16 state variables, 10 factions, 6 advice options,
-  10 per-turn client calls.
+* Northbridge seed scenario: 16 state variables, 10 factions (with red lines,
+  public/private incentives, pressure), 6 advice options with surfaced
+  tradeoffs (benefits, harms, legal/political/operational risk, affected
+  factions), 12 evidence documents, and 10 per-turn client calls that cascade
+  across the engagement.
 * Deterministic turn resolution: NPC decision (followed / partially followed /
-  modified / delayed / rejected), scaled advice effects, ambient crisis
-  pressure, and an `AppliedDiff` for every change.
+  modified / delayed / rejected) with visible mediation (deviation, public
+  explanation, private motive, resulting risk), scaled advice effects, ambient
+  crisis pressure, and an `AppliedDiff` for every change.
+* Deterministic **consequence stack** per turn (immediate, second-order, faction
+  reactions, media/rumor framing, legal/procedural fallout, canonized events,
+  opened threads) plus accumulating **open threads**.
 * Failure thresholds (`water_security`, `hospital_stability`, `public_order`,
   `public_trust`, `budget_capacity`, `state_oversight_risk`, `legal_exposure`)
   and successful 10-turn completion.
-* Full turn history and a canon archive.
-* Playable web UI: state variables, client call, advice workbench, aftermath
-  with applied diffs, and turn history.
+* Full turn history, canon archive, and open-thread tracking.
+* **Continuity Desk** web UI: client call, crisis brief, evidence board,
+  system-status panel, faction panel, advice workbench with tradeoffs,
+  aftermath (NPC mediation + consequence stack + applied diffs), canon/open
+  threads, turn history, and a Markdown **campaign dossier** export
+  (view / copy / download).
+* Derive diegetic system status (power, comms, data freshness, staff capacity)
+  and "last verified" labels from world state.
 
 Intentionally **not** implemented yet:
 
 * AI tools (local/cloud models, research console, rumor classifier, scenario
-  simulator, document review).
+  simulator, document review). The UI shows a disabled "AI systems unavailable
+  in current build" indicator only.
 * Autonomous agents and multi-agent behavior.
 * Vector database / semantic memory.
 * Durable persistence (SQLite/Postgres canon store).
@@ -199,21 +218,20 @@ Intentionally **not** implemented yet:
 
 ## Recommended Next Step
 
-The deterministic loop and workstation UI are already playable end to end, so
-the next step is **UI polish and richer Northbridge content**, not AI
-integration:
+The deterministic loop is now document-rich and the Continuity Desk is
+playable end to end, so the next step is **AI integration as a read-only,
+validation-gated layer** layered on top of this stable foundation:
 
-1. Add the `Document` entity and a first set of Northbridge documents behind an
-   Evidence Board (preliminary lab report, call transcript, contractor letter,
-   hospital request, resident rumor thread), all classified facts.
-2. Deepen the Advice Workbench (per-turn, situation-specific options with
-   surfaced tradeoffs) and add deterministic faction/media aftermath text.
-3. Add a low-fidelity "last verified / degraded feed" treatment as
-   `staff_capacity` or `information_integrity` drop.
-4. Serialize turn history + canon to a Markdown campaign dossier.
+1. Add a validated Research Console that only *proposes* classified facts
+   (proposed / unverified / rumor), never canon — the engine remains the sole
+   authority over world state.
+2. Layer model-assisted artifacts (memo drafts, faction-reaction text, press
+   framing, canon summaries) behind structured-output validation, with
+   deterministic fallbacks on failure.
+3. Add `ModelRun` logging (prompt version, input, parsed output, validation
+   result, latency, token use, cost) per `prompts/README.md`.
+4. Introduce durable persistence (SQLite canon store) once the AI layer's
+   read/write boundary is proven.
 
-AI integration (a validated, read-only Research Console that only *proposes*
-classified facts, never canon) should come **after** this, so the deterministic,
-document-rich loop is the stable foundation the model layer is layered onto.
 See `docs/branch-review.md` for the full branch review.
 

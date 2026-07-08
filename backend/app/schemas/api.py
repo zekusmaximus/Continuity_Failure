@@ -19,6 +19,14 @@ class FactionModel(BaseModel):
     posture: str
     influence: int
     alignment: str
+    type: str = "AGENCY"
+    public_position: str = ""
+    private_incentive: str = ""
+    trust_in_player: int = 50
+    risk_tolerance: int = 40
+    current_pressure: int = 30
+    red_lines: List[str] = Field(default_factory=list)
+    tags: List[str] = Field(default_factory=list)
 
 
 class CrisisModel(BaseModel):
@@ -27,6 +35,7 @@ class CrisisModel(BaseModel):
     description: str
     severity: int
     active: bool
+    type: str = "WATER_FAILURE"
 
 
 class AdviceOptionModel(BaseModel):
@@ -36,6 +45,15 @@ class AdviceOptionModel(BaseModel):
     rationale: str
     tags: List[str]
     effects: Dict[str, int]
+    type: str = "CONTROLLED_DISCLOSURE"
+    title: str = ""
+    recommendation: str = ""
+    expected_benefits: List[str] = Field(default_factory=list)
+    expected_harms: List[str] = Field(default_factory=list)
+    legal_risk: int = 30
+    political_risk: int = 30
+    operational_risk: int = 30
+    affected_factions: List[str] = Field(default_factory=list)
 
 
 class ClientCallModel(BaseModel):
@@ -47,6 +65,36 @@ class ClientCallModel(BaseModel):
     known_facts: List[str]
     ask: str
     crisis_id: Optional[str] = None
+    caller_role: str = ""
+    urgency: str = "high"
+    time_horizon: str = ""
+    unknown_facts: List[str] = Field(default_factory=list)
+    immediate_risks: List[str] = Field(default_factory=list)
+    public_exposure: str = "private"
+    private_pressure: str = ""
+    attached_document_ids: List[str] = Field(default_factory=list)
+
+
+class DocumentModel(BaseModel):
+    id: str
+    title: str
+    type: str
+    source: str
+    turn_number: int
+    public_status: str = "private"
+    reliability: str = "medium"
+    summary: str = ""
+    content: str = ""
+    tags: List[str] = Field(default_factory=list)
+
+
+class OpenThreadModel(BaseModel):
+    id: str
+    title: str
+    summary: str
+    turn_opened: int
+    status: str = "open"
+    tags: List[str] = Field(default_factory=list)
 
 
 class WorldStateModel(BaseModel):
@@ -89,6 +137,10 @@ class NpcDecisionModel(BaseModel):
     rationale: str
     adherence: float
     modifications: Dict[str, int] = Field(default_factory=dict)
+    deviation: str = ""
+    public_explanation: str = ""
+    private_motive: str = ""
+    resulting_risk: str = ""
 
 
 class AppliedDiffModel(BaseModel):
@@ -108,6 +160,25 @@ class CanonEntryModel(BaseModel):
     body: str
     source: str
     classification: str
+    public_status: str = "public"
+    involved_factions: List[str] = Field(default_factory=list)
+    tags: List[str] = Field(default_factory=list)
+
+
+class FactionReactionModel(BaseModel):
+    faction_id: str
+    faction_name: str
+    reaction: str
+
+
+class ConsequenceStackModel(BaseModel):
+    immediate: List[str] = Field(default_factory=list)
+    second_order: List[str] = Field(default_factory=list)
+    faction_reactions: List[FactionReactionModel] = Field(default_factory=list)
+    media_framing: List[str] = Field(default_factory=list)
+    legal_fallout: List[str] = Field(default_factory=list)
+    canonized_events: List[str] = Field(default_factory=list)
+    opened_threads: List[str] = Field(default_factory=list)
 
 
 class TurnResultModel(BaseModel):
@@ -119,7 +190,22 @@ class TurnResultModel(BaseModel):
     aftermath_summary: str
     canon_entry: CanonEntryModel
     status_after: str
+    consequence_stack: ConsequenceStackModel = Field(default_factory=ConsequenceStackModel)
     failure_reason: Optional[str] = None
+
+
+class SystemStatusModel(BaseModel):
+    """Diegetic system/infrastructure status read off world state.
+
+    Deterministic only. ``ai_available`` is always False in this build -- the
+    indicator exists for the workstation visual direction, not to fake output.
+    """
+    power: int
+    comms: int
+    data_freshness: int
+    staff_capacity: int
+    ai_available: bool = False
+    model_status: str = "AI systems unavailable in current build"
 
 
 class CurrentTurnModel(BaseModel):
@@ -128,6 +214,9 @@ class CurrentTurnModel(BaseModel):
     world_state: WorldStateModel
     client_call: Optional[ClientCallModel] = None
     advice_options: List[AdviceOptionModel]
+    documents: List[DocumentModel] = Field(default_factory=list)
+    open_threads: List[OpenThreadModel] = Field(default_factory=list)
+    system_status: SystemStatusModel
     last_turn: Optional[TurnResultModel] = None
 
 
@@ -135,6 +224,7 @@ class TurnHistoryModel(BaseModel):
     summary: CampaignSummaryModel
     turns: List[TurnResultModel]
     canon: List[CanonEntryModel]
+    open_threads: List[OpenThreadModel] = Field(default_factory=list)
 
 
 class CampaignCreatedModel(BaseModel):
@@ -143,6 +233,14 @@ class CampaignCreatedModel(BaseModel):
     status: str
     turn_number: int
     max_turns: int
+
+
+class DossierModel(BaseModel):
+    campaign_id: str
+    name: str
+    status: str
+    filename: str
+    markdown: str
 
 
 class HealthModel(BaseModel):

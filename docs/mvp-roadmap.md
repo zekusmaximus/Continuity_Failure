@@ -3,15 +3,19 @@
 # MVP Roadmap
 
 > **Implementation status (this branch).** **Week 1 (Deterministic Simulation
-> Skeleton) is complete** — the runnable engine, FastAPI backend, and React UI
-> are all in place and tested, and a full 10-turn campaign can be started,
-> played to completion or failure, and reviewed via turn history.
-> - **Done:** engine + seed data, all six campaign endpoints, advice/NPC/diff
->   resolution, completion/failure, and the workstation UI.
-> - **Planned next (Weeks 2–4):** case file + documents, memo-style advice
->   workbench, richer faction/media aftermath, dossier export, visual polish,
->   and (later) AI-assisted artifacts behind a validation boundary.
-> - **Not yet done from Week 1:** campaign-dossier export.
+> Skeleton) is complete**, and **Week 2 (Advice Workbench and Case File) is now
+> complete** on `feature/northbridge-content-and-ui-polish`. The runnable engine,
+> FastAPI backend, and Continuity Desk React UI are all in place and tested, and
+> a full 10-turn campaign with documents, consequence stacks, and an exportable
+> dossier can be started, played to completion or failure, and reviewed.
+> - **Done (Week 1 + 2):** engine + seed data, all campaign endpoints including
+>   `/dossier`, advice/NPC/diff resolution with visible mediation, completion/
+>   failure, the Evidence Board (12 documents), the Advice Workbench with
+>   tradeoffs, deterministic faction/media/legal consequence stacks, open-thread
+>   tracking, the Continuity Desk UI, and Markdown dossier export.
+> - **Planned next (Weeks 3–4):** AI-assisted artifacts behind a validation
+>   boundary (read-only Research Console that only proposes classified facts),
+>   `ModelRun` logging, durable persistence, and demo polish.
 > - **Out of scope for this MVP:** see "Explicitly Out of Scope for MVP" below.
 
 ## Objective
@@ -113,7 +117,14 @@ Make the deterministic game feel like crisis consulting.
 
 ### Week 2 Deliverable
 
-A user can play the Northbridge scenario as a consultant issuing advice, not merely selecting strategy-game buttons.
+A user can play the Northbridge scenario as a consultant issuing advice, not
+merely selecting strategy-game buttons.
+
+> **Status (this branch): COMPLETE.** The case file (Evidence Board with 12
+> documents), the Advice Workbench with surfaced tradeoffs, deterministic
+> consequence stacks (immediate / second-order / faction / media / legal),
+> faction/media reaction summaries, open-thread tracking, the campaign archive
+> screen, and export-to-Markdown dossier are all implemented and tested.
 
 ## Week 3: AI-Assisted Artifacts
 

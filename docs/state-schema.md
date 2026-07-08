@@ -6,17 +6,23 @@
 > schema reference. The implemented engine (`engine/models.py`) uses a
 > **simplified** field set per entity.
 > - **Implemented now:** `Campaign`, `WorldState`, `Crisis`, `Faction`,
->   `AdviceOption` (the implemented `Advice`), `ClientCall`, `AppliedDiff`,
->   `NpcDecision`, `CanonEntry`, `TurnResult`. All 16 state variables below are
->   present and clamped to 0–100. See the implemented starting values and
->   thresholds in `engine/seed_data.py` and `engine/rules.py`.
+>   `AdviceOption` (the implemented `Advice`), `ClientCall`, `Document`,
+>   `OpenThread`, `AppliedDiff`, `NpcDecision`, `CanonEntry`, `TurnResult`,
+>   plus `ConsequenceStack` and `FactionReaction` (deterministic aftermath).
+>   All 16 state variables below are present and clamped to 0–100. See the
+>   implemented starting values and thresholds in `engine/seed_data.py` and
+>   `engine/rules.py`.
 > - **Simplified vs. spec:** implemented entities carry fewer fields than listed
->   here (e.g. `Faction` has `posture`/`influence`/`alignment`, not the full
->   trust/red-line model; `CanonEntry` stores one `classification`, not the full
->   public-status/confidence set).
-> - **Not implemented:** `Jurisdiction`, `Resource`, `Document`, `ModelRun`,
->   `EvaluationResult`, `OpenThread`, `AdviceMemo`. These are planned for later
->   milestones.
+>   here in some cases, but `Faction` now carries posture/influence/alignment
+>   **plus** red lines, public/private incentives, trust, risk tolerance, and
+>   pressure; `AdviceOption` carries the full tradeoff surface (benefits, harms,
+>   legal/political/operational risk, affected factions); `ClientCall` carries
+>   urgency, horizon, unknowns, immediate risks, public exposure, private
+>   pressure, and attached documents; `NpcDecision` carries deviation, public
+>   explanation, private motive, resulting risk; and `CanonEntry` carries public
+>   status, involved factions, and tags.
+> - **Not implemented:** `Jurisdiction`, `Resource`, `ModelRun`,
+>   `EvaluationResult`, `AdviceMemo`. These are planned for later milestones.
 
 ## Purpose
 

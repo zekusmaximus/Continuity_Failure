@@ -9,6 +9,14 @@ export interface Faction {
   posture: string;
   influence: number;
   alignment: string;
+  type: string;
+  public_position: string;
+  private_incentive: string;
+  trust_in_player: number;
+  risk_tolerance: number;
+  current_pressure: number;
+  red_lines: string[];
+  tags: string[];
 }
 
 export interface Crisis {
@@ -17,6 +25,7 @@ export interface Crisis {
   description: string;
   severity: number;
   active: boolean;
+  type: string;
 }
 
 export interface AdviceOption {
@@ -26,6 +35,15 @@ export interface AdviceOption {
   rationale: string;
   tags: string[];
   effects: Record<string, number>;
+  type: string;
+  title: string;
+  recommendation: string;
+  expected_benefits: string[];
+  expected_harms: string[];
+  legal_risk: number;
+  political_risk: number;
+  operational_risk: number;
+  affected_factions: string[];
 }
 
 export interface ClientCall {
@@ -37,6 +55,36 @@ export interface ClientCall {
   known_facts: string[];
   ask: string;
   crisis_id: string | null;
+  caller_role: string;
+  urgency: string;
+  time_horizon: string;
+  unknown_facts: string[];
+  immediate_risks: string[];
+  public_exposure: string;
+  private_pressure: string;
+  attached_document_ids: string[];
+}
+
+export interface DocumentRecord {
+  id: string;
+  title: string;
+  type: string;
+  source: string;
+  turn_number: number;
+  public_status: string;
+  reliability: string;
+  summary: string;
+  content: string;
+  tags: string[];
+}
+
+export interface OpenThread {
+  id: string;
+  title: string;
+  summary: string;
+  turn_opened: number;
+  status: string;
+  tags: string[];
 }
 
 export interface WorldState {
@@ -65,6 +113,10 @@ export interface NpcDecision {
   rationale: string;
   adherence: number;
   modifications: Record<string, number>;
+  deviation: string;
+  public_explanation: string;
+  private_motive: string;
+  resulting_risk: string;
 }
 
 export interface AppliedDiff {
@@ -84,6 +136,25 @@ export interface CanonEntry {
   body: string;
   source: string;
   classification: string;
+  public_status: string;
+  involved_factions: string[];
+  tags: string[];
+}
+
+export interface FactionReaction {
+  faction_id: string;
+  faction_name: string;
+  reaction: string;
+}
+
+export interface ConsequenceStack {
+  immediate: string[];
+  second_order: string[];
+  faction_reactions: FactionReaction[];
+  media_framing: string[];
+  legal_fallout: string[];
+  canonized_events: string[];
+  opened_threads: string[];
 }
 
 export interface TurnResult {
@@ -95,7 +166,17 @@ export interface TurnResult {
   aftermath_summary: string;
   canon_entry: CanonEntry;
   status_after: "ACTIVE" | "COMPLETED" | "FAILED";
+  consequence_stack: ConsequenceStack;
   failure_reason: string | null;
+}
+
+export interface SystemStatus {
+  power: number;
+  comms: number;
+  data_freshness: number;
+  staff_capacity: number;
+  ai_available: boolean;
+  model_status: string;
 }
 
 export interface CurrentTurn {
@@ -103,6 +184,9 @@ export interface CurrentTurn {
   world_state: WorldState;
   client_call: ClientCall | null;
   advice_options: AdviceOption[];
+  documents: DocumentRecord[];
+  open_threads: OpenThread[];
+  system_status: SystemStatus;
   last_turn: TurnResult | null;
 }
 
@@ -110,6 +194,7 @@ export interface TurnHistory {
   summary: CampaignSummary;
   turns: TurnResult[];
   canon: CanonEntry[];
+  open_threads: OpenThread[];
 }
 
 export interface CampaignCreated {
@@ -118,6 +203,14 @@ export interface CampaignCreated {
   status: string;
   turn_number: number;
   max_turns: number;
+}
+
+export interface Dossier {
+  campaign_id: string;
+  name: string;
+  status: string;
+  filename: string;
+  markdown: string;
 }
 
 export interface Health {
@@ -165,4 +258,6 @@ export const api = {
     }),
   getTurns: (id: string) =>
     request<TurnHistory>(`/api/campaigns/${id}/turns`),
+  getDossier: (id: string) =>
+    request<Dossier>(`/api/campaigns/${id}/dossier`),
 };

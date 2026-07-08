@@ -41,25 +41,38 @@ memory/     in-memory CampaignStore (process-local; cleared on restart)
 
 **Implemented now**
 
-* Deterministic engine: 16 state variables (0–100, clamped), 10 factions, 6
-  advice options, 10 per-turn client calls, ambient crisis drift, NPC decision
-  logic, applied diffs for every change, failure thresholds, 10-turn
-  completion.
+* Deterministic engine: 16 state variables (0–100, clamped), 10 factions (with
+  red lines, public/private incentives, trust, risk tolerance, pressure), 12
+  evidence documents, 6 advice options with surfaced tradeoffs (benefits,
+  harms, legal/political/operational risk, affected factions), 10 per-turn
+  client calls forming a cascade, ambient crisis drift, NPC decision logic with
+  visible mediation, applied diffs for every change, deterministic consequence
+  stacks, open-thread tracking, failure thresholds, and 10-turn completion.
+  The engine also ships a framework-free Markdown dossier builder
+  (`engine/dossier.py`).
 * FastAPI endpoints: `GET /health`, `POST /api/campaigns`,
   `GET /api/campaigns/{id}`, `GET /api/campaigns/{id}/current`,
-  `POST /api/campaigns/{id}/advice`, `GET /api/campaigns/{id}/turns`.
-* React workstation UI: state panel, client call, advice workbench, aftermath
-  with applied diffs, turn history, canon archive.
-* `pytest` engine suite (determinism, bounds, failure, completion).
+  `POST /api/campaigns/{id}/advice`, `GET /api/campaigns/{id}/turns`,
+  `GET /api/campaigns/{id}/dossier`.
+* React workstation UI (**Continuity Desk**): client call, crisis brief,
+  evidence board, system-status panel, faction panel, advice workbench with
+  tradeoffs, aftermath (NPC mediation + consequence stack + applied diffs),
+  operational state readout, canon/open-thread archive, turn history, and a
+  Markdown campaign dossier export (view / copy / download).
+* `pytest` suite (**50 passing**): determinism, 0–100 bounds, failure
+  thresholds, completion at turn 10, applied diffs, FastAPI-independence,
+  documents/evidence, advice tradeoffs, consequence stacks, open threads, and
+  dossier generation.
 
 **Actual current repository structure**
 
 ```text
-frontend/   src/{main,App,domain}.tsx, api/client.ts, components/*, styles/global.css
+frontend/   src/{main,App,domain}.tsx, api/client.ts, components/* (Continuity Desk),
+            styles/global.css
 backend/    app/{main,api/campaigns,services/campaign_service,schemas/api}.py
-engine/     {models,state,diffs,rules,turn,seed_data}.py
+engine/     {models,state,diffs,rules,turn,seed_data,consequences,dossier}.py
 memory/     {persistence}.py            (CampaignStore, MemoryStore)
-tests/      test_engine_turns.py, test_state_invariants.py
+tests/      test_engine_turns.py, test_state_invariants.py, test_content_and_dossier.py
 evals/      README.md                    (reserved)
 docs/       *.md
 prompts/    README.md                    (reserved; no prompt files yet)
@@ -68,8 +81,7 @@ prompts/    README.md                    (reserved; no prompt files yet)
 > Note: the "Initial Repository Structure" tree later in this document is the
 > **target** layout. Files it lists that do not yet exist (e.g. `engine/events.py`,
 > `engine/scoring.py`, `memory/canon.py`, `memory/retrieval.py`,
-> `backend/app/config.py`, `backend/app/models/`, frontend `screens/`/`types/`/`utils/`)
-> are planned, not current.
+> `backend/app/config.py`, `backend/app/models/`) are planned, not current.
 
 **Intentionally Not Present Yet**
 
@@ -256,11 +268,16 @@ Core files:
 engine/state.py
 engine/turn.py
 engine/rules.py
-engine/events.py
-engine/scoring.py
+engine/consequences.py
+engine/dossier.py
 engine/diffs.py
 engine/seed_data.py
 ```
+
+> **Status:** `events.py` and `scoring.py` above are the original target list;
+> they are not present. Deterministic consequence-stack generation lives in
+> `engine/consequences.py`, and the framework-free Markdown campaign dossier is
+> built in `engine/dossier.py`.
 
 ### Engine Responsibilities
 

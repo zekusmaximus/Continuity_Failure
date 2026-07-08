@@ -89,3 +89,15 @@ def get_turns(campaign_id: str):
     if result is None:
         _not_found(campaign_id)
     return result
+
+
+@router.get(
+    "/{campaign_id}/dossier",
+    response_model=schemas.DossierModel,
+    summary="Get the campaign dossier as Markdown",
+)
+def get_dossier(campaign_id: str):
+    result = campaign_service.get_dossier(campaign_id)
+    if result is None:
+        _not_found(campaign_id)
+    return result

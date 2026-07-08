@@ -16,6 +16,8 @@ from engine import diffs
 from engine import rules
 from engine import seed_data
 from engine import turn
+from engine import consequences
+from engine import dossier
 
 __all__ = [
     "models",
@@ -24,4 +26,6 @@ __all__ = [
     "rules",
     "seed_data",
     "turn",
+    "consequences",
+    "dossier",
 ]

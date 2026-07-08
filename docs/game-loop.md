@@ -4,13 +4,17 @@
 
 > **Implementation status (this branch).** This document describes the intended
 > full turn loop. Against the working code, the implemented phases are:
-> **1 (Incoming Call)**, **5 (Advice)**, **6 (NPC Decision)**,
-> **7 (Deterministic Resolution → applied diffs)**, and **9 (Canon update)**,
-> plus completion/failure and the aftermath/history UI.
-> - **Planned next:** generated situation briefs, an investigation/case-file
->   screen, faction/media reaction summaries, and dossier export.
-> - **Out of scope for this MVP:** the optional AI-use phase, autonomous cascade
->   events beyond ambient drift, and long-term town→interstate progression.
+> **1 (Incoming Call)**, **2 (Situation Brief — crisis + known facts / unknowns /
+> immediate risks / public exposure)**, **3 (Investigation — evidence board +
+> factions + open threads)**, **5 (Advice — workbench with surfaced tradeoffs)**,
+> **6 (NPC Decision — with visible mediation)**,
+> **7 (Deterministic Resolution → applied diffs)**, **8 (Aftermath — deterministic
+> consequence stack)**, and **9 (Canon + open-thread update)**, plus
+> completion/failure and the Continuity Desk UI and a Markdown dossier export.
+> - **Planned next:** the optional AI-use phase (a validation-gated, read-only
+>   Research Console that only proposes classified facts).
+> - **Out of scope for this MVP:** autonomous cascade events beyond ambient
+>   drift, and long-term town→interstate progression.
 
 ## Core Loop
 
