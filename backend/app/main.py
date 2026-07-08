@@ -20,8 +20,11 @@ from engine import seed_data
 app = FastAPI(
     title="Continuity Failure",
     description=(
-        "Orchestration layer for the Northbridge Water Failure MVP. "
-        "AI integration is intentionally not implemented in this slice."
+        "Orchestration layer for the Northbridge Water Failure MVP. The "
+        "deterministic engine owns all state; a dormant, off-by-default "
+        "AI-assist layer (memo drafter + ModelRun logging) is present and "
+        "validation-gated, degrading to deterministic fallback when AI is off "
+        "or a model call fails."
     ),
     version="0.1.0",
 )

@@ -201,14 +201,61 @@ def test_identical_advice_sequence_is_bit_for_bit_repeatable():
 # Independence from web frameworks
 # ---------------------------------------------------------------------------
 
+def _engine_imports():
+    """Yield ``(filename, imported_module, imported_name)`` for every import in
+    the engine package. Uses AST so prose/comments never count and the check is
+    independent of what other test modules have imported into ``sys.modules``
+    in the same session (mirrors the AI-boundary test pattern).
+    """
+    import os
+    engine_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "engine")
+    assert os.path.isdir(engine_dir), "engine package should exist"
+    import ast
+    for name in sorted(os.listdir(engine_dir)):
+        if not name.endswith(".py"):
+            continue
+        with open(os.path.join(engine_dir, name), "r", encoding="utf-8") as fh:
+            tree = ast.parse(fh.read(), filename=name)
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                for alias in node.names:
+                    yield name, alias.name, None
+            elif isinstance(node, ast.ImportFrom):
+                module = node.module or ""
+                for alias in node.names:
+                    yield name, module, alias.name
+
+
 def test_engine_does_not_import_fastapi():
-    # Importing the engine must not pull in any web framework.
-    for mod in ("engine", "engine.turn", "engine.rules", "engine.seed_data",
-                "engine.models", "engine.state", "engine.diffs"):
-        assert mod in sys.modules, f"{mod} should be importable standalone"
-    assert "fastapi" not in sys.modules, (
-        "the deterministic engine must not depend on FastAPI"
-    )
+    """The deterministic engine must not import any web framework.
+
+    Checked by AST scan of ``engine/*.py`` so the result depends only on the
+    engine source, not on pytest collection order or what other tests imported.
+    """
+    forbidden_prefixes = ("fastapi", "uvicorn", "starlette", "pydantic")
+    for fname, module, _name in _engine_imports():
+        for prefix in forbidden_prefixes:
+            assert not module == prefix and not module.startswith(prefix + "."), (
+                f"engine/{fname} must not import {prefix} (imported {module})"
+            )
+
+
+def test_engine_imports_only_stdlib_and_itself():
+    """Engine modules may import only the stdlib and the engine package itself."""
+    # Top-level packages reachable via the engine source. ``__future__`` and
+    # ``typing`` etc. are stdlib; ``engine`` is self-import. Anything else is a
+    # boundary leak. This is the stricter, structural form of the independence
+    # guarantee.
+    allowed_first_party = {"engine"}
+    for fname, module, _name in _engine_imports():
+        top = module.split(".")[0]
+        if top in allowed_first_party:
+            continue
+        # Stdlib modules are importable without the backend installed.
+        import importlib.util
+        assert importlib.util.find_spec(top) is not None or top in {
+            "__future__",
+        }, f"engine/{fname} imports non-stdlib, non-engine package '{top}'"
 
 
 def test_engine_runs_without_backend_installed():

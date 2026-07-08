@@ -29,9 +29,16 @@ frontend/   React 18 + TypeScript + Vite  (no UI framework, plain CSS)
    |        Vite dev server proxies /api and /health to the backend
    ↓ HTTP (JSON)
 backend/    FastAPI + Pydantic v2, in-memory only
-   |        app/api/campaigns.py        routes
-   |        app/services/campaign_service.py  engine <-> memory <-> schemas
+   |        app/api/campaigns.py        routes (incl. /memo, /model-runs)
+   |        app/services/campaign_service.py  engine <-> memory <-> ai <-> schemas
    |        app/schemas/api.py          Pydantic request/response models
+   |        app/ai/                     dormant, validation-gated AI-assist layer
+   |          provider.py               NullProvider (default) / AnthropicProvider
+   |          runner.py                 run_artifact: validate -> retry -> fallback
+   |          schemas.py                MemoDraft output contract
+   |          fallbacks.py              deterministic memo builder
+   |          logging.py                ModelRun store (append-only, in-memory)
+   |        app/config.py               Settings (AI off by default; ai_live flag)
    ↓ imports
 engine/     framework-free deterministic engine (dataclasses, no web deps)
    |        models.py state.py diffs.py rules.py turn.py seed_data.py
@@ -53,21 +60,36 @@ memory/     in-memory CampaignStore (process-local; cleared on restart)
 * FastAPI endpoints: `GET /health`, `POST /api/campaigns`,
   `GET /api/campaigns/{id}`, `GET /api/campaigns/{id}/current`,
   `POST /api/campaigns/{id}/advice`, `GET /api/campaigns/{id}/turns`,
-  `GET /api/campaigns/{id}/dossier`.
+  `GET /api/campaigns/{id}/dossier`, `POST /api/campaigns/{id}/memo`
+  (advisory memo draft), `GET /api/campaigns/{id}/model-runs` (read-only AI
+  run log).
+* **Dormant, validation-gated AI-assist layer** (`backend/app/ai/`): a memo
+  drafter is the first implemented tool. `run_artifact` renders the versioned
+  prompt, calls a provider (default `NullProvider`, which never succeeds), 
+  validates the output against a Pydantic schema, retries once on failure, and
+  falls back to a deterministic `MemoDraft` built from the advice record. Every
+  call is logged as a `ModelRun` (success / invalid / fallback / error). AI is
+  off by default (`Settings.ai_live` requires both `CF_AI_ENABLED` and
+  `ANTHROPIC_API_KEY`); a live config without the optional `anthropic` extra
+  degrades safely to `NullProvider`. The AI package imports no state-mutation
+  code and is tested never to mutate `WorldState`.
 * React **Continuity Desk — Guided Intake** UI: an intro/boot screen followed by
   a one-task-per-screen turn flow (incoming call → situation brief → evidence
   review → advice → client decision → consequences → turn archive → next call /
   dossier), each with a single primary action and a persistent four-indicator
   header. Dense material (full 16-variable state, all factions, canon, full
   timeline, raw applied diffs, Markdown dossier) is moved into an on-demand
-  **Case File** drawer rather than being rendered all at once. The frontend
-  reveals the backend's single post-advice `TurnResult` across the separate
-  client-decision / consequences / archive phases; no backend shape change was
-  required.
-* `pytest` suite (**50 passing**): determinism, 0–100 bounds, failure
-  thresholds, completion at turn 10, applied diffs, FastAPI-independence,
-  documents/evidence, advice tradeoffs, consequence stacks, open threads, and
-  dossier generation.
+  **Case File** drawer rather than being rendered all at once. The Advice phase
+  exposes an optional **Draft memo** affordance (calls `/memo`, renders the
+  draft with honest "AI draft" / "System draft (fallback)" provenance), and the
+  Case File has a **Model Runs** tab. The frontend reveals the backend's single
+  post-advice `TurnResult` across the separate client-decision / consequences /
+  archive phases; no backend shape change was required.
+* `pytest` suite (**96 passing**): determinism, 0–100 bounds, failure
+  thresholds, completion at turn 10, applied diffs, engine/FastAPI-independence
+  (AST-based), documents/evidence, advice tradeoffs, consequence stacks, open
+  threads, dossier generation, the AI boundary + runner + memo service path,
+  and HTTP route tests (`TestClient`) covering all endpoints and error paths.
 
 **Actual current repository structure**
 
@@ -77,16 +99,18 @@ frontend/   src/{main,App,domain}.tsx, api/client.ts, styles/global.css,
             KeyStateIndicators, PrimaryAction, GuidedTurn), one component per
             turn phase (CallPhase, BriefPhase, EvidencePhase, AdvicePhase,
             ClientDecisionPhase, ConsequencesPhase, ArchivePhase), the on-demand
-            CaseFile drawer (+ DocumentDetail), and the reused dense views
-            (EvidenceBoard, FactionPanel, StateReadout, CanonPanel, TurnHistory,
-            CampaignDossier)
-backend/    app/{main,api/campaigns,services/campaign_service,schemas/api}.py
+            CaseFile drawer (+ DocumentDetail, ModelRunPanel), MemoDraftPanel,
+            and the reused dense views (EvidenceBoard, FactionPanel,
+            StateReadout, CanonPanel, TurnHistory, CampaignDossier)
+backend/    app/{main,config,api/campaigns,services/campaign_service,schemas/api}.py
+            app/ai/{provider,runner,schemas,fallbacks,logging}.py  (dormant by default)
 engine/     {models,state,diffs,rules,turn,seed_data,consequences,dossier}.py
 memory/     {persistence}.py            (CampaignStore, MemoryStore)
-tests/      test_engine_turns.py, test_state_invariants.py, test_content_and_dossier.py
+tests/      test_engine_turns.py, test_state_invariants.py, test_content_and_dossier.py,
+            test_ai_boundary.py, test_ai_runner.py, test_ai_memo.py, test_api.py
 evals/      README.md                    (reserved)
 docs/       *.md
-prompts/    README.md                    (reserved; no prompt files yet)
+prompts/    README.md, memo_drafter.v1.md
 ```
 
 > Note: the "Initial Repository Structure" tree later in this document is the
@@ -96,11 +120,15 @@ prompts/    README.md                    (reserved; no prompt files yet)
 
 **Intentionally Not Present Yet**
 
-* AI / model calls (no provider abstraction, no structured-output validation,
-  no `ModelRun` logging).
+* The broader in-world AI toolset beyond the memo drafter: research console,
+  rumor classifier, scenario simulator, document review, faction-reaction /
+  press / canon-summary generators, and in-world tool costs (power, bandwidth,
+  privacy, latency). The validation boundary and `ModelRun` logging they would
+  use *are* present.
 * Autonomous agents / multi-agent behavior.
 * Durable storage: no SQLite, Postgres, SQLAlchemy, or SQLModel. State is
-  process-local in-memory only.
+  process-local in-memory only (campaigns and model-run logs are lost on
+  restart).
 * Vector database / semantic retrieval.
 * Authentication and deployment configuration.
 * Statewide / regional / interstate progression beyond the town level.
@@ -225,7 +253,9 @@ sequence — **one screen, one task, one obvious next action**:
    Timeline · Dossier.
 
 A future AI Research Console would slot in as an optional step between Brief and
-Advice; it is not present in this build.
+Advice; it is not present in this build. The memo drafter is present as an
+optional, advisory affordance *within* the Advice phase (it drafts a memo for
+the selected option without sending advice or changing state).
 
 ### Frontend Principles
 
@@ -244,7 +274,9 @@ The backend coordinates game state, persistence, model calls, turn resolution, a
 Initial backend stack:
 
 > **Status:** As built, persistence is **in-memory only** (no SQLite/SQLAlchemy
-> yet). The list below is the intended stack for a later durability milestone.
+> yet) for both campaign state and `ModelRun` logs. The list below is the
+> intended stack for a later durability milestone. The AI-assist layer
+> (`app/ai/`) is present and dormant by default; see "AI Layer" below.
 
 ```text
 Python

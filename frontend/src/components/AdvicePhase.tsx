@@ -1,11 +1,16 @@
-import type { AdviceOption, Faction } from "../api/client";
+import type { AdviceOption, Faction, MemoDraft } from "../api/client";
 import { levelClass, titleCase } from "../domain";
+import MemoDraftPanel from "./MemoDraftPanel";
 
 interface Props {
   options: AdviceOption[];
   factions: Faction[];
   selected: string | null;
   onSelect: (id: string) => void;
+  memo: MemoDraft | null;
+  memoLoading: boolean;
+  memoError: string | null;
+  onDraftMemo: () => void;
 }
 
 function RiskBar({ label, value }: { label: string; value: number }) {
@@ -137,8 +142,22 @@ function AdviceCard({
  * ADVICE phase — concise tradeoffs up front; details expand only for the option
  * the player is actually considering. No consequence stack is shown here; the
  * player commits before the fallout is revealed.
+ *
+ * Selecting an option also unlocks an optional "Draft memo" affordance, which
+ * asks the AI-assist layer (off by default → deterministic fallback) to draft a
+ * consultant memo for that option. The draft is advisory only: it never
+ * advances the turn or changes state.
  */
-export default function AdvicePhase({ options, factions, selected, onSelect }: Props) {
+export default function AdvicePhase({
+  options,
+  factions,
+  selected,
+  onSelect,
+  memo,
+  memoLoading,
+  memoError,
+  onDraftMemo,
+}: Props) {
   return (
     <section className="cd-stage-panel cd-advisory">
       <div className="cd-eyebrow">
@@ -160,6 +179,24 @@ export default function AdvicePhase({ options, factions, selected, onSelect }: P
           />
         ))}
       </ul>
+
+      {selected && (
+        <div className="cd-advice-memo">
+          <button
+            className="cd-btn cd-btn-ghost"
+            onClick={onDraftMemo}
+            disabled={memoLoading}
+          >
+            {memoLoading ? "Drafting…" : "Draft memo"}
+          </button>
+          <span className="cd-muted cd-advice-memo-hint">
+            Advisory only — drafts a memo for the selected option without
+            sending advice or changing state. Falls back to a system draft when
+            AI is off.
+          </span>
+          <MemoDraftPanel memo={memo} loading={memoLoading} error={memoError} />
+        </div>
+      )}
     </section>
   );
 }

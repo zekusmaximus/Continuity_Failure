@@ -9,12 +9,14 @@
 >   deterministic consequence stacks, applied diffs, canon entries, open threads,
 >   campaign completion/failure, the Continuity Desk web UI, and a Markdown
 >   campaign dossier export.
-> - **Planned next:** AI-assisted artifacts (a validation-gated, read-only
->   Research Console that only proposes classified facts) and durable persistence.
-> - **Out of scope for this MVP:** all in-world AI tools (local/cloud/archive/
->   legal/rumor/scenario models), AI resource costs, power/comms degradation
->   beyond the derived system-status indicator, and town→state→interstate
->   progression.
+> - **Planned next:** the remaining read-only AI-assist tools (research console,
+>   faction-reaction / press / canon-summary generators) behind the validation
+>   boundary already in place, plus in-world tool costs and durable persistence.
+> - **Out of scope for this MVP:** the in-world AI tools beyond the memo
+>   drafter (local/cloud/archive/legal/rumor/scenario models), AI resource
+>   costs, power/comms degradation beyond the derived system-status indicator,
+>   and town→state→interstate progression. The memo drafter itself is
+>   implemented (off by default, validation-gated, deterministic fallback).
 
 ## One-Sentence Pitch
 

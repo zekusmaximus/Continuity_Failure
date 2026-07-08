@@ -3,3 +3,8 @@ dist
 dist-ssr
 *.local
 .vite
+
+# TypeScript incremental build state and emitted vite config copies
+*.tsbuildinfo
+vite.config.d.ts
+vite.config.js

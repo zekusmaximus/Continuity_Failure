@@ -6,9 +6,10 @@ import StateReadout from "./StateReadout";
 import CanonPanel from "./CanonPanel";
 import TurnHistoryPanel from "./TurnHistory";
 import CampaignDossier from "./CampaignDossier";
+import ModelRunPanel from "./ModelRunPanel";
 
-type Tab = "Evidence" | "Factions" | "Full State" | "Canon" | "Timeline" | "Dossier";
-const TABS: Tab[] = ["Evidence", "Factions", "Full State", "Canon", "Timeline", "Dossier"];
+type Tab = "Evidence" | "Factions" | "Full State" | "Canon" | "Timeline" | "Model Runs" | "Dossier";
+const TABS: Tab[] = ["Evidence", "Factions", "Full State", "Canon", "Timeline", "Model Runs", "Dossier"];
 
 interface Props {
   open: boolean;
@@ -84,6 +85,7 @@ export default function CaseFile({ open, onClose, campaignId, current, history }
               <p className="cd-muted">No canon on record.</p>
             ))}
           {tab === "Timeline" && <TurnHistoryPanel history={history} />}
+          {tab === "Model Runs" && <ModelRunPanel campaignId={campaignId} />}
           {tab === "Dossier" && <CampaignDossier campaignId={campaignId} embedded />}
         </div>
       </aside>

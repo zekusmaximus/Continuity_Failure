@@ -103,11 +103,21 @@ workflow rather than a dense all-at-once dashboard:
   per-turn documents, a deterministic consequence stack, full turn history,
   and an exportable case-file dossier.
 
-**AI integration is intentionally not implemented yet.** There are no model
-calls, agent frameworks, or vector databases in this slice. Per `AGENTS.md`,
-the deterministic engine is the only authority over world state; AI systems
-will be layered on top of this foundation in a later milestone. No AI/model
-calls or fabricated model output exist anywhere in this build.
+**A dormant, validation-gated AI-assist layer is present and wired end to end,
+but off by default.** The deterministic engine remains the sole authority over
+world state. The AI layer (`backend/app/ai/`) provides a memo-drafter tool and
+`ModelRun` logging behind a strict validation boundary: model output is
+validated against a Pydantic schema, retried once on failure, and replaced by a
+deterministic fallback if it still fails. With AI off (the default, and the
+state in which the test suite runs), the `/memo` endpoint returns a system
+draft and logs a `fallback` run — no network call is made. The Advice phase
+exposes an optional **Draft memo** affordance, and the Case File has a **Model
+Runs** tab so every AI invocation is inspectable. A live Anthropic provider can
+be enabled with `CF_AI_ENABLED=true` and `ANTHROPIC_API_KEY`; absent the
+optional `anthropic` extra, even a "live" config degrades safely to fallback.
+Per `AGENTS.md`, AI may only *propose* classified facts; only the engine
+promotes a fact to canon, and the AI package is tested to never import
+state-mutation code.
 
 > Pre-merge review of this branch: see `docs/branch-review.md`. Enforced design
 > invariants: see `AGENTS.md` § "Design Invariants".
@@ -117,12 +127,14 @@ calls or fabricated model output exist anywhere in this build.
 ```text
 frontend/   React + TypeScript + Vite Continuity Desk workstation
 backend/    FastAPI orchestration layer (Pydantic, in-memory persistence)
+            app/ai/ — dormant, validation-gated AI-assist layer (memo drafter)
 engine/     Deterministic simulation engine (no web dependencies)
 memory/     In-memory persistence (durable canon store is a later milestone)
-tests/      pytest suite for engine invariants, content, and the turn loop
+tests/      pytest suite for engine invariants, content, the turn loop,
+            the AI boundary, and HTTP routes
 evals/      Reserved for future model-output evaluation harnesses
 docs/       Design documents
-prompts/    Reserved for versioned prompts (no prompts exist yet)
+prompts/    Versioned prompts (memo_drafter.v1.md implemented)
 ```
 
 ## Local Development
@@ -150,7 +162,17 @@ uvicorn app.main:app --reload
 
 The API is served at `http://localhost:8000` (interactive docs at `/docs`).
 The `engine/` and `memory/` packages at the repo root are made importable by
-the editable install.
+the editable install. To enable the live (Anthropic) AI provider, also install
+the optional extra and set two environment variables:
+
+```bash
+pip install -e "backend[dev,ai]"
+export CF_AI_ENABLED=true
+export ANTHROPIC_API_KEY=sk-...
+```
+
+With AI off (the default) the memo drafter returns a deterministic system draft
+and no network call is made. The test suite runs with AI off.
 
 > Alternative (per-`backend` venv, matching the canonical FastAPI workflow):
 > ```bash
@@ -214,32 +236,48 @@ Implemented:
   faction / media / legal / canon / threads), then as a compact
   changed-variables table (old → new), with the raw applied diffs behind an
   expandable "Why did this change?".
+* **Dormant, validation-gated AI-assist layer.** A memo drafter
+  (`POST /api/campaigns/{id}/memo`) drafts an advisory memo for a selected
+  advice option, surfaced in the Advice phase as an optional "Draft memo"
+  affordance with honest "AI draft" / "System draft (fallback)" provenance
+  labeling. Model output is validated against a Pydantic schema, retried once
+  on failure, and replaced by a deterministic fallback otherwise. Every call
+  (success, invalid, or fallback) is logged as a `ModelRun` and inspectable via
+  a read-only **Model Runs** tab in the Case File. AI is off by default; the
+  diegetic system-status indicator reflects whether a live provider is
+  configured. The AI package is tested to never import state-mutation code.
 
 Intentionally **not** implemented yet:
 
-* AI tools (local/cloud models, research console, rumor classifier, scenario
-  simulator, document review). No model calls or fabricated model output exist
-  in this build.
+* The broader in-world AI toolset beyond the memo drafter (local/cloud/archive
+  models, research console, rumor classifier, scenario simulator, document
+  review) and their resource costs (power, bandwidth, privacy, latency).
 * Autonomous agents and multi-agent behavior.
 * Vector database / semantic memory.
 * Durable persistence (SQLite/Postgres canon store).
 * Statewide or regional gameplay beyond the town level.
 * Authentication and deployment tooling.
 
+The memo drafter *is* implemented (off by default): it drafts an advisory memo
+for a selected advice option, validates model output against a schema, falls
+back to a deterministic system draft on any failure, and logs every call as a
+`ModelRun`. It never advances the turn or changes world state.
+
 ## Recommended Next Step
 
-The deterministic loop is now document-rich and the Continuity Desk is
-playable end to end, so the next step is **AI integration as a read-only,
-validation-gated layer** layered on top of this stable foundation:
+The deterministic loop is document-rich, the Continuity Desk is playable end to
+end, and the first AI-assist tool (memo drafter + `ModelRun` logging) is wired
+through the UI behind the validation boundary. The next step is to **extend the
+AI-assist layer with the remaining read-only tools** before adding durability:
 
 1. Add a validated Research Console that only *proposes* classified facts
    (proposed / unverified / rumor), never canon — the engine remains the sole
    authority over world state.
-2. Layer model-assisted artifacts (memo drafts, faction-reaction text, press
-   framing, canon summaries) behind structured-output validation, with
-   deterministic fallbacks on failure.
-3. Add `ModelRun` logging (prompt version, input, parsed output, validation
-   result, latency, token use, cost) per `prompts/README.md`.
+2. Layer additional model-assisted artifacts (faction-reaction text, press
+   framing, canon summaries) behind structured-output validation, reusing the
+   `run_artifact` boundary and deterministic fallbacks already in place.
+3. Add in-world AI tool costs (power, bandwidth, privacy, latency, confidence)
+   so the memo drafter and later tools carry gameplay tradeoffs.
 4. Introduce durable persistence (SQLite canon store) once the AI layer's
    read/write boundary is proven.
 

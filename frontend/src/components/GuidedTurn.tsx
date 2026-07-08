@@ -1,4 +1,4 @@
-import type { CurrentTurn, TurnHistory, TurnResult } from "../api/client";
+import type { CurrentTurn, TurnHistory, TurnResult, MemoDraft } from "../api/client";
 import type { Phase } from "../domain";
 import CallPhase from "./CallPhase";
 import BriefPhase from "./BriefPhase";
@@ -19,14 +19,16 @@ interface Props {
   terminal: boolean;
   selected: string | null;
   submitting: boolean;
-  memoBusy: boolean;
   onSelect: (id: string) => void;
   onGoto: (phase: Phase) => void;
   onSendAdvice: () => void;
-  onDraftMemo: () => void;
   onNextCall: () => void;
   onRestart: () => void;
   onOpenCaseFile: () => void;
+  memo: MemoDraft | null;
+  memoLoading: boolean;
+  memoError: string | null;
+  onDraftMemo: () => void;
 }
 
 /**
@@ -44,14 +46,16 @@ export default function GuidedTurn(props: Props) {
     terminal,
     selected,
     submitting,
-    memoBusy,
     onSelect,
     onGoto,
     onSendAdvice,
-    onDraftMemo,
     onNextCall,
     onRestart,
     onOpenCaseFile,
+    memo,
+    memoLoading,
+    memoError,
+    onDraftMemo,
   } = props;
 
   const call = current?.client_call ?? null;
@@ -110,6 +114,10 @@ export default function GuidedTurn(props: Props) {
           factions={current.world_state.factions}
           selected={selected}
           onSelect={onSelect}
+          memo={memo}
+          memoLoading={memoLoading}
+          memoError={memoError}
+          onDraftMemo={onDraftMemo}
         />
       ) : null;
       action = (
@@ -117,15 +125,12 @@ export default function GuidedTurn(props: Props) {
           label="Send Advice"
           hint={
             selected
-              ? "Transmit your recommendation, or draft a memo first. The client decides what to do with it."
+              ? "Transmit your recommendation. The client decides what to do with it."
               : "Select a recommendation to send."
           }
           onClick={onSendAdvice}
           disabled={!selected}
           busy={submitting}
-          secondaryLabel={memoBusy ? "Drafting…" : "Draft Memo"}
-          onSecondary={onDraftMemo}
-          secondaryDisabled={!selected || memoBusy}
         />
       );
       break;

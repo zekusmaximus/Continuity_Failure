@@ -18,10 +18,18 @@
 >   backend still resolves the NPC decision and consequences together on advice
 >   submission; the frontend stores that one result and reveals it across the
 >   client-decision, consequences, and archive phases. Dense views (full state,
->   factions, canon, timeline, raw diffs, dossier) live in an on-demand Case File.
+>   factions, canon, timeline, raw diffs, model runs, dossier) live in an
+>   on-demand Case File.
+> - **AI assist (as built):** the Advice phase exposes an optional **Draft
+>   memo** affordance (`POST /api/campaigns/{id}/memo`) that drafts an advisory
+>   memo for the selected option. It is validation-gated and off by default
+>   (returns a deterministic system draft, logs a `fallback` `ModelRun`); it
+>   never sends advice or changes state. Model runs are inspectable in the Case
+>   File. This is advisory drafting, not the full AI-use phase below.
 > - **Planned next:** the optional AI-use phase (a validation-gated, read-only
 >   Research Console that only proposes classified facts), which would sit
->   between BRIEF/EVIDENCE and ADVICE.
+>   between BRIEF/EVIDENCE and ADVICE, plus the remaining read-only tools
+>   (faction reactions, press, canon summaries) and in-world tool costs.
 > - **Out of scope for this MVP:** autonomous cascade events beyond ambient
 >   drift, and long-term town→interstate progression.
 

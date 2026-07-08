@@ -197,15 +197,19 @@ class TurnResultModel(BaseModel):
 class SystemStatusModel(BaseModel):
     """Diegetic system/infrastructure status read off world state.
 
-    Deterministic only. ``ai_available`` is always False in this build -- the
-    indicator exists for the workstation visual direction, not to fake output.
+    The infrastructure metrics (power/comms/data_freshness/staff) are derived
+    deterministically from world state. ``ai_available`` reflects whether a live
+    model provider is actually configured (``settings.ai_live``): the AI-assist
+    layer is present and reachable either way, but when AI is off (the default)
+    the memo drafter returns a deterministic fallback and ``ai_available`` is
+    False so the workstation indicator stays honest.
     """
     power: int
     comms: int
     data_freshness: int
     staff_capacity: int
     ai_available: bool = False
-    model_status: str = "AI systems unavailable in current build"
+    model_status: str = "AI assist present — off by default (returns system drafts)"
 
 
 class CurrentTurnModel(BaseModel):

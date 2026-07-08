@@ -18,8 +18,10 @@ from memory.persistence import CampaignStore
 
 from app.ai import fallbacks
 from app.ai.logging import get_run_store
+from app.ai.provider import get_provider
 from app.ai.runner import run_artifact
 from app.ai.schemas import MemoDraft
+from app.config import get_settings
 from app.schemas import api as schemas
 
 
@@ -71,7 +73,13 @@ def _open_threads(campaign: Campaign) -> list[schemas.OpenThreadModel]:
 
 
 def _system_status(campaign: Campaign) -> schemas.SystemStatusModel:
-    """Derive diegetic infrastructure status from world state (deterministic)."""
+    """Derive diegetic infrastructure status from world state (deterministic).
+
+    ``ai_available`` reflects whether a live model provider is actually
+    configured, so the workstation indicator stays honest: when AI is off (the
+    default), the memo drafter still works but returns a deterministic fallback.
+    """
+    settings = get_settings()
     v = campaign.world_state.variables
     power = v.get("power_stability", 50)
     staff = v.get("staff_capacity", 50)
@@ -80,13 +88,23 @@ def _system_status(campaign: Campaign) -> schemas.SystemStatusModel:
     # operations floor stops keeping feeds current. Kept as a simple blend.
     data_freshness = (info + staff) // 2
     comms = min(power, info + 10)
+    # AI assist is present and reachable; it is "available" only when a live
+    # provider is configured. Otherwise the layer stays dormant and the memo
+    # drafter returns a deterministic fallback.
+    ai_live = settings.ai_live
+    provider = get_provider(settings) if ai_live else None
+    model_status = (
+        f"Live AI assist active ({getattr(provider, 'name', 'unknown')} provider)"
+        if ai_live and provider is not None
+        else "AI assist present — off by default (returns system drafts)"
+    )
     return schemas.SystemStatusModel(
         power=power,
         comms=comms,
         data_freshness=data_freshness,
         staff_capacity=staff,
-        ai_available=False,
-        model_status="AI systems unavailable in current build",
+        ai_available=ai_live,
+        model_status=model_status,
     )
 
 

@@ -2,12 +2,15 @@
 
 # Prompts
 
-> **Implementation status (this branch).** **No prompt files exist yet and AI
-> integration is explicitly out of scope for the current MVP.** This README
-> defines the discipline (versioning, input/output contracts, validation,
-> logging, canon classification) that prompt files will follow once the first
-> AI milestone begins. The deterministic game loop works with no prompts
-> present, and must continue to work if every prompt is removed or fails.
+> **Implementation status (this branch).** The first prompt,
+> `memo_drafter.v1.md`, is implemented and wired to the validation boundary in
+> `backend/app/ai/runner.py` (`run_artifact`). The memo drafter is off by
+> default; with AI off it returns a deterministic fallback and logs a
+> `fallback` `ModelRun`, making no network call. The deterministic game loop
+> works with the prompt absent or failing — `run_artifact` falls back
+> deterministically — and the discipline below (versioning, input/output
+> contracts, validation, logging, canon classification) applies to this and
+> future prompts. The remaining prompt roles are not yet implemented.
 
 ## Purpose
 

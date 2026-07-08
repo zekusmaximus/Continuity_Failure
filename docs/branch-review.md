@@ -60,10 +60,13 @@ workstation and gives Northbridge document-rich, escalating content.
 - **New API surface.** `GET /api/campaigns/{id}/dossier` returns the Markdown
   case file; `current`, `turns`, and the turn result now include documents,
   open threads, a derived `system_status`, and a `consequence_stack`.
+  `POST /api/campaigns/{id}/memo` drafts an advisory memo for a selected advice
+  option (validation-gated, deterministic fallback, never changes state) and
+  `GET /api/campaigns/{id}/model-runs` exposes the read-only AI run log.
 
-- **Tests.** The suite now numbers **50 passing**: the original 35 invariants
-  plus 15 covering documents/evidence, advice tradeoffs, consequence stacks,
-  open threads, and dossier generation.
+- **Tests.** The suite now numbers **96 passing**: the original engine/content
+  tests plus AI boundary, AI runner, AI memo service, and HTTP route
+  (`TestClient`) tests covering all endpoints and error paths.
 
 ## What is unchanged (design invariants, still enforced)
 
@@ -73,8 +76,11 @@ workstation and gives Northbridge document-rich, escalating content.
 - NPC decisions mediate advice; the player never writes state directly.
 - A campaign completes at turn 10 or fails on a documented threshold and never
   advances past terminal.
-- The engine remains framework-free (`test_engine_does_not_import_fastapi`).
-- No AI/model calls, no agent frameworks, no vector DB, no durable storage.
+- The engine remains framework-free (AST-based
+  `test_engine_does_not_import_fastapi`).
+- The AI-assist layer is dormant by default and validation-gated: it may only
+  *propose* advisory artifacts, never mutate state (tested). No agent
+  frameworks, no vector DB, no durable storage.
 
 ## How to run it
 
@@ -111,10 +117,13 @@ Engine + invariants + content (from the repository root, venv active):
 pytest
 ```
 
-These import only `engine/` and require no server: **50 passing**, covering
-bounds, applied diffs, turn increments, every failure threshold, 10-turn
-completion, determinism, FastAPI-independence, documents/evidence, advice
-tradeoffs, consequence stacks, open threads, and dossier generation.
+The engine tests import only `engine/` and require no server; the AI and route
+tests import the backend. **96 passing**, covering bounds, applied diffs, turn
+increments, every failure threshold, 10-turn completion, determinism,
+engine-independence (AST-based), documents/evidence, advice tradeoffs,
+consequence stacks, open threads, dossier generation, the AI boundary + runner
++ memo service path, and HTTP routes (`TestClient`) for all endpoints and error
+paths.
 
 Frontend typecheck + production build:
 
@@ -135,26 +144,32 @@ then `GET /api/campaigns/{id}/dossier`.
 
 ## What is intentionally still missing
 
-- **No AI / model calls.** No provider abstraction, no prompts, no
-  `ModelRun` logging, no structured-output validation, and no fabricated model
-  output anywhere in the UI.
-- **No durable persistence.** Campaigns live in process memory and are lost on
-  restart. No SQLite/Postgres/SQLAlchemy.
+- **The broader AI toolset beyond the memo drafter.** The validation boundary,
+  `ModelRun` logging, prompt versioning seam, and the first tool (memo
+  drafter) are present and wired; the remaining in-world tools (research
+  console, rumor classifier, scenario simulator, document review,
+  faction-reaction / press / canon-summary generators) and in-world tool costs
+  (power, bandwidth, privacy, latency) are not yet implemented.
+- **No durable persistence.** Campaigns and model-run logs live in process
+  memory and are lost on restart. No SQLite/Postgres/SQLAlchemy.
 - **No vector database / semantic retrieval.**
 - **No authentication or deployment configuration.**
 - **No statewide / regional / interstate progression.** Town-level only.
 
 ## Recommended next implementation step
 
-The deterministic, document-rich loop is now a stable foundation, so the next
-step is **AI integration as a validation-gated, read-only layer**:
+The deterministic, document-rich loop is a stable foundation, and the first
+AI-assist tool (memo drafter + `ModelRun` logging) is wired end to end behind
+the validation boundary. The next step is to **extend the AI-assist layer with
+the remaining read-only tools**, then add durability:
 
 1. Add a validated Research Console that only *proposes* classified facts
    (proposed / unverified / rumor); the engine remains the sole promoter to
-   canon.
-2. Layer model-assisted artifacts (memo drafts, faction reactions, press
-   framing, canon summaries) behind structured-output validation with
-   deterministic fallbacks.
-3. Add `ModelRun` logging and versioned prompts per `prompts/README.md`.
+   canon. Reuse the `run_artifact` boundary already in place.
+2. Layer additional model-assisted artifacts (faction reactions, press framing,
+   canon summaries) behind structured-output validation with deterministic
+   fallbacks, reusing `backend/app/ai/runner.py`.
+3. Add in-world AI tool costs (power, bandwidth, privacy, latency, confidence)
+   so the memo drafter and later tools carry gameplay tradeoffs.
 4. Introduce durable persistence (SQLite canon store) once the AI read/write
    boundary is proven.

@@ -3,22 +3,27 @@
 # MVP Roadmap
 
 > **Implementation status (this branch).** **Week 1 (Deterministic Simulation
-> Skeleton) is complete**, and **Week 2 (Advice Workbench and Case File) is now
-> complete** on `feature/northbridge-content-and-ui-polish`. The runnable engine,
-> FastAPI backend, and Continuity Desk React UI are all in place and tested, and
-> a full 10-turn campaign with documents, consequence stacks, and an exportable
-> dossier can be started, played to completion or failure, and reviewed.
-> - **Done (Week 1 + 2):** engine + seed data, all campaign endpoints including
->   `/dossier`, advice/NPC/diff resolution with visible mediation, completion/
->   failure, the Evidence Board (12 documents), the Advice Workbench with
->   tradeoffs, deterministic faction/media/legal consequence stacks, open-thread
->   tracking, and Markdown dossier export. The Continuity Desk UI has since been
->   reset from a dense all-at-once dashboard into a **guided intake flow** — one
->   screen and one primary action per turn phase, with dense views moved into an
->   on-demand Case File.
-> - **Planned next (Weeks 3–4):** AI-assisted artifacts behind a validation
->   boundary (read-only Research Console that only proposes classified facts),
->   `ModelRun` logging, durable persistence, and demo polish.
+> Skeleton) is complete**, **Week 2 (Advice Workbench and Case File) is
+> complete**, and **Week 3 is partially complete** (the validation boundary,
+> provider abstraction, `ModelRun` logging, prompt versioning seam, and the
+> first tool — the memo drafter — are implemented and wired into the UI). The
+> runnable engine, FastAPI backend, and Continuity Desk React UI are all in
+> place and tested, and a full 10-turn campaign with documents, consequence
+> stacks, and an exportable dossier can be started, played to completion or
+> failure, and reviewed.
+> - **Done (Week 1 + 2 + Week 3 partial):** engine + seed data, all campaign
+>   endpoints including `/dossier`, advice/NPC/diff resolution with visible
+>   mediation, completion/failure, the Evidence Board (12 documents), the
+>   Advice Workbench with tradeoffs, deterministic faction/media/legal
+>   consequence stacks, open-thread tracking, Markdown dossier export, the
+>   `app/ai/` validation boundary (`run_artifact`: validate → retry → fallback),
+>   `ModelRun` logging, `memo_drafter.v1.md`, and the `/memo` + `/model-runs`
+>   endpoints surfaced in the Advice phase and Case File. The Continuity Desk
+>   UI is a **guided intake flow** — one screen and one primary action per turn
+>   phase, with dense views moved into an on-demand Case File.
+> - **Planned next (remainder of Week 3 + Week 4):** the remaining read-only AI
+>   tools (research console, faction-reaction / press / canon-summary
+>   generators), in-world tool costs, durable persistence, and demo polish.
 > - **Out of scope for this MVP:** see "Explicitly Out of Scope for MVP" below.
 
 ## Objective
@@ -141,19 +146,19 @@ Add AI support without letting AI control state.
 
 ### Tasks
 
-1. Create model provider abstraction.
-2. Add prompt versioning.
-3. Add model run logging.
-4. Add structured output validation.
+1. Create model provider abstraction. ✅ `app/ai/provider.py` (`NullProvider` default, `AnthropicProvider` optional)
+2. Add prompt versioning. ✅ `prompts/memo_drafter.v1.md`, loaded by `run_artifact`
+3. Add model run logging. ✅ `app/ai/logging.py` (`ModelRun`, `ModelRunStore`)
+4. Add structured output validation. ✅ `app/ai/schemas.py` + `run_artifact` validate/retry/fallback
 5. Add AI tool definitions:
 
-   * document summarizer;
-   * advice option generator;
-   * memo drafter;
-   * faction reaction writer;
-   * press desk;
-   * historian.
-6. Add AI Research Console UI.
+   * document summarizer; ⏳
+   * advice option generator; ⏳
+   * memo drafter; ✅ `app/ai/fallbacks.py` + `/memo` endpoint + Advice-phase UI
+   * faction reaction writer; ⏳
+   * press desk; ⏳
+   * historian. ⏳
+6. Add AI Research Console UI. ⏳
 7. Add in-world AI tool costs:
 
    * power;
@@ -161,15 +166,16 @@ Add AI support without letting AI control state.
    * privacy exposure;
    * latency;
    * confidence.
-8. Add local/cloud model distinction in the UI, even if both initially call the same backend provider.
-9. Add fallback behavior when model output fails.
-10. Add AI-generated draft memo that the player can accept/edit.
-11. Add AI-generated press/faction aftermath text.
-12. Ensure deterministic engine still owns all state changes.
+   ⏳ (not yet; the memo drafter has no resource cost)
+8. Add local/cloud model distinction in the UI, even if both initially call the same backend provider. ⏳
+9. Add fallback behavior when model output fails. ✅ deterministic fallback in `run_artifact`
+10. Add AI-generated draft memo that the player can accept/edit. ✅ (draft produced; accept/edit not yet — draft is advisory display only)
+11. Add AI-generated press/faction aftermath text. ⏳
+12. Ensure deterministic engine still owns all state changes. ✅ tested (`test_ai_layer_cannot_mutate_game_state`, `test_draft_memo_does_not_change_world_state`)
 
 ### Week 3 Deliverable
 
-AI can help draft, summarize, and narrate, but the game remains deterministic and replayable.
+AI can help draft, summarize, and narrate, but the game remains deterministic and replayable. **Partial:** the memo drafter is done and wired; the remaining tools and tool costs are not.
 
 ## Week 4: Polish, Evaluation, and Demo Loop
 

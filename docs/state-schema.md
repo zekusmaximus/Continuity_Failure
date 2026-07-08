@@ -21,8 +21,14 @@
 >   pressure, and attached documents; `NpcDecision` carries deviation, public
 >   explanation, private motive, resulting risk; and `CanonEntry` carries public
 >   status, involved factions, and tags.
-> - **Not implemented:** `Jurisdiction`, `Resource`, `ModelRun`,
->   `EvaluationResult`, `AdviceMemo`. These are planned for later milestones.
+> - **Not implemented:** `Jurisdiction`, `Resource`, `EvaluationResult`,
+>   `AdviceMemo`. These are planned for later milestones. `ModelRun` is
+>   **partially implemented**: a logging-only projection exists in
+>   `backend/app/ai/logging.py` (and is exposed read-only at
+>   `GET /api/campaigns/{id}/model-runs`), carrying the prompt name/version,
+>   model name, validation status, retry count, latency, and campaign/turn
+>   provenance. The full field set below (power/bandwidth/privacy costs, token
+>   usage, estimated cost) is not yet populated.
 
 ## Purpose
 

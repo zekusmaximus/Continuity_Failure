@@ -899,3 +899,37 @@ body {
 .cd-modal-body::-webkit-scrollbar-thumb, .cd-diff-list::-webkit-scrollbar-thumb {
   background: var(--border-strong); border-radius: 5px;
 }
+
+/* ============================ AI memo draft ============================ */
+.cd-advice-memo {
+  margin-top: 14px; padding-top: 14px; border-top: 1px dashed var(--border-strong);
+  display: flex; flex-direction: column; gap: 10px;
+}
+.cd-advice-memo-hint { font-size: 12px; }
+.cd-memo-panel {
+  border: 1px solid var(--border); border-radius: 6px; background: var(--bg-panel-2);
+  padding: 12px 14px; display: flex; flex-direction: column; gap: 10px;
+}
+.cd-memo-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.cd-memo-src { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 10px; }
+.cd-memo-src-ai { color: var(--accent); border: 1px solid var(--accent-dim); background: var(--accent-bg); }
+.cd-memo-src-system { color: var(--text-dim); border: 1px solid var(--border-strong); }
+.cd-memo-advisory { font-size: 11px; }
+.cd-memo-body { display: flex; flex-direction: column; gap: 10px; }
+.cd-memo-list { margin: 4px 0 0 18px; padding: 0; display: flex; flex-direction: column; gap: 3px; }
+.cd-memo-list li { font-size: 13px; }
+.cd-memo-list.cd-bad-list li { color: var(--crit); }
+
+/* ============================ Model runs (Case File) ============================ */
+.cd-runs { font-size: 13px; }
+.cd-table { width: 100%; border-collapse: collapse; }
+.cd-table th, .cd-table td {
+  text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+.cd-table th { color: var(--text-dim); font-weight: 500; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; }
+.cd-run-tag { font-size: 11px; padding: 1px 6px; border-radius: 8px; border: 1px solid var(--border-strong); }
+.cd-run-ok { color: var(--good); border-color: var(--good); }
+.cd-run-warn { color: var(--warn); border-color: var(--warn); }
+.cd-run-system { color: var(--text-dim); }
+.cd-run-input { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

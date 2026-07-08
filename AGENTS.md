@@ -61,9 +61,13 @@ the tests in `tests/`.
    `source_type`. The UI can always show why something changed.
 
 3. **Model output is not canon unless accepted by deterministic workflow.**
-   No AI/model code exists yet. When it is added, it must only *propose* facts
-   classified `proposed`/`unverified`/`rumor`; only the engine promotes a fact
-   to `canon`. `FactClassification` in `engine/models.py` is the vocabulary.
+   A dormant, validation-gated AI-assist layer exists in `backend/app/ai/`
+   (memo drafter + `ModelRun` logging), off by default. It may only *propose*
+   advisory artifacts (memo drafts) classified `proposed`/`unverified`/`rumor`;
+   only the engine promotes a fact to `canon`, and the AI package is tested
+   (`test_ai_layer_cannot_mutate_game_state`, `test_draft_memo_does_not_change_world_state`)
+   to never import state-mutation code (`engine.diffs`/`engine.turn`).
+   `FactClassification` in `engine/models.py` is the vocabulary.
 
 4. **NPC decisions mediate the player's advice.**
    The player selects an `AdviceOption`; `engine.rules.decide` determines
@@ -77,8 +81,10 @@ the tests in `tests/`.
 
 6. **Engine code must remain independent from FastAPI.**
    The `engine/` package imports no web/Pydantic dependency. The backend maps
-   engine dataclasses to Pydantic at the API boundary only. Verified by
-   `test_engine_does_not_import_fastapi`.
+   engine dataclasses to Pydantic at the API boundary only. Verified by an
+   AST scan of `engine/*.py` (`test_engine_does_not_import_fastapi`,
+   `test_engine_imports_only_stdlib_and_itself`) so the check is independent
+   of test collection order and what other tests import.
 
 ## Tone
 
@@ -261,8 +267,18 @@ When making changes:
 
 ## Current Priority
 
-Build the deterministic Northbridge MVP before implementing autonomous multi-agent behavior.
+The deterministic Northbridge MVP is implemented, playable, and tested (96
+tests). A dormant, validation-gated AI-assist layer (memo drafter +
+`ModelRun` logging) is wired end to end and off by default. Build out the
+remaining read-only AI tools and add durable persistence before implementing
+autonomous multi-agent behavior.
 
-The first technical milestone is:
+The first technical milestone (met):
 
-> A user can run a 10-turn deterministic Northbridge water-crisis campaign, inspect state changes, and export a basic turn log.
+> A user can run a 10-turn deterministic Northbridge water-crisis campaign,
+> inspect state changes, and export a basic turn log.
+
+The next milestone:
+
+> The AI-assist layer covers the read-only research/drafting tools behind the
+> validation boundary, with in-world tool costs, before durability is added.

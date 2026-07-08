@@ -3,16 +3,15 @@ import { api } from "./api/client";
 import type {
   CampaignSummary,
   CurrentTurn,
-  MemoDraft,
   TurnHistory,
   TurnResult,
+  MemoDraft,
 } from "./api/client";
 import type { Phase } from "./domain";
 import IntroScreen from "./components/IntroScreen";
 import ContinuityHeader from "./components/ContinuityHeader";
 import GuidedTurn from "./components/GuidedTurn";
 import CaseFile from "./components/CaseFile";
-import MemoModal from "./components/MemoModal";
 
 /**
  * Continuity Desk — Guided Intake.
@@ -36,16 +35,16 @@ export default function App() {
   const [selected, setSelected] = useState<string | null>(null);
   const [caseFileOpen, setCaseFileOpen] = useState(false);
 
-  // Advisory memo drawer state. The memo is read-only: it never sends advice
-  // or advances the turn.
-  const [memoOpen, setMemoOpen] = useState(false);
-  const [memoLoading, setMemoLoading] = useState(false);
-  const [memo, setMemo] = useState<MemoDraft | null>(null);
-  const [memoError, setMemoError] = useState<string | null>(null);
-
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Advisory memo draft for the selected advice option. AI-assist is off by
+  // default, so this returns a deterministic fallback unless a live provider is
+  // configured. Drafting never advances the turn or changes state.
+  const [memo, setMemo] = useState<MemoDraft | null>(null);
+  const [memoLoading, setMemoLoading] = useState(false);
+  const [memoError, setMemoError] = useState<string | null>(null);
 
   const refreshCurrent = useCallback(async (id: string) => {
     const cur = await api.getCurrent(id);
@@ -94,29 +93,39 @@ export default function App() {
     }
   }, [campaignId, selected, refreshCurrent, refreshHistory]);
 
-  const handleDraftMemo = useCallback(async () => {
-    if (!campaignId || !selected) return;
-    // Open the modal immediately in a loading state, then fill it in. This is
-    // advisory only — no turn is advanced and no state changes.
-    setMemoOpen(true);
-    setMemoLoading(true);
+  const handleNextCall = useCallback(() => {
+    // `current` was already refreshed after submit and now holds the next call.
+    setSelected(null);
+    setLastResult(null);
     setMemo(null);
     setMemoError(null);
+    setPhase("CALL");
+  }, []);
+
+  const handleDraftMemo = useCallback(async () => {
+    if (!campaignId || !selected) return;
+    setMemoLoading(true);
+    setMemoError(null);
     try {
-      setMemo(await api.draftMemo(campaignId, selected));
+      const draft = await api.draftMemo(campaignId, selected);
+      setMemo(draft);
     } catch (e) {
+      setMemo(null);
       setMemoError(e instanceof Error ? e.message : String(e));
     } finally {
       setMemoLoading(false);
     }
   }, [campaignId, selected]);
 
-  const handleNextCall = useCallback(() => {
-    // `current` was already refreshed after submit and now holds the next call.
-    setSelected(null);
-    setLastResult(null);
-    setPhase("CALL");
-  }, []);
+  const handleSelectAdvice = useCallback(
+    (id: string) => {
+      // Switching options invalidates any prior memo draft.
+      setSelected(id);
+      setMemo(null);
+      setMemoError(null);
+    },
+    [],
+  );
 
   const terminal = summary?.status === "COMPLETED" || summary?.status === "FAILED";
   const busy = loading || submitting;
@@ -173,14 +182,16 @@ export default function App() {
         terminal={terminal}
         selected={selected}
         submitting={submitting}
-        onSelect={setSelected}
+        onSelect={handleSelectAdvice}
         onGoto={setPhase}
         onSendAdvice={handleSendAdvice}
-        onDraftMemo={handleDraftMemo}
-        memoBusy={memoLoading}
         onNextCall={handleNextCall}
         onRestart={startCampaign}
         onOpenCaseFile={() => setCaseFileOpen(true)}
+        memo={memo}
+        memoLoading={memoLoading}
+        memoError={memoError}
+        onDraftMemo={handleDraftMemo}
       />
 
       <CaseFile
@@ -189,18 +200,6 @@ export default function App() {
         campaignId={campaignId}
         current={current}
         history={history}
-      />
-
-      <MemoModal
-        open={memoOpen}
-        loading={memoLoading}
-        memo={memo}
-        error={memoError}
-        optionTitle={(() => {
-          const opt = current?.advice_options.find((o) => o.id === selected);
-          return opt?.title || opt?.label || null;
-        })()}
-        onClose={() => setMemoOpen(false)}
       />
     </div>
   );

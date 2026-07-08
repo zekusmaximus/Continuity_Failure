@@ -219,9 +219,10 @@ export interface Health {
   scenario: string;
 }
 
-// Advisory memo drafted from a selected advice option. Prose only — the /memo
-// endpoint never advances the turn or mutates state. With AI disabled (the
-// default) `source` is always "system".
+// --- AI-assist layer (advisory only; never mutates game state) ---
+// Mirrors backend/app/schemas/api.py MemoContentModel / MemoDraftModel /
+// ModelRunModel. ``status`` is "ok" (model output) or "fallback" (deterministic
+// builder); ``source`` is "ai" or "system" — for honest UI labeling.
 export interface MemoContent {
   recommendation: string;
   rationale: string;
@@ -236,6 +237,17 @@ export interface MemoDraft {
   status: "ok" | "fallback";
   source: "ai" | "system";
   draft: MemoContent;
+}
+
+export interface ModelRun {
+  prompt_name: string;
+  prompt_version: string;
+  model_name: string;
+  validation_status: string;
+  input_summary: string;
+  retry_count: number;
+  latency_ms: number | null;
+  turn_number: number | null;
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -275,13 +287,18 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ advice_id: adviceId }),
     }),
+  getTurns: (id: string) =>
+    request<TurnHistory>(`/api/campaigns/${id}/turns`),
+  getDossier: (id: string) =>
+    request<Dossier>(`/api/campaigns/${id}/dossier`),
+  // Advisory only: drafts a memo without advancing the turn or changing state.
+  // With AI off (the default) this returns a deterministic fallback memo.
   draftMemo: (id: string, adviceId: string) =>
     request<MemoDraft>(`/api/campaigns/${id}/memo`, {
       method: "POST",
       body: JSON.stringify({ advice_id: adviceId }),
     }),
-  getTurns: (id: string) =>
-    request<TurnHistory>(`/api/campaigns/${id}/turns`),
-  getDossier: (id: string) =>
-    request<Dossier>(`/api/campaigns/${id}/dossier`),
+  // Read-only log of AI model runs recorded for this campaign.
+  getModelRuns: (id: string) =>
+    request<ModelRun[]>(`/api/campaigns/${id}/model-runs`),
 };
