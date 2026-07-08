@@ -2,6 +2,22 @@
 
 # State Schema
 
+> **Implementation status (this branch).** This document is the canonical
+> schema reference. The implemented engine (`engine/models.py`) uses a
+> **simplified** field set per entity.
+> - **Implemented now:** `Campaign`, `WorldState`, `Crisis`, `Faction`,
+>   `AdviceOption` (the implemented `Advice`), `ClientCall`, `AppliedDiff`,
+>   `NpcDecision`, `CanonEntry`, `TurnResult`. All 16 state variables below are
+>   present and clamped to 0–100. See the implemented starting values and
+>   thresholds in `engine/seed_data.py` and `engine/rules.py`.
+> - **Simplified vs. spec:** implemented entities carry fewer fields than listed
+>   here (e.g. `Faction` has `posture`/`influence`/`alignment`, not the full
+>   trust/red-line model; `CanonEntry` stores one `classification`, not the full
+>   public-status/confidence set).
+> - **Not implemented:** `Jurisdiction`, `Resource`, `Document`, `ModelRun`,
+>   `EvaluationResult`, `OpenThread`, `AdviceMemo`. These are planned for later
+>   milestones.
+
 ## Purpose
 
 This document defines the initial MVP state model for **Continuity Failure**.
@@ -596,6 +612,11 @@ NOT_RUN
 ```
 
 ## Initial Invariants
+
+> **Enforced subset.** The six invariants that are actually enforced by code and
+> tests on this branch (including engine/FastAPI independence and NPC-mediated
+> advice) are listed authoritatively in `AGENTS.md` § "Design Invariants". The
+> list below is the broader intended invariant set.
 
 The engine should enforce these rules:
 

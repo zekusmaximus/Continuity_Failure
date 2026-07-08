@@ -46,6 +46,40 @@ The core fantasy is not “command society.” The core fantasy is “advise fai
    * Prefer legal ambiguity, emergency procurement, public trust collapse, stale data, infrastructure fragility, jurisdiction conflict, bad incentives, and institutional overload.
    * Avoid melodramatic disaster spectacle unless it emerges from civic failure.
 
+## Design Invariants (enforced on this branch)
+
+These are concrete, test-backed guarantees. Do not weaken them without updating
+the tests in `tests/`.
+
+1. **All numeric state values stay within 0–100.**
+   Enforced by `engine.state.clamp`; every mutation routes through
+   `engine.diffs.apply_diffs`. Covered by `tests/test_state_invariants.py`.
+
+2. **Every authoritative state mutation produces an `AppliedDiff`.**
+   There is no path that changes `WorldState.variables` without emitting a diff
+   with `variable`, `old_value`, `new_value`, `delta`, `reason`, and
+   `source_type`. The UI can always show why something changed.
+
+3. **Model output is not canon unless accepted by deterministic workflow.**
+   No AI/model code exists yet. When it is added, it must only *propose* facts
+   classified `proposed`/`unverified`/`rumor`; only the engine promotes a fact
+   to `canon`. `FactClassification` in `engine/models.py` is the vocabulary.
+
+4. **NPC decisions mediate the player's advice.**
+   The player selects an `AdviceOption`; `engine.rules.decide` determines
+   `decision_type` and `adherence`, and `engine.turn.advance_turn` scales the
+   advice effects accordingly. The player never writes state directly.
+
+5. **A campaign can complete or fail, and never advances past terminal.**
+   Failure thresholds live in `engine.rules.FAILURE_THRESHOLDS`; completion is
+   reaching turn 10 without failure (`CampaignStatus.COMPLETED`). A terminal
+   campaign rejects further turns. Statuses: `ACTIVE`, `COMPLETED`, `FAILED`.
+
+6. **Engine code must remain independent from FastAPI.**
+   The `engine/` package imports no web/Pydantic dependency. The backend maps
+   engine dataclasses to Pydantic at the API boundary only. Verified by
+   `test_engine_does_not_import_fastapi`.
+
 ## Tone
 
 The tone should be:

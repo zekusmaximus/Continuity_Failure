@@ -1,5 +1,16 @@
 # Project Spec: Continuity Failure
 
+> **Implementation status (this branch).** This spec describes the intended
+> product. Against the working code:
+> - **Implemented now:** the deterministic Northbridge 10-turn loop — client
+>   calls, advice selection, NPC decisions, applied diffs, canon entries,
+>   campaign completion/failure, and the crisis-consulting web UI.
+> - **Planned next:** documents/evidence board, memo-style advice drafting,
+>   richer faction/media aftermath, and dossier export.
+> - **Out of scope for this MVP:** all in-world AI tools (local/cloud/archive/
+>   legal/rumor/scenario models), AI resource costs, power/comms degradation,
+>   and town→state→interstate progression.
+
 ## One-Sentence Pitch
 
 **Continuity Failure** is a near-future civic breakdown simulator where the player runs a crisis-governance consulting firm called into failing institutions as towns, agencies, utilities, hospitals, and regional governments lose the capacity to manage cascading emergencies.

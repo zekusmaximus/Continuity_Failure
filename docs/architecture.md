@@ -2,6 +2,13 @@
 
 # Architecture
 
+> **Implementation status (this branch).** This is a forward-looking design
+> spec. The Northbridge deterministic MVP is implemented and runnable today;
+> the AI, persistence, and deployment layers described below are **planned**,
+> not present. See § "Current Architecture (as built)" for what actually
+> exists, and § "Intentionally Not Present Yet" for what is deliberately
+> deferred.
+
 ## Purpose
 
 This document defines the initial technical architecture for **Continuity Failure**.
@@ -11,6 +18,69 @@ The first milestone is not a large agent simulation. The first milestone is a de
 The architecture must preserve one core rule:
 
 > The deterministic engine owns state. AI systems advise, draft, summarize, research, forecast, and narrate.
+
+## Current Architecture (as built)
+
+This is the architecture that exists and runs on the current branch. Everything
+in this section is verified by passing tests and a working dev server.
+
+```text
+frontend/   React 18 + TypeScript + Vite  (no UI framework, plain CSS)
+   |        Vite dev server proxies /api and /health to the backend
+   ↓ HTTP (JSON)
+backend/    FastAPI + Pydantic v2, in-memory only
+   |        app/api/campaigns.py        routes
+   |        app/services/campaign_service.py  engine <-> memory <-> schemas
+   |        app/schemas/api.py          Pydantic request/response models
+   ↓ imports
+engine/     framework-free deterministic engine (dataclasses, no web deps)
+   |        models.py state.py diffs.py rules.py turn.py seed_data.py
+   ↓ used by
+memory/     in-memory CampaignStore (process-local; cleared on restart)
+```
+
+**Implemented now**
+
+* Deterministic engine: 16 state variables (0–100, clamped), 10 factions, 6
+  advice options, 10 per-turn client calls, ambient crisis drift, NPC decision
+  logic, applied diffs for every change, failure thresholds, 10-turn
+  completion.
+* FastAPI endpoints: `GET /health`, `POST /api/campaigns`,
+  `GET /api/campaigns/{id}`, `GET /api/campaigns/{id}/current`,
+  `POST /api/campaigns/{id}/advice`, `GET /api/campaigns/{id}/turns`.
+* React workstation UI: state panel, client call, advice workbench, aftermath
+  with applied diffs, turn history, canon archive.
+* `pytest` engine suite (determinism, bounds, failure, completion).
+
+**Actual current repository structure**
+
+```text
+frontend/   src/{main,App,domain}.tsx, api/client.ts, components/*, styles/global.css
+backend/    app/{main,api/campaigns,services/campaign_service,schemas/api}.py
+engine/     {models,state,diffs,rules,turn,seed_data}.py
+memory/     {persistence}.py            (CampaignStore, MemoryStore)
+tests/      test_engine_turns.py, test_state_invariants.py
+evals/      README.md                    (reserved)
+docs/       *.md
+prompts/    README.md                    (reserved; no prompt files yet)
+```
+
+> Note: the "Initial Repository Structure" tree later in this document is the
+> **target** layout. Files it lists that do not yet exist (e.g. `engine/events.py`,
+> `engine/scoring.py`, `memory/canon.py`, `memory/retrieval.py`,
+> `backend/app/config.py`, `backend/app/models/`, frontend `screens/`/`types/`/`utils/`)
+> are planned, not current.
+
+**Intentionally Not Present Yet**
+
+* AI / model calls (no provider abstraction, no structured-output validation,
+  no `ModelRun` logging).
+* Autonomous agents / multi-agent behavior.
+* Durable storage: no SQLite, Postgres, SQLAlchemy, or SQLModel. State is
+  process-local in-memory only.
+* Vector database / semantic retrieval.
+* Authentication and deployment configuration.
+* Statewide / regional / interstate progression beyond the town level.
 
 ## High-Level Architecture
 
@@ -101,6 +171,10 @@ The player is not looking at a generic game UI. The player is using an in-world 
 
 Initial frontend stack:
 
+> **Status:** As built, the frontend is React + TypeScript + Vite with plain CSS
+> and no data-fetching library. TanStack Query and Tailwind (below) are options,
+> not current dependencies.
+
 ```text
 React
 TypeScript
@@ -137,6 +211,9 @@ Avoid premature UI frameworks that impose too much aesthetic personality. The UI
 The backend coordinates game state, persistence, model calls, turn resolution, and replay.
 
 Initial backend stack:
+
+> **Status:** As built, persistence is **in-memory only** (no SQLite/SQLAlchemy
+> yet). The list below is the intended stack for a later durability milestone.
 
 ```text
 Python

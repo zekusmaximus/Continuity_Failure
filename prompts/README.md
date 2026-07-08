@@ -2,6 +2,13 @@
 
 # Prompts
 
+> **Implementation status (this branch).** **No prompt files exist yet and AI
+> integration is explicitly out of scope for the current MVP.** This README
+> defines the discipline (versioning, input/output contracts, validation,
+> logging, canon classification) that prompt files will follow once the first
+> AI milestone begins. The deterministic game loop works with no prompts
+> present, and must continue to work if every prompt is removed or fails.
+
 ## Purpose
 
 This directory contains versioned prompts for AI-assisted gameplay systems in **Continuity Failure**.

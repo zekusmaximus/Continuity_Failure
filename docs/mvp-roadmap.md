@@ -2,6 +2,18 @@
 
 # MVP Roadmap
 
+> **Implementation status (this branch).** **Week 1 (Deterministic Simulation
+> Skeleton) is complete** — the runnable engine, FastAPI backend, and React UI
+> are all in place and tested, and a full 10-turn campaign can be started,
+> played to completion or failure, and reviewed via turn history.
+> - **Done:** engine + seed data, all six campaign endpoints, advice/NPC/diff
+>   resolution, completion/failure, and the workstation UI.
+> - **Planned next (Weeks 2–4):** case file + documents, memo-style advice
+>   workbench, richer faction/media aftermath, dossier export, visual polish,
+>   and (later) AI-assisted artifacts behind a validation boundary.
+> - **Not yet done from Week 1:** campaign-dossier export.
+> - **Out of scope for this MVP:** see "Explicitly Out of Scope for MVP" below.
+
 ## Objective
 
 Build a playable 10-turn deterministic version of **Northbridge Water Failure** before adding complex AI orchestration.

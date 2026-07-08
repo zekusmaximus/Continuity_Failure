@@ -83,4 +83,137 @@ The frontend should feel like an in-world crisis-consulting workstation: a degra
 
 ## Repository Status
 
-This repository is at project inception. The first milestone is to build a deterministic Northbridge town-crisis simulator before adding any model-driven turn generation.
+The **deterministic Northbridge MVP** is implemented and playable end to end:
+
+* A framework-free `engine/` package resolves every state change through
+  explicit, explainable rules.
+* A FastAPI `backend/` exposes the campaign endpoints.
+* A React + TypeScript + Vite `frontend/` renders a diegetic crisis-consulting
+  workstation.
+* A 10-turn Northbridge campaign can be started, played, won, or lost, with
+  full turn history and an applied-diff record.
+
+**AI integration is intentionally not implemented yet.** There are no model
+calls, agent frameworks, or vector databases in this slice. Per `AGENTS.md`,
+the deterministic engine is the only authority over world state; AI systems
+will be layered on top of this foundation in a later milestone.
+
+> Pre-merge review of this branch: see `docs/branch-review.md`. Enforced design
+> invariants: see `AGENTS.md` § "Design Invariants".
+
+## Repository Layout
+
+```text
+frontend/   React + TypeScript + Vite crisis-consulting workstation
+backend/    FastAPI orchestration layer (Pydantic, in-memory persistence)
+engine/     Deterministic simulation engine (no web dependencies)
+memory/     In-memory persistence (durable canon store is a later milestone)
+tests/      pytest suite for engine invariants and the turn loop
+evals/      Reserved for future model-output evaluation harnesses
+docs/       Design documents
+prompts/    Reserved for versioned prompts (no prompts exist yet)
+```
+
+## Local Development
+
+### Prerequisites
+
+* Python 3.10+
+* Node.js 18+ and npm
+
+### Backend
+
+From the repository root (a root-level venv lets you run the server and the
+root-level tests from one environment):
+
+```bash
+python -m venv .venv
+# Windows PowerShell
+. .venv\Scripts\Activate.ps1
+# macOS / Linux
+# source .venv/bin/activate
+
+pip install -e "backend[dev]"
+uvicorn app.main:app --reload
+```
+
+The API is served at `http://localhost:8000` (interactive docs at `/docs`).
+The `engine/` and `memory/` packages at the repo root are made importable by
+the editable install.
+
+> Alternative (per-`backend` venv, matching the canonical FastAPI workflow):
+> ```bash
+> cd backend
+> python -m venv .venv
+> source .venv/bin/activate      # Windows: . .venv\Scripts\Activate.ps1
+> pip install -e ".[dev]"
+> uvicorn app.main:app --reload
+> ```
+
+### Frontend
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+The Vite dev server runs at `http://localhost:5173` and proxies `/api` and
+`/health` to the backend, so start the backend first.
+
+### Tests
+
+From the repository root (with the venv active):
+
+```bash
+pytest
+```
+
+The engine tests exercise only the `engine` package and require no web server.
+
+## MVP Scope (this slice)
+
+Implemented:
+
+* Northbridge seed scenario: 16 state variables, 10 factions, 6 advice options,
+  10 per-turn client calls.
+* Deterministic turn resolution: NPC decision (followed / partially followed /
+  modified / delayed / rejected), scaled advice effects, ambient crisis
+  pressure, and an `AppliedDiff` for every change.
+* Failure thresholds (`water_security`, `hospital_stability`, `public_order`,
+  `public_trust`, `budget_capacity`, `state_oversight_risk`, `legal_exposure`)
+  and successful 10-turn completion.
+* Full turn history and a canon archive.
+* Playable web UI: state variables, client call, advice workbench, aftermath
+  with applied diffs, and turn history.
+
+Intentionally **not** implemented yet:
+
+* AI tools (local/cloud models, research console, rumor classifier, scenario
+  simulator, document review).
+* Autonomous agents and multi-agent behavior.
+* Vector database / semantic memory.
+* Durable persistence (SQLite/Postgres canon store).
+* Statewide or regional gameplay beyond the town level.
+* Authentication and deployment tooling.
+
+## Recommended Next Step
+
+The deterministic loop and workstation UI are already playable end to end, so
+the next step is **UI polish and richer Northbridge content**, not AI
+integration:
+
+1. Add the `Document` entity and a first set of Northbridge documents behind an
+   Evidence Board (preliminary lab report, call transcript, contractor letter,
+   hospital request, resident rumor thread), all classified facts.
+2. Deepen the Advice Workbench (per-turn, situation-specific options with
+   surfaced tradeoffs) and add deterministic faction/media aftermath text.
+3. Add a low-fidelity "last verified / degraded feed" treatment as
+   `staff_capacity` or `information_integrity` drop.
+4. Serialize turn history + canon to a Markdown campaign dossier.
+
+AI integration (a validated, read-only Research Console that only *proposes*
+classified facts, never canon) should come **after** this, so the deterministic,
+document-rich loop is the stable foundation the model layer is layered onto.
+See `docs/branch-review.md` for the full branch review.
+

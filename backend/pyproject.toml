@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "continuity-failure-backend"
+version = "0.1.0"
+description = "FastAPI orchestration layer for Continuity Failure (Northbridge MVP)."
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.27",
+    "pydantic>=2.5",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8",
+    "httpx>=0.27",
+]
+
+# ---------------------------------------------------------------------------
+# Layout: `app` lives under backend/, while `engine` and `memory` live one
+# level up at the repository root. The package-dir mapping below makes all
+# three importable from a single `pip install -e .` run from this directory.
+# ---------------------------------------------------------------------------
+
+[tool.setuptools]
+packages = [
+    "app",
+    "app.api",
+    "app.services",
+    "app.schemas",
+    "engine",
+    "memory",
+]
+
+[tool.setuptools.package-dir]
+"app" = "app"
+"engine" = "../engine"
+"memory" = "../memory"
+
+[tool.pytest.ini_options]
+testpaths = ["../tests"]
+pythonpath = ["..", "."]

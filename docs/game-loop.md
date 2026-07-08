@@ -2,6 +2,16 @@
 
 # Game Loop
 
+> **Implementation status (this branch).** This document describes the intended
+> full turn loop. Against the working code, the implemented phases are:
+> **1 (Incoming Call)**, **5 (Advice)**, **6 (NPC Decision)**,
+> **7 (Deterministic Resolution → applied diffs)**, and **9 (Canon update)**,
+> plus completion/failure and the aftermath/history UI.
+> - **Planned next:** generated situation briefs, an investigation/case-file
+>   screen, faction/media reaction summaries, and dossier export.
+> - **Out of scope for this MVP:** the optional AI-use phase, autonomous cascade
+>   events beyond ambient drift, and long-term town→interstate progression.
+
 ## Core Loop
 
 The player is a crisis-governance consultant called into failing institutions.
