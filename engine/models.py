@@ -292,6 +292,10 @@ class Campaign:
     world_state: WorldState
     advice_options: List[AdviceOption]
     client_calls: Dict[int, ClientCall]    # turn -> call
+    # Advice options that only make sense on a specific turn's call (e.g. a
+    # school-closure protocol on the school turn). Global options above are
+    # always available; these are appended for their turn only.
+    per_turn_advice: Dict[int, List[AdviceOption]] = field(default_factory=dict)
     turn_history: List[TurnResult] = field(default_factory=list)
     canon: List[CanonEntry] = field(default_factory=list)
     documents: List[Document] = field(default_factory=list)
@@ -306,7 +310,10 @@ class Campaign:
         return self.client_calls.get(self.turn_number)
 
     def available_advice(self) -> List[AdviceOption]:
-        return list(self.advice_options)
+        """Global options plus any advice specific to the current turn's call."""
+        return list(self.advice_options) + list(
+            self.per_turn_advice.get(self.turn_number, [])
+        )
 
     def available_documents(self) -> List[Document]:
         """Documents visible at the current turn (available-on-or-before now)."""

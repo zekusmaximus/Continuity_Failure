@@ -32,7 +32,9 @@ class UnknownAdviceOption(Exception):
 
 
 def find_advice(campaign: Campaign, advice_id: str) -> AdviceOption:
-    for option in campaign.advice_options:
+    # Search current-turn options too, so turn-specific advice is playable on
+    # its turn (available_advice() = global options + this turn's options).
+    for option in campaign.available_advice():
         if option.id == advice_id:
             return option
     raise UnknownAdviceOption(advice_id)

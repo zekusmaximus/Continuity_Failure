@@ -198,6 +198,47 @@ def test_identical_advice_sequence_is_bit_for_bit_repeatable():
 
 
 # ---------------------------------------------------------------------------
+# NPC decider is the client on the current call, not a hardcoded office
+# ---------------------------------------------------------------------------
+
+def test_decider_is_the_current_caller_not_hardcoded():
+    """The NPC that acts on the advice must be the caller of the current turn.
+
+    Previously every decision was attributed to the Town Manager's Office; now
+    the hospital (turn 3), the contractor (turn 4), and the state liaison
+    (turn 6) each own their own decision.
+    """
+    campaign = _fresh_campaign()
+    expected = {
+        1: "Town Manager's Office",
+        3: "Northbridge Hospital",
+        4: "Utility Contractor",
+        6: "State Emergency Management Liaison",
+    }
+    for advice_id in SURVIVAL_SEQUENCE:
+        if campaign.is_terminal():
+            break
+        resolving_turn = campaign.turn_number
+        call = campaign.client_calls[resolving_turn]
+        result = turn.advance_turn(campaign, advice_id)
+        # The decider always equals the caller on the line this turn.
+        assert result.decision.decider == call.caller
+        if resolving_turn in expected:
+            assert result.decision.decider == expected[resolving_turn]
+        # And it is threaded into the human-readable surfaces.
+        assert call.caller in result.decision.rationale
+        assert call.caller in result.aftermath_summary
+        assert call.caller in result.canon_entry.source
+
+    # Turns 3, 4, 6 must NOT all be attributed to the Town Manager anymore.
+    non_manager = [
+        t.decision.decider for t in campaign.turn_history
+        if t.turn_number in (3, 4, 6)
+    ]
+    assert "Town Manager's Office" not in non_manager
+
+
+# ---------------------------------------------------------------------------
 # Independence from web frameworks
 # ---------------------------------------------------------------------------
 

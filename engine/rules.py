@@ -94,11 +94,25 @@ AMBIENT_DRIFT: Dict[str, int] = {
 
 
 # ---------------------------------------------------------------------------
-# NPC decision logic. The player selects advice; the Town Manager's Office
-# decides how much of it to actually use, modulated by faction pressure.
+# NPC decision logic. The player selects advice; the NPC client on the current
+# call decides how much of it to actually use, modulated by faction pressure.
+# The Town Manager's Office is the default decider when no call is on the line.
 # ---------------------------------------------------------------------------
 
 DECIDER = "Town Manager's Office"
+
+
+def _resolve_decider(campaign: Campaign) -> str:
+    """The NPC client that acts on the advice this turn.
+
+    Every turn is anchored to a client call, so the decider is the caller's
+    display name (Hospital, Contractor, State Liaison, ...). Falls back to the
+    Town Manager's Office only if a turn has no call on the line.
+    """
+    call = campaign.current_call()
+    if call is not None and call.caller:
+        return call.caller
+    return DECIDER
 
 
 def _decide_disclosure(campaign: Campaign) -> _DecisionDraft:
@@ -108,7 +122,7 @@ def _decide_disclosure(campaign: Campaign) -> _DecisionDraft:
     trust = v.get("public_trust", 50)
 
     if legal >= 60 or media >= 60:
-        # Scrutinity is too high; officials must come clean.
+        # Scrutiny is too high; officials must come clean.
         return _DecisionDraft(
             DecisionType.FOLLOWED, 1.0, {},
             deviation="None \u2014 the advice was adopted as written once scrutiny forced it.",
@@ -271,12 +285,88 @@ def _decide_mutual_aid(campaign: Campaign) -> _DecisionDraft:
         )
 
 
+def _decide_school_closure(campaign: Campaign) -> _DecisionDraft:
+    v = campaign.world_state.variables
+    trust = v.get("public_trust", 50)
+    school = v.get("school_disruption", 0)
+
+    if trust < 50 or school >= 50:
+        # Parent pressure is high enough that a clear, published rule is adopted.
+        return _DecisionDraft(
+            DecisionType.FOLLOWED, 0.9, {},
+            deviation="None — pressure forced a written, defensible threshold.",
+            public_explanation=(
+                "The superintendent has published a pressure threshold and a "
+                "staged closure protocol for the south-zone schools."
+            ),
+            private_motive="A defensible rule was safer than another day of guessing.",
+            resulting_risk="A published threshold signals the crisis is real.",
+        )
+    return _DecisionDraft(
+        DecisionType.PARTIALLY_FOLLOWED, 0.7,
+        {"school_disruption": +2},
+        deviation="Issued interim guidance but hedged the exact closure threshold.",
+        public_explanation="Schools remain open under monitoring, with a closure trigger held in reserve.",
+        private_motive="Wanted to avoid a precautionary closure the water might not justify.",
+        resulting_risk="A hedged threshold invites a dispute the moment pressure drops.",
+    )
+
+
+def _decide_hospital_priority(campaign: Campaign) -> _DecisionDraft:
+    v = campaign.world_state.variables
+    hospital = v.get("hospital_stability", 50)
+
+    if hospital <= 35:
+        # Acute enough that the full priority allocation is documented at once.
+        return _DecisionDraft(
+            DecisionType.FOLLOWED, 0.9, {},
+            deviation="None — the clinical margin was too thin to hedge.",
+            public_explanation="Documented priority allocation for dialysis and sterilization is in force.",
+            private_motive="A clinical harm event would have been indefensible.",
+            resulting_risk="Visible hospital priority can read as unfair to residents.",
+        )
+    return _DecisionDraft(
+        DecisionType.PARTIALLY_FOLLOWED, 0.65,
+        {"water_security": +1},
+        deviation="Granted priority informally while limiting the documented diversion.",
+        public_explanation="The hospital has assured clinical supply, coordinated quietly.",
+        private_motive="Avoided a formal allocation that would spotlight the shortage.",
+        resulting_risk="An informal arrangement is fragile if pressure drops again.",
+    )
+
+
+def _decide_business_compensation(campaign: Campaign) -> _DecisionDraft:
+    v = campaign.world_state.variables
+    budget = v.get("budget_capacity", 50)
+
+    if budget <= 25:
+        # No room to fully fund the framework; the town trims it and eats risk.
+        return _DecisionDraft(
+            DecisionType.MODIFIED, 0.5,
+            {"budget_capacity": +2, "public_order": -2, "legal_exposure": +2},
+            deviation="Trimmed the compensation framework to what the budget could bear.",
+            public_explanation="A limited compensation offer accompanies the conservation order.",
+            private_motive="Full compensation was unaffordable; a partial offer bought some peace.",
+            resulting_risk="An underfunded framework may not hold off the injunction.",
+        )
+    return _DecisionDraft(
+        DecisionType.FOLLOWED, 0.85, {},
+        deviation="None — the framework was funded and tied to compliance.",
+        public_explanation="Conservation restrictions now carry a capped compensation framework.",
+        private_motive="Enforceable restrictions were worth the fiscal cost.",
+        resulting_risk="Compensation sets a precedent other claimants will cite.",
+    )
+
+
 _ADVICE_TAG_DISPATCH = {
     "disclosure": _decide_disclosure,
     "delay": _decide_delay,
     "state_support": _decide_state_support,
     "contractor": _decide_contractor,
     "mutual_aid": _decide_mutual_aid,
+    "school_closure": _decide_school_closure,
+    "hospital_priority": _decide_hospital_priority,
+    "business_compensation": _decide_business_compensation,
 }
 
 
@@ -311,11 +401,14 @@ def decide(campaign: Campaign, advice: AdviceOption) -> NpcDecision:
     media = v.get("media_pressure", 0)
     trust = v.get("public_trust", 50)
 
-    rationale = _build_rationale(advice, draft.decision_type, media, trust, campaign.turn_number)
+    decider = _resolve_decider(campaign)
+    rationale = _build_rationale(
+        advice, draft.decision_type, media, trust, campaign.turn_number, decider
+    )
     return NpcDecision(
         advice_id=advice.id,
         decision_type=draft.decision_type,
-        decider=DECIDER,
+        decider=decider,
         rationale=rationale,
         adherence=draft.adherence,
         modifications=draft.modifications,
@@ -332,29 +425,30 @@ def _build_rationale(
     media: int,
     trust: int,
     turn: int,
+    decider: str,
 ) -> str:
     label = advice.label
     if decision_type == DecisionType.FOLLOWED:
         return (
-            f"The Town Manager adopted {label} in full. "
+            f"The {decider} adopted {label} in full. "
             f"Media pressure {media}, public trust {trust}, turn {turn}."
         )
     if decision_type == DecisionType.PARTIALLY_FOLLOWED:
         return (
-            f"The Town Manager adopted the spirit of {label} but trimmed the "
+            f"The {decider} adopted the spirit of {label} but trimmed the "
             f"public-facing scope. Media pressure {media}, public trust {trust}."
         )
     if decision_type == DecisionType.MODIFIED:
         return (
-            f"The Town Manager reworked {label} to fit political constraints "
+            f"The {decider} reworked {label} to fit political constraints "
             f"before acting. Media pressure {media}, turn {turn}."
         )
     if decision_type == DecisionType.DELAYED:
         return (
-            f"The Town Manager postponed {label}, buying time but letting "
+            f"The {decider} postponed {label}, buying time but letting "
             f"rumors accumulate. Public trust {trust}, turn {turn}."
         )
-    return f"The Town Manager declined {label}."
+    return f"The {decider} declined {label}."
 
 
 # ---------------------------------------------------------------------------

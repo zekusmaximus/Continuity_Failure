@@ -440,6 +440,142 @@ def _advice_options() -> List[AdviceOption]:
 
 
 # ---------------------------------------------------------------------------
+# Per-turn advice options. These only make sense on a specific turn's call, so
+# they are surfaced *in addition to* the six global options above -- but only on
+# their turn. Each carries the same tradeoff surface and a deterministic effects
+# map; each has at least one stated harm (no free lunch). New tags get a
+# dedicated ``_decide_*`` handler in engine/rules.py.
+# ---------------------------------------------------------------------------
+
+def _per_turn_advice() -> Dict[int, List[AdviceOption]]:
+    return {
+        2: [
+            AdviceOption(
+                id="school_staged_closure",
+                label="Issue a staged, threshold-based school closure protocol",
+                summary=(
+                    "Publish a written pressure threshold and a staged closure "
+                    "protocol for the three south-zone schools."
+                ),
+                rationale=(
+                    "Gives the superintendent a defensible, on-the-record rule "
+                    "instead of a guess, and blunts the concealment narrative."
+                ),
+                tags=["school_closure"],
+                effects={
+                    "school_disruption": -6,
+                    "public_trust": +4,
+                    "legal_exposure": -3,
+                    "budget_capacity": -3,
+                    "public_order": -2,
+                    "media_pressure": +2,
+                },
+                type="SCHOOL_CLOSURE_PROTOCOL",
+                recommendation=(
+                    "Adopt a written pressure floor below which the three "
+                    "south-zone schools close, with a staged reopening test."
+                ),
+                expected_benefits=[
+                    "Replaces a guess with a defensible, published threshold.",
+                    "Parents see on-the-record action; trust steadies.",
+                ],
+                expected_harms=[
+                    "A precautionary closure spends budget and disrupts families "
+                    "even if the water proves fine.",
+                    "Publishing a closure rule signals the crisis is real, "
+                    "raising media pressure.",
+                ],
+                legal_risk=25, political_risk=40, operational_risk=35,
+                affected_factions=[
+                    "parent_resident_coalition", "council_majority",
+                    "media_rumor_network",
+                ],
+            ),
+        ],
+        3: [
+            AdviceOption(
+                id="hospital_priority_allocation",
+                label="Document priority water allocation for the hospital",
+                summary=(
+                    "Formally allocate priority pressurized supply to dialysis "
+                    "and sterilization, with tanker resupply as backup."
+                ),
+                rationale=(
+                    "Protects the most acute clinical need and creates a clean "
+                    "record before a harm event can occur."
+                ),
+                tags=["hospital_priority"],
+                effects={
+                    "hospital_stability": +8,
+                    "water_security": -3,
+                    "public_trust": +2,
+                    "legal_exposure": -2,
+                    "budget_capacity": -2,
+                },
+                type="HOSPITAL_PRIORITY",
+                recommendation=(
+                    "Issue documented priority allocation for clinical water and "
+                    "pre-stage tanker resupply for dialysis and sterilization."
+                ),
+                expected_benefits=[
+                    "Clinical operations are protected before a cascade begins.",
+                    "A documented allocation reduces liability exposure.",
+                ],
+                expected_harms=[
+                    "Diverting pressurized supply thins the general system margin.",
+                    "A visible priority for the hospital can trigger a fairness "
+                    "dispute with residents.",
+                ],
+                legal_risk=25, political_risk=35, operational_risk=45,
+                affected_factions=[
+                    "hospital", "water_authority", "parent_resident_coalition",
+                ],
+            ),
+        ],
+        7: [
+            AdviceOption(
+                id="business_compensation_framework",
+                label="Offer a compensation framework for mandatory closures",
+                summary=(
+                    "Pair enforceable conservation restrictions with a limited "
+                    "compensation framework for affected businesses."
+                ),
+                rationale=(
+                    "Trades fiscal capacity for enforceability, defusing the "
+                    "injunction threat without conceding the public-health line."
+                ),
+                tags=["business_compensation"],
+                effects={
+                    "budget_capacity": -6,
+                    "public_order": +4,
+                    "legal_exposure": -4,
+                    "public_trust": +2,
+                    "media_pressure": -2,
+                },
+                type="BUSINESS_COMPENSATION",
+                recommendation=(
+                    "Offer a capped compensation framework tied to compliance so "
+                    "restrictions hold up against an injunction."
+                ),
+                expected_benefits=[
+                    "Keeps conservation restrictions enforceable; order improves.",
+                    "Removes the coalition's strongest grounds for an injunction.",
+                ],
+                expected_harms=[
+                    "Compensation draws down already-thin budget capacity.",
+                    "A framework can be read as admitting fault and invite further "
+                    "claims.",
+                ],
+                legal_risk=35, political_risk=45, operational_risk=30,
+                affected_factions=[
+                    "business_alliance", "council_majority", "town_managers_office",
+                ],
+            ),
+        ],
+    }
+
+
+# ---------------------------------------------------------------------------
 # Documents. Hand-authored canon; available from ``turn_number`` onward.
 # ---------------------------------------------------------------------------
 
@@ -1063,6 +1199,7 @@ def create_northbridge_campaign(campaign_id: str = "", name: str = "") -> Campai
         max_turns=MAX_TURNS,
         world_state=world_state,
         advice_options=_advice_options(),
+        per_turn_advice=_per_turn_advice(),
         client_calls=_client_calls(),
         documents=_documents(),
         open_threads=_seed_open_threads(),

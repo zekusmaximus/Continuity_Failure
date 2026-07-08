@@ -138,7 +138,8 @@ def get_current(campaign_id: str) -> Optional[schemas.CurrentTurnModel]:
     call = campaign.current_call()
     client_call = schemas.ClientCallModel.model_validate(asdict(call)) if call else None
     advice_options = [
-        schemas.AdviceOptionModel.model_validate(asdict(o)) for o in campaign.advice_options
+        schemas.AdviceOptionModel.model_validate(asdict(o))
+        for o in campaign.available_advice()
     ]
     last_turn = None
     if campaign.turn_history:
@@ -217,7 +218,7 @@ def draft_memo(
         return None
 
     option = next(
-        (o for o in campaign.advice_options if o.id == advice_id), None
+        (o for o in campaign.available_advice() if o.id == advice_id), None
     )
     if option is None:
         raise turn_engine.UnknownAdviceOption(advice_id)

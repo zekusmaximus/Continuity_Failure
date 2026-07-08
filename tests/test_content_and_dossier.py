@@ -78,10 +78,21 @@ TRADEOFF_FIELDS = (
 )
 
 
+def _all_advice_options(campaign):
+    """Global options plus every per-turn option, deduped by id."""
+    seen = {}
+    for opt in campaign.advice_options:
+        seen[opt.id] = opt
+    for options in campaign.per_turn_advice.values():
+        for opt in options:
+            seen[opt.id] = opt
+    return list(seen.values())
+
+
 def test_advice_options_have_tradeoff_fields():
     campaign = _fresh_campaign()
     assert len(campaign.advice_options) >= 3
-    for opt in campaign.advice_options:
+    for opt in _all_advice_options(campaign):
         for field in TRADEOFF_FIELDS:
             assert hasattr(opt, field), f"{opt.id} missing tradeoff field {field}"
         # Tradeoffs must be non-vacuous: at least one benefit and one harm.
@@ -94,10 +105,36 @@ def test_advice_options_have_tradeoff_fields():
 
 
 def test_no_advice_option_is_purely_optimal():
-    """Every option must carry at least one stated harm (no free lunch)."""
+    """Every option -- global or per-turn -- must carry at least one stated harm."""
     campaign = _fresh_campaign()
-    for opt in campaign.advice_options:
+    for opt in _all_advice_options(campaign):
         assert opt.expected_harms, f"{opt.id} appears risk-free, which violates the design"
+
+
+def test_per_turn_advice_is_available_on_its_turn_only():
+    """Turn-specific options surface only on their turn, and are playable there."""
+    campaign = _fresh_campaign()
+    # Turn 1: only the global options are available.
+    turn1_ids = {o.id for o in campaign.available_advice()}
+    assert "school_staged_closure" not in turn1_ids
+    assert len(turn1_ids) == len(campaign.advice_options)
+
+    # Advance to turn 2; the school-closure option now appears and resolves.
+    turn.advance_turn(campaign, "controlled_disclosure")
+    assert campaign.turn_number == 2
+    turn2_ids = {o.id for o in campaign.available_advice()}
+    assert "school_staged_closure" in turn2_ids
+    result = turn.advance_turn(campaign, "school_staged_closure")
+    assert result.advice_id == "school_staged_closure"
+    # The decider is the school caller, and the decision is a real NPC mediation.
+    assert result.decision.decider == campaign.client_calls[2].caller
+    assert result.decision.decision_type in {
+        DecisionType.FOLLOWED, DecisionType.PARTIALLY_FOLLOWED,
+        DecisionType.MODIFIED, DecisionType.DELAYED, DecisionType.REJECTED,
+    }
+    # A turn-3 option is not playable on turn 3? It is -- verify hospital option.
+    assert campaign.turn_number == 3
+    assert "hospital_priority_allocation" in {o.id for o in campaign.available_advice()}
 
 
 def test_client_calls_carry_rich_situation_fields():
@@ -140,6 +177,51 @@ def test_consequence_stack_is_deterministic():
     assert [r.reaction for r in a.faction_reactions] == [r.reaction for r in b.faction_reactions]
     assert a.media_framing == b.media_framing
     assert a.legal_fallout == b.legal_fallout
+
+
+def test_immediate_consequence_text_varies_per_turn():
+    """The same advice tag on different turns must read differently.
+
+    The survival sequence picks ``controlled_disclosure`` four times (turns 1,
+    4, 6, 9). Previously all four produced identical immediate lines; now the
+    per-turn contextual opener (caller + phase) makes each distinct while
+    staying a pure function of the turn.
+    """
+    campaign = _fresh_campaign()
+    disclosure_immediate = {}
+    for advice_id in SURVIVAL_SEQUENCE:
+        if campaign.is_terminal():
+            break
+        resolving_turn = campaign.turn_number
+        result = turn.advance_turn(campaign, advice_id)
+        if advice_id == "controlled_disclosure":
+            disclosure_immediate[resolving_turn] = tuple(
+                result.consequence_stack.immediate
+            )
+
+    assert len(disclosure_immediate) >= 3, "expected several same-tag turns"
+    texts = list(disclosure_immediate.values())
+    assert len(set(texts)) == len(texts), (
+        "immediate consequence text repeats across same-tag turns"
+    )
+    # The opener names the specific caller for that turn.
+    for resolving_turn, lines in disclosure_immediate.items():
+        caller = campaign.client_calls[resolving_turn].caller
+        assert any(caller in line for line in lines)
+
+
+def test_immediate_consequence_variation_is_deterministic():
+    """Two identical runs must produce byte-identical immediate text."""
+    def play():
+        c = _fresh_campaign()
+        out = []
+        for advice_id in SURVIVAL_SEQUENCE:
+            if c.is_terminal():
+                break
+            out.append(tuple(turn.advance_turn(c, advice_id).consequence_stack.immediate))
+        return out
+
+    assert play() == play()
 
 
 def test_delay_path_opens_concealment_thread():

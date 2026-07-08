@@ -126,6 +126,60 @@ _IMMEDIATE: dict = {
             "Mutual aid declined; the town attempts a purely local response.",
         ],
     },
+    "school_closure": {
+        DecisionType.FOLLOWED: [
+            "A written pressure threshold and staged closure protocol are now published for the south-zone schools.",
+            "Parents have an on-the-record rule they can hold the town to.",
+        ],
+        DecisionType.PARTIALLY_FOLLOWED: [
+            "Interim school guidance issued, but the exact closure threshold was hedged.",
+        ],
+        DecisionType.MODIFIED: [
+            "The closure protocol was reshaped to fit political and fiscal limits.",
+        ],
+        DecisionType.DELAYED: [
+            "The closure decision was deferred; schools stay open on an assumption.",
+        ],
+        DecisionType.REJECTED: [
+            "No closure protocol issued; the superintendent is left without a defensible rule.",
+        ],
+    },
+    "hospital_priority": {
+        DecisionType.FOLLOWED: [
+            "Documented priority allocation for dialysis and sterilization is in force.",
+            "Tanker resupply is pre-staged against a clinical-pressure drop.",
+        ],
+        DecisionType.PARTIALLY_FOLLOWED: [
+            "Clinical supply was assured informally to avoid spotlighting the shortage.",
+        ],
+        DecisionType.MODIFIED: [
+            "Priority allocation was trimmed to limit the documented diversion of supply.",
+        ],
+        DecisionType.DELAYED: [
+            "The priority-allocation decision was postponed; the hospital waits on a written commitment.",
+        ],
+        DecisionType.REJECTED: [
+            "No priority allocation documented; clinical operations run on the general margin.",
+        ],
+    },
+    "business_compensation": {
+        DecisionType.FOLLOWED: [
+            "Conservation restrictions now carry a funded, compliance-tied compensation framework.",
+            "The strongest grounds for an injunction have been removed.",
+        ],
+        DecisionType.PARTIALLY_FOLLOWED: [
+            "A limited compensation offer was floated alongside the restrictions.",
+        ],
+        DecisionType.MODIFIED: [
+            "The compensation framework was trimmed to what the budget could bear.",
+        ],
+        DecisionType.DELAYED: [
+            "The compensation decision was deferred; the injunction threat stays live.",
+        ],
+        DecisionType.REJECTED: [
+            "No compensation offered; restrictions proceed over business objections.",
+        ],
+    },
 }
 
 
@@ -136,13 +190,55 @@ def _primary_tag(advice: AdviceOption) -> str:
     return "disclosure"
 
 
-def _immediate_for(advice: AdviceOption, decision: NpcDecision) -> List[str]:
+# The engagement has three legible phases; the same advice tag reads differently
+# in the opening, mid-crisis, and closeout stretches. Purely a function of turn.
+_PHASE_LABEL = {
+    "early": "opening phase",
+    "mid": "mid-crisis phase",
+    "late": "closeout phase",
+}
+
+
+def _turn_phase(turn: int) -> str:
+    if turn <= 3:
+        return "early"
+    if turn <= 7:
+        return "mid"
+    return "late"
+
+
+def _immediate_for(
+    campaign: Campaign,
+    advice: AdviceOption,
+    decision: NpcDecision,
+    resolving_turn: int,
+) -> List[str]:
+    """Immediate-consequence lines for the turn.
+
+    The tag/decision pool supplies the substance; a deterministic contextual
+    opener ties the effect to *this* turn's specific call (its caller and
+    situation) and the engagement phase, so choosing the same advice tag on a
+    later turn no longer produces identical text. Pure function of
+    (advice, decision, state, turn) -- no randomness.
+    """
     tag = _primary_tag(advice)
     pool = _IMMEDIATE.get(tag, {})
     lines = list(pool.get(decision.decision_type, []))
     if not lines:
         lines.append(
             f"The {decision.decider} responded to the advice ({decision.decision_type})."
+        )
+
+    # Fetch by resolving_turn: by the time consequences are built the campaign's
+    # turn counter has already advanced, so current_call() would point at the
+    # *next* call. The seed guarantees a call for every turn 1..max_turns.
+    call = campaign.client_calls.get(resolving_turn)
+    if call is not None:
+        phase = _PHASE_LABEL[_turn_phase(resolving_turn)]
+        lines.insert(
+            0,
+            f"Turn {resolving_turn} · {phase}: acting on {call.caller}'s call "
+            f"— {call.summary}",
         )
     return lines
 
@@ -361,7 +457,7 @@ def build_consequence_stack(
     new_threads = _threads_for_turn(campaign, advice, decision, variables, resolving_turn)
 
     stack = ConsequenceStack(
-        immediate=_immediate_for(advice, decision),
+        immediate=_immediate_for(campaign, advice, decision, resolving_turn),
         second_order=_second_order(variables),
         faction_reactions=_faction_reactions(campaign),
         media_framing=_media_framing(variables, decision),

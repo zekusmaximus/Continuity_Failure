@@ -194,6 +194,15 @@ The advice should include:
 
 The player should rarely have a clean best option. Every useful option should create tradeoffs.
 
+**As built:** six global advice options are available every turn, plus a small
+set of **turn-specific options** surfaced only on the call that motivates them —
+a staged school-closure protocol on turn 2, a hospital priority-allocation on
+turn 3, and a business-compensation framework on turn 7. These are held in
+`Campaign.per_turn_advice` (turn → options) and merged in by
+`Campaign.available_advice()`; each carries the full tradeoff surface and at
+least one stated harm, and each new advice tag has a dedicated `_decide_*`
+handler in `engine/rules.py`.
+
 ### 6. NPC Decision
 
 The client decides how to use the advice.
@@ -225,6 +234,13 @@ Possible NPC responses:
 * blame the consultant later.
 
 This phase is crucial. The player is influential but not sovereign.
+
+**As built:** the NPC that acts on the advice — `NpcDecision.decider` — is the
+client on the current call (`campaign.current_call().caller`), so the hospital,
+the contractor, the state liaison, and public works each own their own
+decisions; the Town Manager's Office is only the fallback when a turn has no
+call. The decider is woven into the decision rationale, the aftermath summary,
+and the immediate consequence text.
 
 ### 7. Deterministic Resolution
 
@@ -277,6 +293,14 @@ It should include:
 * legal/procedural fallout;
 * new open threads;
 * canonized events.
+
+**As built:** the immediate-consequence lines vary per turn. The tag/decision
+pool supplies the substance, and a deterministic opener ties the effect to
+*this* turn's specific call (its caller and situation) and the engagement phase
+(opening / mid-crisis / closeout). Choosing the same advice tag on a later turn
+therefore no longer reads identically. The variation is a pure function of
+`(advice, decision, state, turn)` — no randomness — so the consequence stack
+stays bit-for-bit reproducible.
 
 Example:
 

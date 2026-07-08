@@ -40,9 +40,12 @@ scaling debts, none of which block forward progress.
   backend imports and serves, full 10-turn campaign + memo draft smoke-tested
   end to end through the HTTP API.
 - Aligned with intended product? Yes, and now documented accurately.
-- Biggest remaining risk: the `DECIDER` hardcode (semantic, not blocking) and
-  the absence of a schema-contract test between the Pydantic models and the TS
-  interfaces (the duplicated-contract debt is unprotected).
+- Biggest remaining risk: **substantially reduced.** The `DECIDER` hardcode is
+  **RESOLVED** (the decider is now the current caller), the immediate
+  consequence-text repetition is **RESOLVED** (deterministic per-turn
+  variation), and the missing schema-contract test is **RESOLVED**
+  (`tests/test_contract.py` now enforces engine↔Pydantic↔TS agreement). See the
+  Test, Content, and Determinism sections below for evidence.
 
 ## Current Implementation Summary
 
@@ -271,37 +274,62 @@ indicator delta flashes) — none blocking, none addressed by this remediation.
 
 ## Scenario Content Review
 
-Unchanged. Northbridge content remains specific, plausible, well-structured,
-and internally consistent. The two content weaknesses identified originally
-remain **OPEN** (not addressed by this remediation, which was scoped to
-architecture/docs/tests):
+Northbridge content remains specific, plausible, well-structured, and
+internally consistent. The two content weaknesses identified originally are now
+**RESOLVED**:
 
 - **Immediate-consequence text repeats** across same-tag turns
-  (`controlled_disclosure` appears 4× in the survival sequence with identical
-  immediate lines). Fix: per-turn variation in `_IMMEDIATE` pools.
+  (`controlled_disclosure` appeared 4× in the survival sequence with identical
+  immediate lines). — **RESOLVED.** `engine/consequences.py` `_immediate_for`
+  now prepends a deterministic per-turn opener that names the turn's specific
+  caller and engagement phase (opening/mid-crisis/closeout), so the four
+  `controlled_disclosure` turns (1, 4, 6, 9 — Town Manager, Contractor, State
+  Liaison, Public Works) each read differently. The variation is a pure
+  function of `(advice, decision, state, turn)`; determinism is preserved and
+  covered by `test_immediate_consequence_text_varies_per_turn` and
+  `test_immediate_consequence_variation_is_deterministic`.
 - **Advice options are global, not per-turn** — turn 2's school-closure call
-  has no school-specific advice option. The architecture supports per-turn
-  advice; the seed data does not use it.
+  had no school-specific advice option. — **RESOLVED.**
+  `Campaign.per_turn_advice` (turn → options) now adds a staged school-closure
+  protocol (turn 2), a hospital priority allocation (turn 3), and a
+  business-compensation framework (turn 7), merged in by
+  `Campaign.available_advice()`. Each has full tradeoff fields, at least one
+  stated harm, a deterministic `effects` map, and a dedicated `_decide_*`
+  handler in `engine/rules.py`. Covered by
+  `test_per_turn_advice_is_available_on_its_turn_only` and the extended
+  `test_no_advice_option_is_purely_optimal`.
 
 ## State Model and Determinism Review
 
-Unchanged. Bounds enforced, invariants strong, failure thresholds correct,
-completion logic correct, NPC logic deterministic, determinism bit-for-bit
-tested. The fragile assumptions remain **OPEN**:
+Bounds enforced, invariants strong, failure thresholds correct, completion
+logic correct, NPC logic deterministic, determinism bit-for-bit tested.
 
 - **`rules.DECIDER` hardcoded to "Town Manager's Office"** — hospital/contractor/
-  state turns are all attributed to the Town Manager. Semantic bug, not
-  blocking for the MVP but breaks the fiction on non-manager calls. Fix: set
-  `decider` from `campaign.current_call().caller`.
+  state turns were all attributed to the Town Manager. — **RESOLVED.**
+  `engine.rules._resolve_decider` now derives `NpcDecision.decider` from
+  `campaign.current_call().caller` (falling back to the Town Manager's Office
+  only when no call is present), and `_build_rationale` uses the resolved
+  decider. `build_aftermath_summary` already embedded `decision.decider`, so
+  the aftermath text now names the correct client while remaining bit-for-bit
+  reproducible (same caller ⇒ same text). Covered by
+  `test_decider_is_the_current_caller_not_hardcoded`; the determinism tests
+  still pass.
+
+Remaining fragile assumptions (still **OPEN**, lower priority):
+
 - `update_faction_postures` keyed on hardcoded faction ids.
-- `_ADVICE_TAG_DISPATCH` only handles 5 tags (silent generic fallback otherwise).
+- `_ADVICE_TAG_DISPATCH` now handles 8 tags (the original 5 plus
+  `school_closure`, `hospital_priority`, `business_compensation`); a silent
+  generic fallback still applies to any future untagged advice.
 - `player_shadow_authority` barely simulated (only `state_support` +3 moves it).
 
 ## Test Review
 
-- **Count: 96 tests, all passing** (was 72; +24 in this remediation: 2 new
-  AST-based engine-independence tests replacing 1 fragile one, plus 21
-  `TestClient` route tests).
+- **Count: 146 tests, all passing** (was 96; +50 in this content/correctness
+  pass: 46 parametrized schema-contract checks in `tests/test_contract.py`
+  plus decider, per-turn-advice, and consequence-variation tests). The earlier
+  96 came from +24 over the original 72 (2 AST-based engine-independence tests
+  replacing 1 fragile one, plus 21 `TestClient` route tests).
 - **Coverage by area:** state invariants, turn flow/failure/completion/
   determinism, engine AST-independence, content/dossier, AI boundary (AST +
   runtime), AI runner (success/retry/fallback/transport-error/off), AI memo
@@ -310,12 +338,22 @@ tested. The fragile assumptions remain **OPEN**:
 - **Core invariants protected: yes** — bounds, diffs, failure thresholds,
   completion, NPC mediation, consequence stack, engine independence (AST), AI
   state-mutation boundary (AST + runtime).
-- **Critical behavior still lacking tests:**
-  - **No schema-contract test** between Pydantic models and TS interfaces
-    (duplicated by hand, nothing enforces agreement). **OPEN — highest-leverage
-    remaining test gap.**
-  - No test for the `DECIDER` mismatch (because the behavior is "as
-    implemented," not as intended). **OPEN** until the hardcode is fixed.
+- **Previously-lacking tests, now added:**
+  - **Schema-contract test** between the engine dataclasses, the Pydantic
+    models, and the TS interfaces. — **RESOLVED.** `tests/test_contract.py`
+    introspects `Model.model_fields` vs `dataclasses.fields` for every entity
+    that crosses the boundary (Faction/Crisis/AdviceOption/ClientCall/Document/
+    OpenThread/WorldState/AppliedDiff/NpcDecision/CanonEntry/FactionReaction/
+    ConsequenceStack/TurnResult, plus Campaign→summary), asserting field-set
+    parity **and** structural type compatibility on the dangerous `asdict` leg,
+    and field-name parity against the `client.ts` interfaces (parsed with a
+    dependency-free regex). A rename or type change in any exposed engine
+    dataclass now breaks a test (verified by a temporary rename during
+    development).
+  - **`DECIDER` test.** — **RESOLVED.**
+    `test_decider_is_the_current_caller_not_hardcoded` asserts the decider
+    equals the caller for the hospital (3), contractor (4), and state-liaison
+    (6) turns.
 - **Brittle tests: none remaining.** The fragile `sys.modules` test was
   replaced (M4).
 
@@ -339,26 +377,30 @@ All rows below are **RESOLVED** unless marked OPEN.
 
 ## Technical Debt
 
-Resolved by this remediation: docs drift (1), half-wired AI surface (2), no
-route tests + fragile independence test (3, coupled — fixed together), tracked
-build artifacts (7), `_system_status` dishonesty (6).
+Resolved by the earlier remediation: docs drift (1), half-wired AI surface (2),
+no route tests + fragile independence test (3, coupled — fixed together),
+tracked build artifacts (7), `_system_status` dishonesty (6).
+
+Resolved by this content/correctness pass:
+
+1. ~~**Duplicated schema contract with no enforcement.**~~ — **RESOLVED.**
+   `tests/test_contract.py` enforces engine↔Pydantic↔TS agreement; a rename or
+   type change on the boundary now fails a test.
+2. ~~**`DECIDER` hardcoded to Town Manager.**~~ — **RESOLVED.** The decider is
+   derived from the current caller (`engine.rules._resolve_decider`).
+3. ~~**Static immediate-consequence text repeats** across same-tag turns.~~ —
+   **RESOLVED.** Deterministic per-turn variation in `_immediate_for`.
+4. ~~**Advice options are global, not per-turn.**~~ — **RESOLVED.**
+   `Campaign.per_turn_advice` adds turn-specific options for turns 2, 3, 7.
 
 **Remaining open debts (priority order):**
 
-1. **Duplicated schema contract with no enforcement.** Engine dataclass →
-   Pydantic → TS interface, all hand-synced. A field rename silently breaks the
-   API. **No contract test exists.** (Highest-leverage remaining gap.)
-2. **`DECIDER` hardcoded to Town Manager.** Breaks the fiction on non-manager
-   calls; blocks multi-client scaling.
-3. **Static immediate-consequence text repeats** across same-tag turns.
-4. **Advice options are global, not per-turn,** disconnecting rich per-turn calls
-   from the actual choice.
-5. **`Crisis` lifecycle unimplemented** despite schema defining statuses.
-6. Two venv workflows documented (cosmetic).
-7. Low: "Scrutinity" typo, vestigial `_risk_label`, `allowScripts` field.
+1. **`Crisis` lifecycle unimplemented** despite schema defining statuses.
+2. Two venv workflows documented (cosmetic).
+3. Low: "Scrutinity" typo, vestigial `_risk_label`, `allowScripts` field.
 
 None of this is overengineering — the codebase is lean. The remaining debts are
-concentrated in content variety and one semantic hardcode, not in excessive
+low-severity cosmetics and one unimplemented entity lifecycle, not excessive
 abstraction.
 
 ## Recommended Next Steps
@@ -369,14 +411,12 @@ abstraction.
 3. ~~Decide AI-seam fate (H1) + fix `_system_status` (M1).~~ **Done — wired.**
 
 ### Next implementation branch/pass
-1. **Add a schema-contract test** asserting the TS interfaces match the Pydantic
-   models (and thereby the engine dataclasses). Cheapest insurance against the
-   duplicated-contract debt — now the highest-leverage missing test.
-2. **Fix `DECIDER` to use the current caller** and add a test. Small change,
-   big fiction/scaling payoff.
-3. **Add per-turn variation to immediate consequence text** and consider 2–3
-   turn-specific advice options, to remove repetition and connect calls to
-   choices.
+1. ~~**Add a schema-contract test.**~~ **Done** — `tests/test_contract.py`.
+2. ~~**Fix `DECIDER` to use the current caller** and add a test.~~ **Done** —
+   `engine.rules._resolve_decider` + `test_decider_is_the_current_caller_not_hardcoded`.
+3. ~~**Add per-turn variation to immediate consequence text** and 2–3
+   turn-specific advice options.~~ **Done** — `_immediate_for` opener +
+   `Campaign.per_turn_advice` (turns 2, 3, 7).
 
 ### Later, not now
 1. Durable persistence (SQLite canon store) — only after the AI read/write

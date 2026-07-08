@@ -370,9 +370,24 @@ INDEPENDENT_REVIEW
 BACKCHANNEL
 ```
 
+**As built:** advice options are both global and per-turn. The engine holds six
+global `AdviceOption`s (available every turn) plus `Campaign.per_turn_advice`
+(a `turn -> [AdviceOption]` map) for options that only make sense on a specific
+call — currently a school-closure protocol (turn 2), a hospital priority
+allocation (turn 3), and a business-compensation framework (turn 7).
+`Campaign.available_advice()` returns the global options merged with the current
+turn's options, and both `engine.turn.find_advice` and the API surface resolve
+against it.
+
 ### NpcDecision
 
 NpcDecision records what the client actually does with the player’s advice.
+
+**As built:** `NpcDecision.decider` is the client on the current call
+(`campaign.current_call().caller`), not a fixed office. Each turn's decision is
+attributed to whoever called that turn — hospital, contractor, state liaison,
+public works — falling back to the Town Manager's Office only when a turn has no
+call.
 
 ```text
 NpcDecision
