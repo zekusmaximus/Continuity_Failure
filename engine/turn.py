@@ -11,6 +11,7 @@ from __future__ import annotations
 from typing import List
 
 from engine import rules
+from engine.consequences import build_consequence_stack
 from engine.diffs import apply_diffs
 from engine.models import (
     AdviceOption,
@@ -20,6 +21,7 @@ from engine.models import (
     CampaignStatus,
     DecisionType,
     FactClassification,
+    PublicStatus,
     SourceType,
     TurnResult,
 )
@@ -105,6 +107,12 @@ def advance_turn(campaign: Campaign, advice_id: str) -> TurnResult:
         advice, decision, diffs, campaign.status, failure_reason
     )
 
+    # Build the deterministic consequence stack and any threads it opens.
+    consequence_stack, new_threads = build_consequence_stack(
+        campaign, advice, decision, diffs, resolving_turn,
+    )
+    campaign.open_threads.extend(new_threads)
+
     canon_entry = CanonEntry(
         id=f"canon_turn_{resolving_turn}",
         turn_number=resolving_turn,
@@ -113,7 +121,11 @@ def advance_turn(campaign: Campaign, advice_id: str) -> TurnResult:
         body=aftermath,
         source=decision.decider,
         classification=FactClassification.CANON,
+        public_status=PublicStatus.PUBLIC,
+        involved_factions=[decision.decider],
+        tags=list(advice.tags) + [decision.decision_type.lower()],
     )
+    consequence_stack.canonized_events = [canon_entry.title]
     campaign.canon.append(canon_entry)
     world_state.last_verified = f"Turn {resolving_turn + 1} \u00b7 Operational snapshot (deterministic)"
 
@@ -126,6 +138,7 @@ def advance_turn(campaign: Campaign, advice_id: str) -> TurnResult:
         aftermath_summary=aftermath,
         canon_entry=canon_entry,
         status_after=campaign.status,
+        consequence_stack=consequence_stack,
         failure_reason=failure_reason,
     )
     campaign.turn_history.append(turn_result)

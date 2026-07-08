@@ -43,3 +43,78 @@ export const GROUP_ORDER: VariableMeta["group"][] = [
 export function effectiveLevel(value: number, risk: boolean): number {
   return risk ? 100 - value : value;
 }
+
+export function levelClass(level: number): string {
+  if (level >= 60) return "lvl-good";
+  if (level >= 35) return "lvl-warn";
+  return "lvl-crit";
+}
+
+// --- Diegetic label maps (deterministic, presentation only) ---
+
+export const URGENCY_LABEL: Record<string, string> = {
+  low: "Low",
+  elevated: "Elevated",
+  high: "High",
+  critical: "Critical",
+};
+
+export const URGENCY_CLASS: Record<string, string> = {
+  low: "tag-low",
+  elevated: "tag-elevated",
+  high: "tag-high",
+  critical: "tag-critical",
+};
+
+export const PUBLIC_STATUS_LABEL: Record<string, string> = {
+  public: "Public",
+  private: "Private",
+  leaked: "Leaked",
+  sealed: "Sealed",
+  disputed: "Disputed",
+  unknown: "Unknown",
+};
+
+export const PUBLIC_STATUS_CLASS: Record<string, string> = {
+  public: "tag-public",
+  private: "tag-private",
+  leaked: "tag-leaked",
+  sealed: "tag-sealed",
+  disputed: "tag-disputed",
+  unknown: "tag-unknown",
+};
+
+export const RELIABILITY_LABEL: Record<string, string> = {
+  high: "High",
+  medium: "Medium",
+  low: "Low",
+  unknown: "Unknown",
+  contested: "Contested",
+};
+
+export const RELIABILITY_CLASS: Record<string, string> = {
+  high: "rel-high",
+  medium: "rel-medium",
+  low: "rel-low",
+  unknown: "rel-unknown",
+  contested: "rel-contested",
+};
+
+export const DECISION_BADGE: Record<string, string> = {
+  FOLLOWED: "badge-followed",
+  PARTIALLY_FOLLOWED: "badge-partial",
+  MODIFIED: "badge-modified",
+  DELAYED: "badge-delayed",
+  REJECTED: "badge-rejected",
+};
+
+export const SOURCE_LABEL: Record<string, string> = {
+  advice: "Advice",
+  npc_modification: "NPC",
+  ambient: "Drift",
+  decision: "Decision",
+};
+
+export function titleCase(s: string): string {
+  return s.replace(/_/g, " ").replace(/\w\S*/g, (w) => w.charAt(0).toUpperCase() + w.slice(1));
+}

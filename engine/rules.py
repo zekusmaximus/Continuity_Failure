@@ -20,6 +20,28 @@ from engine.models import (
 from engine.state import clamp
 
 
+# An internal working draft of an NPC decision, before the public NpcDecision
+# is assembled. The first three fields (decision_type, adherence, modifications)
+# are authoritative and determinism-tested; the descriptive fields only surface
+# *why* the client deviated, so the player can read the mediation.
+class _DecisionDraft:
+    __slots__ = (
+        "decision_type", "adherence", "modifications",
+        "deviation", "public_explanation", "private_motive", "resulting_risk",
+    )
+
+    def __init__(self, decision_type: str, adherence: float,
+                 modifications, deviation="", public_explanation="",
+                 private_motive="", resulting_risk=""):
+        self.decision_type = decision_type
+        self.adherence = adherence
+        self.modifications = modifications
+        self.deviation = deviation
+        self.public_explanation = public_explanation
+        self.private_motive = private_motive
+        self.resulting_risk = resulting_risk
+
+
 # ---------------------------------------------------------------------------
 # Failure conditions. Each tuple is (variable, operator, threshold).
 #   "<=" means "fails at or below threshold" (a capacity has collapsed).
@@ -79,7 +101,7 @@ AMBIENT_DRIFT: Dict[str, int] = {
 DECIDER = "Town Manager's Office"
 
 
-def _decide_disclosure(campaign: Campaign) -> Tuple[str, float, Dict[str, int]]:
+def _decide_disclosure(campaign: Campaign) -> _DecisionDraft:
     v = campaign.world_state.variables
     media = v.get("media_pressure", 0)
     legal = v.get("legal_exposure", 0)
@@ -87,18 +109,39 @@ def _decide_disclosure(campaign: Campaign) -> Tuple[str, float, Dict[str, int]]:
 
     if legal >= 60 or media >= 60:
         # Scrutinity is too high; officials must come clean.
-        return DecisionType.FOLLOWED, 1.0, {}
+        return _DecisionDraft(
+            DecisionType.FOLLOWED, 1.0, {},
+            deviation="None \u2014 the advice was adopted as written once scrutiny forced it.",
+            public_explanation=(
+                "Given the level of public attention, the Manager is releasing the "
+                "findings and the response timeline in full."
+            ),
+            private_motive="Legal and media pressure made a partial posture indefensible.",
+            resulting_risk="Short-term panic and a difficult news cycle.",
+        )
     if media <= 25 and trust >= 60 and campaign.turn_number <= 4:
         # Early, quiet, trusted window -- the manager is tempted to soft-pedal.
-        return (
-            DecisionType.PARTIALLY_FOLLOWED,
-            0.6,
+        return _DecisionDraft(
+            DecisionType.PARTIALLY_FOLLOWED, 0.6,
             {"media_pressure": 2, "information_integrity": -3},
+            deviation="Trimmed the public-facing scope; held back detail while trust held.",
+            public_explanation=(
+                "A measured update has been issued; fuller detail will follow with "
+                "the confirmatory result."
+            ),
+            private_motive="The early window looked survivable without a full release.",
+            resulting_risk="A leak during the trimmed window becomes a concealment story.",
         )
-    return DecisionType.PARTIALLY_FOLLOWED, 0.75, {}
+    return _DecisionDraft(
+        DecisionType.PARTIALLY_FOLLOWED, 0.75, {},
+        deviation="Adopted the spirit of the disclosure but narrowed its public scope.",
+        public_explanation="A controlled statement has been issued with mitigation pre-positioned.",
+        private_motive="Wanted the credit for openness without the cost of full exposure.",
+        resulting_risk="Controlled framing is brittle if the rumor feed moves first.",
+    )
 
 
-def _decide_delay(campaign: Campaign) -> Tuple[str, float, Dict[str, int]]:
+def _decide_delay(campaign: Campaign) -> _DecisionDraft:
     v = campaign.world_state.variables
     media = v.get("media_pressure", 0)
     legal = v.get("legal_exposure", 0)
@@ -107,71 +150,125 @@ def _decide_delay(campaign: Campaign) -> Tuple[str, float, Dict[str, int]]:
         # Can no longer delay under active scrutiny -- officials are forced to
         # pivot toward a partial release, but the pivot itself is costly: trust
         # and legal exposure still worsen as the record of the delay surfaces.
-        return (
-            DecisionType.MODIFIED,
-            0.3,
+        return _DecisionDraft(
+            DecisionType.MODIFIED, 0.3,
             {"information_integrity": +2, "public_trust": -2,
              "legal_exposure": +4, "media_pressure": +4},
+            deviation="Pivoted from delay to a forced partial release under scrutiny.",
+            public_explanation=(
+                "The Manager is releasing what can be confirmed now, ahead of the "
+                "full confirmatory result."
+            ),
+            private_motive="Could no longer hold the line; salvaging the appearance of initiative.",
+            resulting_risk="The record of the delay itself becomes the liability.",
         )
-    return (
-        DecisionType.DELAYED,
-        0.35,
+    return _DecisionDraft(
+        DecisionType.DELAYED, 0.35,
         {"information_integrity": -5, "public_trust": -4,
          "legal_exposure": +3, "media_pressure": +4},
+        deviation="Held the public line and let the disclosure clock keep running.",
+        public_explanation="The Manager will await confirmatory testing before any public statement.",
+        private_motive="Bought time for the contractor and for political cover.",
+        resulting_risk="Disclosure-timing liability compounds; a leak converts delay to cover-up.",
     )
 
 
-def _decide_state_support(campaign: Campaign) -> Tuple[str, float, Dict[str, int]]:
+def _decide_state_support(campaign: Campaign) -> _DecisionDraft:
     v = campaign.world_state.variables
     oversight = v.get("state_oversight_risk", 0)
     water = v.get("water_security", 50)
 
     if oversight >= 60:
         # Council majority resists further state intrusion; trims the ask.
-        return (
-            DecisionType.MODIFIED,
-            0.45,
+        return _DecisionDraft(
+            DecisionType.MODIFIED, 0.45,
             {"state_oversight_risk": +6, "public_trust": -2, "water_security": +4},
+            deviation="Trimmed the state request to limit intrusion while accepting partial help.",
+            public_explanation="A limited state assistance request has been submitted.",
+            private_motive="The majority bloc refused a full request to avoid an oversight trajectory.",
+            resulting_risk="A partial ask may still draw oversight without buying enough capacity.",
         )
     if water <= 20:
         # Crisis is acute enough that even wary officials accept the help.
-        return DecisionType.FOLLOWED, 0.9, {}
-    return DecisionType.PARTIALLY_FOLLOWED, 0.7, {}
+        return _DecisionDraft(
+            DecisionType.FOLLOWED, 0.9, {},
+            deviation="None \u2014 the crisis was acute enough to accept the full request.",
+            public_explanation="The Manager has formally requested state emergency assistance.",
+            private_motive="Local capacity had failed; refusing was no longer credible.",
+            resulting_risk="The support package may carry conditions approaching oversight.",
+        )
+    return _DecisionDraft(
+        DecisionType.PARTIALLY_FOLLOWED, 0.7, {},
+        deviation="Accepted state resources but downplayed the request publicly.",
+        public_explanation="State resources are being brought in on a limited, time-bound basis.",
+        private_motive="Wanted the capacity without owning a public admission of failure.",
+        resulting_risk="Half-measures invite a later, less favorable intervention.",
+    )
 
 
-def _decide_contractor(campaign: Campaign) -> Tuple[str, float, Dict[str, int]]:
+def _decide_contractor(campaign: Campaign) -> _DecisionDraft:
     v = campaign.world_state.variables
     dependency = v.get("contractor_dependency", 0)
     budget = v.get("budget_capacity", 50)
 
     if dependency >= 70:
         # The contractor holds the leverage; the squeeze mostly fails.
-        return (
-            DecisionType.MODIFIED,
-            0.5,
+        return _DecisionDraft(
+            DecisionType.MODIFIED, 0.5,
             {"contractor_dependency": +6, "water_security": +3, "budget_capacity": -3},
+            deviation="Conceded much of the contractor's terms to keep crews on site.",
+            public_explanation="Emergency repair scope has been expanded to protect supply.",
+            private_motive="With no alternative, the town could not credibly hold the line.",
+            resulting_risk="Structural dependency deepens; premium terms become precedent.",
         )
     if budget <= 20:
         # No fiscal room to apply real pressure.
-        return DecisionType.PARTIALLY_FOLLOWED, 0.55, {}
-    return DecisionType.FOLLOWED, 0.85, {}
+        return _DecisionDraft(
+            DecisionType.PARTIALLY_FOLLOWED, 0.55, {},
+            deviation="Pressed the contractor lightly; budget left no room for a real squeeze.",
+            public_explanation="Repair timelines are being renegotiated within current authority.",
+            private_motive="Could not fund a credible alternative or premium concession.",
+            resulting_risk="Light pressure yields little leverage over a sole-source firm.",
+        )
+    return _DecisionDraft(
+        DecisionType.FOLLOWED, 0.85, {},
+        deviation="None \u2014 the private pressure strategy held together.",
+        public_explanation="Repair sequencing has been accelerated without public escalation.",
+        private_motive="The threat of alternatives was just credible enough.",
+        resulting_risk="Dependency still grows even when the immediate squeeze works.",
+    )
 
 
-def _decide_mutual_aid(campaign: Campaign) -> Tuple[str, float, Dict[str, int]]:
+def _decide_mutual_aid(campaign: Campaign) -> _DecisionDraft:
     v = campaign.world_state.variables
     budget = v.get("budget_capacity", 50)
     hospital = v.get("hospital_stability", 50)
 
     if budget <= 25:
         # Can only afford a partial aid activation.
-        return (
-            DecisionType.PARTIALLY_FOLLOWED,
-            0.6,
+        return _DecisionDraft(
+            DecisionType.PARTIALLY_FOLLOWED, 0.6,
             {"budget_capacity": -3, "hospital_stability": +3, "water_security": +3},
+            deviation="Activated only a partial mutual-aid package given the fiscal limit.",
+            public_explanation="Regional partners are supporting hospital and supply resilience.",
+            private_motive="Budget constrained the activation to what could be afforded.",
+            resulting_risk="Partial aid may not cover the next pressure drop.",
         )
     if hospital <= 25:
-        return DecisionType.FOLLOWED, 0.9, {}
-    return DecisionType.FOLLOWED, 0.8, {}
+        return _DecisionDraft(
+            DecisionType.FOLLOWED, 0.9, {},
+            deviation="None \u2014 the hospital threshold made full activation defensible.",
+            public_explanation="The regional mutual-aid compact has been fully activated.",
+            private_motive="Hospital vulnerability made full aid politically unassailable.",
+            resulting_risk="Aid visibility nudges state awareness of the failure.",
+        )
+    return _DecisionDraft(
+        DecisionType.FOLLOWED, 0.8, {},
+        deviation="None \u2014 mutual aid was convened on the planned scope.",
+        public_explanation="Regional coordination is underway for hospital and supply support.",
+        private_motive="Cooperative posture protected trust at manageable cost.",
+        resulting_risk="Spends budget and some political capital for a cooperative gain.",
+        )
 
 
 _ADVICE_TAG_DISPATCH = {
@@ -188,13 +285,11 @@ def decide(campaign: Campaign, advice: AdviceOption) -> NpcDecision:
 
     Returns a fully deterministic ``NpcDecision``. ``adherence`` scales the
     advice's base effects; ``modifications`` are extra deltas the NPC imposed.
+    The ``deviation`` / ``public_explanation`` / ``private_motive`` /
+    ``resulting_risk`` fields are descriptive overlays so the player can read
+    the mediation; they do not change state.
     """
-    decider = DECIDER
-    rationale = ""
-    decision_type = DecisionType.FOLLOWED
-    adherence = 1.0
-    modifications: Dict[str, int] = {}
-
+    draft: _DecisionDraft
     handler = None
     for tag in advice.tags:
         if tag in _ADVICE_TAG_DISPATCH:
@@ -202,22 +297,32 @@ def decide(campaign: Campaign, advice: AdviceOption) -> NpcDecision:
             break
 
     if handler is not None:
-        decision_type, adherence, modifications = handler(campaign)
+        draft = handler(campaign)
     else:
-        decision_type, adherence = DecisionType.PARTIALLY_FOLLOWED, 0.7
+        draft = _DecisionDraft(
+            DecisionType.PARTIALLY_FOLLOWED, 0.7, {},
+            deviation="Adopted a general, partial version of the advice.",
+            public_explanation="The Manager acted on the recommendation in part.",
+            private_motive="No specific guidance applied cleanly; hedged the decision.",
+            resulting_risk="Unfocused action leaves the underlying failure unaddressed.",
+        )
 
     v = campaign.world_state.variables
     media = v.get("media_pressure", 0)
     trust = v.get("public_trust", 50)
 
-    rationale = _build_rationale(advice, decision_type, media, trust, campaign.turn_number)
+    rationale = _build_rationale(advice, draft.decision_type, media, trust, campaign.turn_number)
     return NpcDecision(
         advice_id=advice.id,
-        decision_type=decision_type,
-        decider=decider,
+        decision_type=draft.decision_type,
+        decider=DECIDER,
         rationale=rationale,
-        adherence=adherence,
-        modifications=modifications,
+        adherence=draft.adherence,
+        modifications=draft.modifications,
+        deviation=draft.deviation,
+        public_explanation=draft.public_explanation,
+        private_motive=draft.private_motive,
+        resulting_risk=draft.resulting_risk,
     )
 
 

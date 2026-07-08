@@ -11,6 +11,7 @@ from __future__ import annotations
 from dataclasses import asdict
 from typing import Optional
 
+from engine import dossier as dossier_engine
 from engine import seed_data, turn as turn_engine
 from engine.models import Campaign
 from memory.persistence import CampaignStore
@@ -49,6 +50,40 @@ def _summary(campaign: Campaign) -> schemas.CampaignSummaryModel:
 
 def _world_state(campaign: Campaign) -> schemas.WorldStateModel:
     return schemas.WorldStateModel.model_validate(asdict(campaign.world_state))
+
+
+def _documents(campaign: Campaign) -> list[schemas.DocumentModel]:
+    return [
+        schemas.DocumentModel.model_validate(asdict(d))
+        for d in campaign.available_documents()
+    ]
+
+
+def _open_threads(campaign: Campaign) -> list[schemas.OpenThreadModel]:
+    return [
+        schemas.OpenThreadModel.model_validate(asdict(t))
+        for t in campaign.open_threads
+    ]
+
+
+def _system_status(campaign: Campaign) -> schemas.SystemStatusModel:
+    """Derive diegetic infrastructure status from world state (deterministic)."""
+    v = campaign.world_state.variables
+    power = v.get("power_stability", 50)
+    staff = v.get("staff_capacity", 50)
+    info = v.get("information_integrity", 50)
+    # Data freshness degrades as staff/information capacity drops -- a strained
+    # operations floor stops keeping feeds current. Kept as a simple blend.
+    data_freshness = (info + staff) // 2
+    comms = min(power, info + 10)
+    return schemas.SystemStatusModel(
+        power=power,
+        comms=comms,
+        data_freshness=data_freshness,
+        staff_capacity=staff,
+        ai_available=False,
+        model_status="AI systems unavailable in current build",
+    )
 
 
 def create_campaign(name: Optional[str] = None) -> schemas.CampaignCreatedModel:
@@ -94,6 +129,9 @@ def get_current(campaign_id: str) -> Optional[schemas.CurrentTurnModel]:
         world_state=_world_state(campaign),
         client_call=client_call,
         advice_options=advice_options,
+        documents=_documents(campaign),
+        open_threads=_open_threads(campaign),
+        system_status=_system_status(campaign),
         last_turn=last_turn,
     )
 
@@ -121,7 +159,25 @@ def get_turns(campaign_id: str) -> Optional[schemas.TurnHistoryModel]:
     canon = [
         schemas.CanonEntryModel.model_validate(asdict(c)) for c in campaign.canon
     ]
-    return schemas.TurnHistoryModel(summary=_summary(campaign), turns=turns, canon=canon)
+    return schemas.TurnHistoryModel(
+        summary=_summary(campaign),
+        turns=turns,
+        canon=canon,
+        open_threads=_open_threads(campaign),
+    )
+
+
+def get_dossier(campaign_id: str) -> Optional[schemas.DossierModel]:
+    campaign = _require_campaign_or_none(campaign_id)
+    if campaign is None:
+        return None
+    return schemas.DossierModel(
+        campaign_id=campaign.id,
+        name=campaign.name,
+        status=campaign.status,
+        filename=dossier_engine.dossier_filename(campaign),
+        markdown=dossier_engine.render_dossier_markdown(campaign),
+    )
 
 
 def _require_campaign_or_none(campaign_id: str) -> Optional[Campaign]:

@@ -3,13 +3,18 @@
 > **Implementation status (this branch).** This spec describes the intended
 > product. Against the working code:
 > - **Implemented now:** the deterministic Northbridge 10-turn loop — client
->   calls, advice selection, NPC decisions, applied diffs, canon entries,
->   campaign completion/failure, and the crisis-consulting web UI.
-> - **Planned next:** documents/evidence board, memo-style advice drafting,
->   richer faction/media aftermath, and dossier export.
+>   calls (with caller role, urgency, horizon, known/unknown facts, immediate
+>   risks, public exposure), an Evidence Board with 12 documents, advice
+>   selection with surfaced tradeoffs, NPC decisions with visible mediation,
+>   deterministic consequence stacks, applied diffs, canon entries, open threads,
+>   campaign completion/failure, the Continuity Desk web UI, and a Markdown
+>   campaign dossier export.
+> - **Planned next:** AI-assisted artifacts (a validation-gated, read-only
+>   Research Console that only proposes classified facts) and durable persistence.
 > - **Out of scope for this MVP:** all in-world AI tools (local/cloud/archive/
->   legal/rumor/scenario models), AI resource costs, power/comms degradation,
->   and town→state→interstate progression.
+>   legal/rumor/scenario models), AI resource costs, power/comms degradation
+>   beyond the derived system-status indicator, and town→state→interstate
+>   progression.
 
 ## One-Sentence Pitch
 
