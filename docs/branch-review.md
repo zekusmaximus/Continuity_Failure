@@ -40,13 +40,22 @@ workstation and gives Northbridge document-rich, escalating content.
   tracked threads (`concealment narrative`, `oversight designation threat`,
   `contractor precedent`, `school standoff`, `trust collapse`) that accumulate.
 
-- **Continuity Desk UI.** A restructured, diegetic workstation: masthead with
-    turn/status, client call, crisis brief, evidence board (expandable
-    documents), system-status panel (power/comms/data freshness/staff +
-    nonfunctional "AI unavailable" indicator), faction panel, advice workbench
-    with tradeoffs, aftermath (NPC mediation + consequence stack + applied
-    diffs), operational state readout, canon/open-thread archive, turn history,
-    and a **campaign dossier** modal (view / copy-as-markdown / download).
+- **Continuity Desk — Guided Intake UI.** A **UX reset** of the earlier
+    all-at-once dashboard into a guided, one-task-per-screen turn flow. An
+    intro/boot screen leads into a phased sequence — incoming call → situation
+    brief → evidence review (Critical/Relevant/Background) → advice (concise
+    tradeoffs, details expand on selection) → client decision → consequences
+    (human-readable first; raw applied diffs behind a "Why did this change?"
+    expander) → turn archive → next call / dossier. Each screen has exactly one
+    primary action; a persistent header shows only four key indicators
+    (Water Security · Public Trust · Legal Exposure · Hospital Stability) plus a
+    turn stepper. All dense material (full 16-variable state, all factions,
+    canon, full timeline, raw diffs, and the Markdown **campaign dossier** —
+    view / copy / download) is moved into an on-demand **Case File** drawer.
+    This is a frontend information-architecture refactor only: the backend, the
+    engine, and all API shapes are unchanged, and the single post-advice
+    `TurnResult` is simply revealed across the decision/consequences/archive
+    phases.
 
 - **New API surface.** `GET /api/campaigns/{id}/dossier` returns the Markdown
   case file; `current`, `turns`, and the turn result now include documents,
@@ -114,16 +123,21 @@ cd frontend
 npm run build      # runs tsc -b && vite build
 ```
 
-Manual end-to-end smoke: with the backend running, create a campaign
-(`POST /api/campaigns`), fetch `/current`, submit advice repeatedly to `/advice`
-until `status_after` becomes `COMPLETED` or `FAILED`, then open the Campaign
-Dossier (button in the masthead, or `GET /api/campaigns/{id}/dossier`).
+Manual end-to-end smoke (UI): open the app to the intro screen, `Begin Intake`
+to start Turn 1 at the incoming call, then walk Accept Call → Review Evidence →
+Continue to Advice → Send Advice, confirm the client decision is shown before
+the consequences and the consequences before the archive, then `Next Call` and
+repeat until the engagement completes or fails and the dossier is reachable.
+Dense data should only appear via the **Case File** drawer. API-level smoke:
+create a campaign (`POST /api/campaigns`), fetch `/current`, submit advice
+repeatedly to `/advice` until `status_after` becomes `COMPLETED` or `FAILED`,
+then `GET /api/campaigns/{id}/dossier`.
 
 ## What is intentionally still missing
 
 - **No AI / model calls.** No provider abstraction, no prompts, no
-  `ModelRun` logging, no structured-output validation. The UI only shows a
-  disabled AI-status indicator.
+  `ModelRun` logging, no structured-output validation, and no fabricated model
+  output anywhere in the UI.
 - **No durable persistence.** Campaigns live in process memory and are lost on
   restart. No SQLite/Postgres/SQLAlchemy.
 - **No vector database / semantic retrieval.**

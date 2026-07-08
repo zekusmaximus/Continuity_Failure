@@ -118,3 +118,133 @@ export const SOURCE_LABEL: Record<string, string> = {
 export function titleCase(s: string): string {
   return s.replace(/_/g, " ").replace(/\w\S*/g, (w) => w.charAt(0).toUpperCase() + w.slice(1));
 }
+
+// --- Guided turn flow ---------------------------------------------------------
+// The frontend walks the player through one focused task at a time. The backend
+// still resolves NPC decision + consequences together on advice submission; the
+// UI simply reveals that single result across separate phases.
+
+export type Phase =
+  | "INTRO"
+  | "CALL"
+  | "BRIEF"
+  | "EVIDENCE"
+  | "ADVICE"
+  | "CLIENT_DECISION"
+  | "CONSEQUENCES"
+  | "ARCHIVE"
+  | "DOSSIER";
+
+export const PHASE_LABEL: Record<Phase, string> = {
+  INTRO: "Intake",
+  CALL: "Incoming Call",
+  BRIEF: "Situation Brief",
+  EVIDENCE: "Evidence Review",
+  ADVICE: "Advisory",
+  CLIENT_DECISION: "Client Decision",
+  CONSEQUENCES: "Consequences",
+  ARCHIVE: "Turn Archive",
+  DOSSIER: "Campaign Dossier",
+};
+
+// The ordered spine of a single turn, used for the header stepper.
+export const TURN_STEPS: Phase[] = [
+  "CALL",
+  "BRIEF",
+  "EVIDENCE",
+  "ADVICE",
+  "CLIENT_DECISION",
+  "CONSEQUENCES",
+  "ARCHIVE",
+];
+
+export const STEP_SHORT: Record<Phase, string> = {
+  INTRO: "Intake",
+  CALL: "Call",
+  BRIEF: "Brief",
+  EVIDENCE: "Evidence",
+  ADVICE: "Advice",
+  CLIENT_DECISION: "Decision",
+  CONSEQUENCES: "Fallout",
+  ARCHIVE: "Archive",
+  DOSSIER: "Dossier",
+};
+
+// --- Evidence prioritization --------------------------------------------------
+// Group documents into Critical / Relevant / Background without any AI. Priority
+// is derived deterministically: attached-to-this-call ⇒ Critical, high-reliability
+// or leaked/disputed ⇒ Relevant, everything else ⇒ Background.
+
+export type EvidenceTier = "Critical" | "Relevant" | "Background";
+
+export const EVIDENCE_TIER_ORDER: EvidenceTier[] = ["Critical", "Relevant", "Background"];
+
+export const EVIDENCE_TIER_HINT: Record<EvidenceTier, string> = {
+  Critical: "Attached to the current call — read these first.",
+  Relevant: "Bears directly on the decision in front of you.",
+  Background: "Context on file. Skim if time allows.",
+};
+
+// A short, deterministic "why it matters" line for a document.
+export function whyItMatters(
+  doc: { public_status: string; reliability: string; type: string },
+  attached: boolean,
+): string {
+  if (attached) return "Filed with the current client call.";
+  if (doc.public_status === "leaked") return "Already public — shapes the narrative whether you act or not.";
+  if (doc.public_status === "disputed") return "Contested record — its reliability is itself a live question.";
+  if (doc.reliability === "high") return "High-reliability record you can lean on.";
+  if (doc.reliability === "low" || doc.reliability === "contested")
+    return "Low-confidence source — corroborate before relying on it.";
+  return "Background context on the engagement.";
+}
+
+// --- Consequence-phase diff aggregation ---------------------------------------
+// Collapse the raw applied-diff list into one net row per variable (old → new),
+// so the player sees "what changed" before "why it changed".
+
+export interface AggregatedChange {
+  variable: string;
+  label: string;
+  risk: boolean;
+  oldValue: number;
+  newValue: number;
+  delta: number;
+  reasons: string[];
+}
+
+export function aggregateChanges(
+  diffs: { variable: string; old_value: number; new_value: number; reason: string }[],
+): AggregatedChange[] {
+  const byVar = new Map<string, AggregatedChange>();
+  for (const d of diffs) {
+    const meta = VARIABLE_META[d.variable];
+    const existing = byVar.get(d.variable);
+    if (existing) {
+      existing.newValue = d.new_value;
+      existing.delta = existing.newValue - existing.oldValue;
+      if (d.reason && !existing.reasons.includes(d.reason)) existing.reasons.push(d.reason);
+    } else {
+      byVar.set(d.variable, {
+        variable: d.variable,
+        label: meta?.label ?? titleCase(d.variable),
+        risk: meta?.risk ?? false,
+        oldValue: d.old_value,
+        newValue: d.new_value,
+        delta: d.new_value - d.old_value,
+        reasons: d.reason ? [d.reason] : [],
+      });
+    }
+  }
+  return [...byVar.values()]
+    .filter((c) => c.delta !== 0)
+    .sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta));
+}
+
+// The four indicators surfaced in the header. Full state lives in the Case File.
+export const KEY_INDICATORS: string[] = [
+  "water_security",
+  "public_trust",
+  "legal_exposure",
+  "hospital_stability",
+];

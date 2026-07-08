@@ -101,3 +101,39 @@ def get_dossier(campaign_id: str):
     if result is None:
         _not_found(campaign_id)
     return result
+
+
+@router.post(
+    "/{campaign_id}/memo",
+    response_model=schemas.MemoDraftModel,
+    summary="Draft a consultant memo for an advice option (advisory only)",
+)
+def draft_memo(campaign_id: str, payload: schemas.AdviceRequest):
+    """Advisory only: drafts a memo without advancing the turn or changing state.
+
+    With AI disabled (the default) this returns a deterministic fallback memo.
+    """
+    if campaign_service.get_campaign(campaign_id) is None:
+        _not_found(campaign_id)
+    try:
+        result = campaign_service.draft_memo(campaign_id, payload.advice_id)
+    except UnknownAdviceOption as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unknown advice option: {exc}",
+        )
+    if result is None:
+        _not_found(campaign_id)
+    return result
+
+
+@router.get(
+    "/{campaign_id}/model-runs",
+    response_model=list[schemas.ModelRunModel],
+    summary="Read-only log of AI model runs for this campaign",
+)
+def get_model_runs(campaign_id: str):
+    result = campaign_service.get_model_runs(campaign_id)
+    if result is None:
+        _not_found(campaign_id)
+    return result

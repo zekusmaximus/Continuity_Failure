@@ -79,20 +79,26 @@ Model provider abstraction
 Structured AI role calls
 ```
 
-The frontend should feel like an in-world crisis-consulting workstation: a degraded civic operations dashboard, legal workbench, emergency management console, document review system, and AI research terminal.
+The frontend should feel like an in-world crisis-consulting workstation. As
+built, it favors a **guided intake flow** — one screen, one task, one obvious
+next action — over a wall of simultaneous panels, with the dense operational
+material tucked into an on-demand Case File.
 
 ## Repository Status
 
 The **deterministic Northbridge MVP** is implemented and playable end to end,
-now with a document-rich, diegetic **Continuity Desk** workstation:
+now with a **guided-intake Continuity Desk** — a one-screen-at-a-time consulting
+workflow rather than a dense all-at-once dashboard:
 
 * A framework-free `engine/` package resolves every state change through
   explicit, explainable rules.
 * A FastAPI `backend/` exposes the campaign endpoints.
-* A React + TypeScript + Vite `frontend/` renders a crisis-consulting
-  workstation — client call, crisis brief, evidence board, faction panel,
-  advice workbench with surfaced tradeoffs, consequence stack, applied-diff
-  record, canon/open-thread archive, and a Markdown campaign dossier export.
+* A React + TypeScript + Vite `frontend/` walks the player through each turn as
+  a focused sequence — **intro → incoming call → situation brief → evidence
+  review → advice → client decision → consequences → archive → next call /
+  dossier** — with exactly one primary action per screen. Dense material
+  (full state, all factions, canon, full timeline, raw applied diffs) lives in
+  a **Case File** drawer, on demand rather than by default.
 * A 10-turn Northbridge campaign can be started, played, won, or lost, with
   per-turn documents, a deterministic consequence stack, full turn history,
   and an exportable case-file dossier.
@@ -100,9 +106,8 @@ now with a document-rich, diegetic **Continuity Desk** workstation:
 **AI integration is intentionally not implemented yet.** There are no model
 calls, agent frameworks, or vector databases in this slice. Per `AGENTS.md`,
 the deterministic engine is the only authority over world state; AI systems
-will be layered on top of this foundation in a later milestone. The
-workstation surfaces a nonfunctional "AI systems unavailable in current build"
-indicator to support the visual direction without fabricating model output.
+will be layered on top of this foundation in a later milestone. No AI/model
+calls or fabricated model output exist anywhere in this build.
 
 > Pre-merge review of this branch: see `docs/branch-review.md`. Enforced design
 > invariants: see `AGENTS.md` § "Design Invariants".
@@ -197,19 +202,24 @@ Implemented:
   `public_trust`, `budget_capacity`, `state_oversight_risk`, `legal_exposure`)
   and successful 10-turn completion.
 * Full turn history, canon archive, and open-thread tracking.
-* **Continuity Desk** web UI: client call, crisis brief, evidence board,
-  system-status panel, faction panel, advice workbench with tradeoffs,
-  aftermath (NPC mediation + consequence stack + applied diffs), canon/open
-  threads, turn history, and a Markdown **campaign dossier** export
-  (view / copy / download).
-* Derive diegetic system status (power, comms, data freshness, staff capacity)
-  and "last verified" labels from world state.
+* **Continuity Desk — Guided Intake** web UI: a boot/intro screen, then a
+  phased turn flow (incoming call → situation brief → evidence review → advice →
+  client decision → consequences → turn archive → next call), each screen with a
+  single primary action and a persistent four-indicator header
+  (Water Security · Public Trust · Legal Exposure · Hospital Stability). Dense
+  material — full 16-variable state, all factions, canon, full timeline, raw
+  applied diffs, and the Markdown **campaign dossier** (view / copy / download) —
+  lives in an on-demand **Case File** drawer, not the default view.
+* Consequences are shown human-readable first (immediate / second-order /
+  faction / media / legal / canon / threads), then as a compact
+  changed-variables table (old → new), with the raw applied diffs behind an
+  expandable "Why did this change?".
 
 Intentionally **not** implemented yet:
 
 * AI tools (local/cloud models, research console, rumor classifier, scenario
-  simulator, document review). The UI shows a disabled "AI systems unavailable
-  in current build" indicator only.
+  simulator, document review). No model calls or fabricated model output exist
+  in this build.
 * Autonomous agents and multi-agent behavior.
 * Vector database / semantic memory.
 * Durable persistence (SQLite/Postgres canon store).

@@ -4,18 +4,23 @@ import type { Dossier } from "../api/client";
 
 interface Props {
   campaignId: string | null;
-  open: boolean;
-  onClose: () => void;
+  /** Compact rendering for the Case File tab (skips the eyebrow header). */
+  embedded?: boolean;
 }
 
-export default function CampaignDossier({ campaignId, open, onClose }: Props) {
+/**
+ * Campaign dossier viewer. Fetches the Markdown case file and offers copy /
+ * download. Rendered inline both as the DOSSIER phase and inside the Case File
+ * → Dossier tab, so it never dominates the normal turn flow.
+ */
+export default function CampaignDossier({ campaignId, embedded }: Props) {
   const [dossier, setDossier] = useState<Dossier | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    if (!open || !campaignId) return;
+    if (!campaignId) return;
     let cancelled = false;
     setLoading(true);
     setError(null);
@@ -33,7 +38,7 @@ export default function CampaignDossier({ campaignId, open, onClose }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [open, campaignId]);
+  }, [campaignId]);
 
   const copy = async () => {
     if (!dossier) return;
@@ -59,44 +64,33 @@ export default function CampaignDossier({ campaignId, open, onClose }: Props) {
     URL.revokeObjectURL(url);
   };
 
-  if (!open) return null;
-
   return (
-    <div className="cd-modal-overlay" role="dialog" aria-modal="true" onClick={onClose}>
-      <div className="cd-modal" onClick={(e) => e.stopPropagation()}>
-        <header className="cd-modal-head">
-          <div>
-            <h2>Campaign Dossier</h2>
-            <span className="cd-verified">
-              {dossier ? `${dossier.name} · ${dossier.status}` : "Compiling…"}
-            </span>
-          </div>
-          <button className="cd-btn cd-btn-ghost cd-modal-close" onClick={onClose} aria-label="Close">
-            ✕
-          </button>
-        </header>
-
-        {error && <div className="cd-alert cd-alert-error">System alert: {error}</div>}
-
-        <div className="cd-modal-actions">
-          <button className="cd-btn cd-btn-ghost" onClick={copy} disabled={loading || !dossier}>
-            {copied ? "Copied" : "Copy as Markdown"}
-          </button>
-          <button className="cd-btn cd-btn-ghost" onClick={download} disabled={loading || !dossier}>
-            Download .md
-          </button>
+    <div className={embedded ? "cd-dossier-embed" : "cd-stage-panel cd-dossier"}>
+      {!embedded && (
+        <div className="cd-eyebrow">
+          <span className="cd-eyebrow-dot" aria-hidden />
+          Campaign dossier {dossier ? `· ${dossier.status}` : ""}
         </div>
+      )}
 
-        <div className="cd-modal-body">
-          {loading ? (
-            <p className="cd-muted">Compiling case file…</p>
-          ) : dossier ? (
-            <pre className="cd-dossier-md">{dossier.markdown}</pre>
-          ) : (
-            <p className="cd-muted">No dossier available.</p>
-          )}
-        </div>
+      {error && <div className="cd-alert cd-alert-error">System alert: {error}</div>}
+
+      <div className="cd-dossier-actions">
+        <button className="cd-btn cd-btn-ghost cd-btn-sm" onClick={copy} disabled={loading || !dossier}>
+          {copied ? "Copied" : "Copy as Markdown"}
+        </button>
+        <button className="cd-btn cd-btn-ghost cd-btn-sm" onClick={download} disabled={loading || !dossier}>
+          Download .md
+        </button>
       </div>
+
+      {loading ? (
+        <p className="cd-muted">Compiling case file…</p>
+      ) : dossier ? (
+        <pre className="cd-dossier-md">{dossier.markdown}</pre>
+      ) : (
+        <p className="cd-muted">No dossier available.</p>
+      )}
     </div>
   );
 }

@@ -54,11 +54,16 @@ memory/     in-memory CampaignStore (process-local; cleared on restart)
   `GET /api/campaigns/{id}`, `GET /api/campaigns/{id}/current`,
   `POST /api/campaigns/{id}/advice`, `GET /api/campaigns/{id}/turns`,
   `GET /api/campaigns/{id}/dossier`.
-* React workstation UI (**Continuity Desk**): client call, crisis brief,
-  evidence board, system-status panel, faction panel, advice workbench with
-  tradeoffs, aftermath (NPC mediation + consequence stack + applied diffs),
-  operational state readout, canon/open-thread archive, turn history, and a
-  Markdown campaign dossier export (view / copy / download).
+* React **Continuity Desk — Guided Intake** UI: an intro/boot screen followed by
+  a one-task-per-screen turn flow (incoming call → situation brief → evidence
+  review → advice → client decision → consequences → turn archive → next call /
+  dossier), each with a single primary action and a persistent four-indicator
+  header. Dense material (full 16-variable state, all factions, canon, full
+  timeline, raw applied diffs, Markdown dossier) is moved into an on-demand
+  **Case File** drawer rather than being rendered all at once. The frontend
+  reveals the backend's single post-advice `TurnResult` across the separate
+  client-decision / consequences / archive phases; no backend shape change was
+  required.
 * `pytest` suite (**50 passing**): determinism, 0–100 bounds, failure
   thresholds, completion at turn 10, applied diffs, FastAPI-independence,
   documents/evidence, advice tradeoffs, consequence stacks, open threads, and
@@ -67,8 +72,14 @@ memory/     in-memory CampaignStore (process-local; cleared on restart)
 **Actual current repository structure**
 
 ```text
-frontend/   src/{main,App,domain}.tsx, api/client.ts, components/* (Continuity Desk),
-            styles/global.css
+frontend/   src/{main,App,domain}.tsx, api/client.ts, styles/global.css,
+            components/* — guided shell (IntroScreen, ContinuityHeader,
+            KeyStateIndicators, PrimaryAction, GuidedTurn), one component per
+            turn phase (CallPhase, BriefPhase, EvidencePhase, AdvicePhase,
+            ClientDecisionPhase, ConsequencesPhase, ArchivePhase), the on-demand
+            CaseFile drawer (+ DocumentDetail), and the reused dense views
+            (EvidenceBoard, FactionPanel, StateReadout, CanonPanel, TurnHistory,
+            CampaignDossier)
 backend/    app/{main,api/campaigns,services/campaign_service,schemas/api}.py
 engine/     {models,state,diffs,rules,turn,seed_data,consequences,dossier}.py
 memory/     {persistence}.py            (CampaignStore, MemoryStore)
@@ -197,16 +208,24 @@ CSS modules or Tailwind
 
 Avoid premature UI frameworks that impose too much aesthetic personality. The UI should be custom enough to feel like institutional software under stress.
 
-### Initial Screens
+### Screens (as built: guided intake flow)
 
-1. Engagement Dashboard.
-2. Incoming Call.
-3. Crisis Brief.
-4. Evidence Board.
-5. AI Research Console.
-6. Advice Workbench.
-7. Aftermath / Consequence Stack.
-8. Archive / Campaign Dossier.
+Rather than one dashboard showing everything at once, the UI is a guided
+sequence — **one screen, one task, one obvious next action**:
+
+1. Intro / boot (orient the player).
+2. Incoming Call (`Accept Call`).
+3. Situation Brief (`Review Evidence` / `Skip to Advice`).
+4. Evidence Review — Critical / Relevant / Background (`Continue to Advice`).
+5. Advice — concise tradeoffs, details expand on selection (`Send Advice`).
+6. Client Decision — how the NPC used the advice (`Resolve Consequences`).
+7. Consequences — human-readable first, raw diffs behind an expander (`Archive Turn`).
+8. Turn Archive (`Next Call`, or `View Campaign Dossier` when terminal).
+9. Case File drawer (on demand): Evidence · Factions · Full State · Canon ·
+   Timeline · Dossier.
+
+A future AI Research Console would slot in as an optional step between Brief and
+Advice; it is not present in this build.
 
 ### Frontend Principles
 

@@ -247,3 +247,37 @@ class HealthModel(BaseModel):
     status: str
     service: str
     scenario: str
+
+
+# --- AI-assist layer (advisory only; never mutates game state) ---
+
+
+class MemoContentModel(BaseModel):
+    recommendation: str
+    rationale: str
+    operational_steps: List[str]
+    communications: str
+    likely_opposition: List[str]
+    second_order_risks: List[str]
+    fallback_plan: str
+
+
+class MemoDraftModel(BaseModel):
+    # ``status``: "ok" (model produced it) or "fallback" (deterministic builder).
+    # ``source``: "ai" or "system" — for honest UI labeling.
+    status: str
+    source: str
+    draft: MemoContentModel
+
+
+class ModelRunModel(BaseModel):
+    """Read-only projection of a logged ModelRun for the inspector endpoint."""
+
+    prompt_name: str
+    prompt_version: str
+    model_name: str
+    validation_status: str
+    input_summary: str
+    retry_count: int
+    latency_ms: Optional[int]
+    turn_number: Optional[int]

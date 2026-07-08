@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { api } from "./api/client";
 import type {
   CampaignSummary,
@@ -6,27 +6,33 @@ import type {
   TurnHistory,
   TurnResult,
 } from "./api/client";
+import type { Phase } from "./domain";
+import IntroScreen from "./components/IntroScreen";
 import ContinuityHeader from "./components/ContinuityHeader";
-import SystemStatusPanel from "./components/SystemStatusPanel";
-import CrisisBriefPanel from "./components/CrisisBriefPanel";
-import ClientCallPanel from "./components/ClientCallPanel";
-import EvidenceBoard from "./components/EvidenceBoard";
-import AdviceWorkbench from "./components/AdviceWorkbench";
-import FactionPanel from "./components/FactionPanel";
-import StateReadout from "./components/StateReadout";
-import ConsequenceStack from "./components/ConsequenceStack";
-import CanonPanel from "./components/CanonPanel";
-import TurnHistoryPanel from "./components/TurnHistory";
-import CampaignDossier from "./components/CampaignDossier";
+import GuidedTurn from "./components/GuidedTurn";
+import CaseFile from "./components/CaseFile";
 
+/**
+ * Continuity Desk — Guided Intake.
+ *
+ * The app walks the player through one focused task per screen:
+ *   INTRO → CALL → BRIEF → EVIDENCE → ADVICE → CLIENT_DECISION →
+ *   CONSEQUENCES → ARCHIVE → (next call | DOSSIER)
+ *
+ * The backend still resolves the NPC decision and consequences together on
+ * advice submission; that single TurnResult is stored and revealed across the
+ * CLIENT_DECISION / CONSEQUENCES / ARCHIVE phases. Dense data lives in the
+ * Case File drawer, never in the default view.
+ */
 export default function App() {
+  const [phase, setPhase] = useState<Phase>("INTRO");
   const [campaignId, setCampaignId] = useState<string | null>(null);
   const [summary, setSummary] = useState<CampaignSummary | null>(null);
   const [current, setCurrent] = useState<CurrentTurn | null>(null);
   const [lastResult, setLastResult] = useState<TurnResult | null>(null);
   const [history, setHistory] = useState<TurnHistory | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
-  const [dossierOpen, setDossierOpen] = useState(false);
+  const [caseFileOpen, setCaseFileOpen] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -36,8 +42,7 @@ export default function App() {
     const cur = await api.getCurrent(id);
     setCurrent(cur);
     setSummary(cur.summary);
-    setLastResult(cur.last_turn);
-    setSelected(null);
+    return cur;
   }, []);
 
   const refreshHistory = useCallback(async (id: string) => {
@@ -50,7 +55,10 @@ export default function App() {
     try {
       const created = await api.createCampaign();
       setCampaignId(created.id);
+      setLastResult(null);
+      setSelected(null);
       await Promise.all([refreshCurrent(created.id), refreshHistory(created.id)]);
+      setPhase("CALL");
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -58,18 +66,18 @@ export default function App() {
     }
   }, [refreshCurrent, refreshHistory]);
 
-  useEffect(() => {
-    if (!campaignId) startCampaign();
-  }, [campaignId, startCampaign]);
-
-  const handleSubmit = useCallback(async () => {
+  const handleSendAdvice = useCallback(async () => {
     if (!campaignId || !selected) return;
     setSubmitting(true);
     setError(null);
     try {
       const result = await api.submitAdvice(campaignId, selected);
       setLastResult(result);
+      // Refresh state/history so the header + Case File reflect the resolved
+      // turn, then reveal the outcome across the decision → consequences →
+      // archive phases.
       await Promise.all([refreshCurrent(campaignId), refreshHistory(campaignId)]);
+      setPhase("CLIENT_DECISION");
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -77,129 +85,83 @@ export default function App() {
     }
   }, [campaignId, selected, refreshCurrent, refreshHistory]);
 
+  const handleNextCall = useCallback(() => {
+    // `current` was already refreshed after submit and now holds the next call.
+    setSelected(null);
+    setLastResult(null);
+    setPhase("CALL");
+  }, []);
+
   const terminal = summary?.status === "COMPLETED" || summary?.status === "FAILED";
+  const busy = loading || submitting;
+
+  if (phase === "INTRO") {
+    return (
+      <div className="cd-app cd-app-intro">
+        <IntroScreen onBegin={startCampaign} loading={loading} />
+        {error && (
+          <div className="cd-banner-alert cd-alert cd-alert-error">
+            <strong>System alert:</strong> {error}
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
-    <div className="cd-workstation">
+    <div className="cd-app">
       <ContinuityHeader
         summary={summary}
-        loading={loading}
-        submitting={submitting}
+        worldState={current?.world_state ?? null}
+        phase={phase}
+        onOpenCaseFile={() => setCaseFileOpen(true)}
         onRestart={startCampaign}
-        onOpenDossier={() => setDossierOpen(true)}
+        busy={busy}
       />
 
       {error && (
-        <div className="cd-alert cd-alert-error cd-banner-alert">
+        <div className="cd-banner-alert cd-alert cd-alert-error">
           <strong>System alert:</strong> {error}
         </div>
       )}
 
-      {terminal && summary && (
-        <div className={`cd-banner-alert cd-alert ${summary.status === "COMPLETED" ? "cd-alert-ok" : "cd-alert-crit"}`}>
+      {terminal && summary && phase !== "DOSSIER" && (
+        <div
+          className={`cd-banner-alert cd-alert ${
+            summary.status === "COMPLETED" ? "cd-alert-ok" : "cd-alert-crit"
+          }`}
+        >
           <strong>Engagement {summary.status.toLowerCase()}.</strong>{" "}
           {summary.failure_reason
             ? summary.failure_reason
             : "The 10-turn stabilization window closed without a critical failure."}
-          <button className="cd-btn cd-btn-ghost cd-inline" onClick={() => setDossierOpen(true)}>
-            Review dossier
-          </button>
         </div>
       )}
 
-      <main className="cd-main">
-        {/* Top row: Client Call · Crisis Brief · System Status */}
-        <section className="cd-row cd-row-3">
-          <div className="cd-cell">
-            {current ? <ClientCallPanel call={current.client_call} /> : <Placeholder />}
-          </div>
-          <div className="cd-cell">
-            {current ? (
-              <CrisisBriefPanel call={current.client_call} state={current.world_state} />
-            ) : (
-              <Placeholder />
-            )}
-          </div>
-          <div className="cd-cell">
-            {current ? <SystemStatusPanel status={current.system_status} /> : <Placeholder />}
-          </div>
-        </section>
-
-        {/* Mid row: Evidence Board · Advice Workbench · Factions */}
-        <section className="cd-row cd-row-3">
-          <div className="cd-cell">
-            {current ? (
-              <EvidenceBoard documents={current.documents} call={current.client_call} />
-            ) : (
-              <Placeholder />
-            )}
-          </div>
-          <div className="cd-cell">
-            {current ? (
-              <AdviceWorkbench
-                options={current.advice_options}
-                factions={current.world_state.factions}
-                selected={selected}
-                onSelect={setSelected}
-                onSubmit={handleSubmit}
-                disabled={terminal}
-                submitting={submitting}
-              />
-            ) : (
-              <Placeholder />
-            )}
-          </div>
-          <div className="cd-cell">
-            {current ? (
-              <FactionPanel factions={current.world_state.factions} />
-            ) : (
-              <Placeholder />
-            )}
-          </div>
-        </section>
-
-        {/* Full-width operational state readout */}
-        <section className="cd-row cd-row-1">
-          {current ? <StateReadout state={current.world_state} /> : <Placeholder />}
-        </section>
-
-        {/* Aftermath: consequence stack */}
-        <section className="cd-row cd-row-1">
-          <ConsequenceStack result={lastResult} />
-        </section>
-
-        {/* Archive: canon/threads + turn history */}
-        <section className="cd-row cd-row-2">
-          <div className="cd-cell">
-            {history ? (
-              <CanonPanel canon={history.canon} threads={history.open_threads} />
-            ) : (
-              <Placeholder />
-            )}
-          </div>
-          <div className="cd-cell">
-            <TurnHistoryPanel history={history} />
-          </div>
-        </section>
-      </main>
-
-      <footer className="cd-footbar">
-        <span>CONTINUITY DESK · Deterministic engine · Northbridge MVP · AI systems unavailable in current build</span>
-      </footer>
-
-      <CampaignDossier
+      <GuidedTurn
+        phase={phase}
         campaignId={campaignId}
-        open={dossierOpen}
-        onClose={() => setDossierOpen(false)}
+        current={current}
+        lastResult={lastResult}
+        history={history}
+        terminal={terminal}
+        selected={selected}
+        submitting={submitting}
+        onSelect={setSelected}
+        onGoto={setPhase}
+        onSendAdvice={handleSendAdvice}
+        onNextCall={handleNextCall}
+        onRestart={startCampaign}
+        onOpenCaseFile={() => setCaseFileOpen(true)}
+      />
+
+      <CaseFile
+        open={caseFileOpen}
+        onClose={() => setCaseFileOpen(false)}
+        campaignId={campaignId}
+        current={current}
+        history={history}
       />
     </div>
-  );
-}
-
-function Placeholder() {
-  return (
-    <section className="cd-panel">
-      <p className="cd-muted">Initializing workstation…</p>
-    </section>
   );
 }

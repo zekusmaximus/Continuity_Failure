@@ -12,7 +12,10 @@
 >   `/dossier`, advice/NPC/diff resolution with visible mediation, completion/
 >   failure, the Evidence Board (12 documents), the Advice Workbench with
 >   tradeoffs, deterministic faction/media/legal consequence stacks, open-thread
->   tracking, the Continuity Desk UI, and Markdown dossier export.
+>   tracking, and Markdown dossier export. The Continuity Desk UI has since been
+>   reset from a dense all-at-once dashboard into a **guided intake flow** — one
+>   screen and one primary action per turn phase, with dense views moved into an
+>   on-demand Case File.
 > - **Planned next (Weeks 3–4):** AI-assisted artifacts behind a validation
 >   boundary (read-only Research Console that only proposes classified facts),
 >   `ModelRun` logging, durable persistence, and demo polish.
@@ -121,10 +124,14 @@ A user can play the Northbridge scenario as a consultant issuing advice, not
 merely selecting strategy-game buttons.
 
 > **Status (this branch): COMPLETE.** The case file (Evidence Board with 12
-> documents), the Advice Workbench with surfaced tradeoffs, deterministic
+> documents), the advice step with surfaced tradeoffs, deterministic
 > consequence stacks (immediate / second-order / faction / media / legal),
 > faction/media reaction summaries, open-thread tracking, the campaign archive
 > screen, and export-to-Markdown dossier are all implemented and tested.
+> These are now presented through a **guided intake flow** (one screen per turn
+> phase, one primary action) rather than a single dense dashboard, directly
+> addressing the "should not feel like a dashboard with no game" quality bar
+> below; the dense material is available on demand in the Case File drawer.
 
 ## Week 3: AI-Assisted Artifacts
 

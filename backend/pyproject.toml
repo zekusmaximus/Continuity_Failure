@@ -18,6 +18,11 @@ dev = [
     "pytest>=8",
     "httpx>=0.27",
 ]
+# Live AI provider. Not required to run or test the game — the AI layer is off by
+# default and degrades to deterministic fallbacks without this installed.
+ai = [
+    "anthropic>=0.40",
+]
 
 # ---------------------------------------------------------------------------
 # Layout: `app` lives under backend/, while `engine` and `memory` live one

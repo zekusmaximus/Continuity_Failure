@@ -16,6 +16,10 @@ from engine import seed_data, turn as turn_engine
 from engine.models import Campaign
 from memory.persistence import CampaignStore
 
+from app.ai import fallbacks
+from app.ai.logging import get_run_store
+from app.ai.runner import run_artifact
+from app.ai.schemas import MemoDraft
 from app.schemas import api as schemas
 
 
@@ -178,6 +182,64 @@ def get_dossier(campaign_id: str) -> Optional[schemas.DossierModel]:
         filename=dossier_engine.dossier_filename(campaign),
         markdown=dossier_engine.render_dossier_markdown(campaign),
     )
+
+
+def draft_memo(
+    campaign_id: str, advice_id: str
+) -> Optional[schemas.MemoDraftModel]:
+    """Draft a consultant memo for a selected advice option.
+
+    This is **advisory only** — it reads campaign state and produces prose; it
+    never calls ``advance_turn`` or mutates ``WorldState``. With AI disabled (the
+    default), the runner returns a deterministic fallback memo. Raises
+    ``UnknownAdviceOption`` if the advice id isn't available this turn.
+    """
+    campaign = _require_campaign_or_none(campaign_id)
+    if campaign is None:
+        return None
+
+    option = next(
+        (o for o in campaign.advice_options if o.id == advice_id), None
+    )
+    if option is None:
+        raise turn_engine.UnknownAdviceOption(advice_id)
+
+    payload = fallbacks.build_memo_input(option, campaign.current_call())
+    artifact = run_artifact(
+        prompt_name="memo_drafter",
+        prompt_version="v1",
+        input_payload=payload,
+        schema=MemoDraft,
+        fallback=fallbacks.memo_fallback,
+        input_summary=f"turn {campaign.turn_number}: {option.label}",
+        campaign_id=campaign.id,
+        turn_number=campaign.turn_number,
+    )
+    return schemas.MemoDraftModel(
+        status=artifact.status,
+        source="ai" if artifact.from_model else "system",
+        draft=schemas.MemoContentModel(**artifact.content.model_dump()),
+    )
+
+
+def get_model_runs(campaign_id: str) -> Optional[list[schemas.ModelRunModel]]:
+    """Read-only log of AI model runs recorded for this campaign."""
+    campaign = _require_campaign_or_none(campaign_id)
+    if campaign is None:
+        return None
+    return [
+        schemas.ModelRunModel(
+            prompt_name=r.prompt_name,
+            prompt_version=r.prompt_version,
+            model_name=r.model_name,
+            validation_status=r.validation_status,
+            input_summary=r.input_summary,
+            retry_count=r.retry_count,
+            latency_ms=r.latency_ms,
+            turn_number=r.turn_number,
+        )
+        for r in get_run_store().for_campaign(campaign_id)
+    ]
 
 
 def _require_campaign_or_none(campaign_id: str) -> Optional[Campaign]:

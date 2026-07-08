@@ -10,9 +10,18 @@
 > **6 (NPC Decision — with visible mediation)**,
 > **7 (Deterministic Resolution → applied diffs)**, **8 (Aftermath — deterministic
 > consequence stack)**, and **9 (Canon + open-thread update)**, plus
-> completion/failure and the Continuity Desk UI and a Markdown dossier export.
+> completion/failure and a Markdown dossier export.
+> - **UI shape (as built):** the loop below is presented as a **guided intake
+>   flow** — one screen per phase with a single primary action
+>   (INTRO → CALL → BRIEF → EVIDENCE → ADVICE → CLIENT_DECISION → CONSEQUENCES →
+>   ARCHIVE → next call / DOSSIER), not a single all-at-once dashboard. The
+>   backend still resolves the NPC decision and consequences together on advice
+>   submission; the frontend stores that one result and reveals it across the
+>   client-decision, consequences, and archive phases. Dense views (full state,
+>   factions, canon, timeline, raw diffs, dossier) live in an on-demand Case File.
 > - **Planned next:** the optional AI-use phase (a validation-gated, read-only
->   Research Console that only proposes classified facts).
+>   Research Console that only proposes classified facts), which would sit
+>   between BRIEF/EVIDENCE and ADVICE.
 > - **Out of scope for this MVP:** autonomous cascade events beyond ambient
 >   drift, and long-term town→interstate progression.
 
