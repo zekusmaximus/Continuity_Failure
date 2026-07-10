@@ -11,7 +11,7 @@ from __future__ import annotations
 from typing import List
 
 from engine import rules
-from engine.consequences import build_consequence_stack
+from engine.consequences import build_consequence_report, build_consequence_stack
 from engine.diffs import apply_diffs
 from engine.models import (
     AdviceOption,
@@ -70,6 +70,10 @@ def advance_turn(campaign: Campaign, advice_id: str) -> TurnResult:
     variables = world_state.variables
 
     decision = rules.decide(campaign, advice)
+
+    # Snapshot the pre-turn values so the consequence report can reconcile
+    # start -> attributed deltas -> final for every touched variable.
+    start_values = dict(variables)
 
     diffs: List[AppliedDiff] = []
     diffs += apply_diffs(
@@ -164,6 +168,9 @@ def advance_turn(campaign: Campaign, advice_id: str) -> TurnResult:
         status_after=campaign.status,
         consequence_stack=consequence_stack,
         failure_reason=failure_reason,
+        consequence_report=build_consequence_report(
+            start_values, diffs, advice, decision
+        ),
     )
     campaign.turn_history.append(turn_result)
     return turn_result

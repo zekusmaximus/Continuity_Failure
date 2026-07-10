@@ -412,6 +412,7 @@
       "involved_factions": [
         "Town Manager's Office"
       ],
+      "memo_id": "memo_105581b97ec64ce9aa3e20010d6b217b",
       "public_status": "public",
       "source": "Town Manager's Office",
       "tags": [
@@ -420,6 +421,296 @@
       ],
       "title": "Turn 1: PARTIALLY_FOLLOWED on Full disclosure and emergency conservation order",
       "turn_number": 1
+    },
+    "consequence_report": {
+      "variables": [
+        {
+          "advice": {
+            "adherence": 0.75,
+            "applied_delta": 8,
+            "clamped": false,
+            "expected_delta": 8,
+            "outcome": "reduced",
+            "proposed_delta": 10
+          },
+          "deltas": [
+            {
+              "delta": 8,
+              "reason": "Advice — Full disclosure and emergency conservation order",
+              "source_type": "advice",
+              "value_after": 36,
+              "value_before": 28
+            },
+            {
+              "delta": 3,
+              "reason": "Ambient crisis pressure",
+              "source_type": "ambient",
+              "value_after": 39,
+              "value_before": 36
+            }
+          ],
+          "direction": "higher_is_worse",
+          "final_value": 39,
+          "label": "Media Pressure",
+          "net_delta": 11,
+          "start_value": 28,
+          "variable": "media_pressure"
+        },
+        {
+          "advice": {
+            "adherence": 0.75,
+            "applied_delta": 8,
+            "clamped": false,
+            "expected_delta": 8,
+            "outcome": "reduced",
+            "proposed_delta": 10
+          },
+          "deltas": [
+            {
+              "delta": 8,
+              "reason": "Advice — Full disclosure and emergency conservation order",
+              "source_type": "advice",
+              "value_after": 70,
+              "value_before": 62
+            }
+          ],
+          "direction": "higher_is_better",
+          "final_value": 70,
+          "label": "Information Integrity",
+          "net_delta": 8,
+          "start_value": 62,
+          "variable": "information_integrity"
+        },
+        {
+          "advice": {
+            "adherence": 0.75,
+            "applied_delta": -8,
+            "clamped": false,
+            "expected_delta": -8,
+            "outcome": "reduced",
+            "proposed_delta": -10
+          },
+          "deltas": [
+            {
+              "delta": -8,
+              "reason": "Advice — Full disclosure and emergency conservation order",
+              "source_type": "advice",
+              "value_after": 26,
+              "value_before": 34
+            },
+            {
+              "delta": 2,
+              "reason": "Ambient crisis pressure",
+              "source_type": "ambient",
+              "value_after": 28,
+              "value_before": 26
+            }
+          ],
+          "direction": "higher_is_worse",
+          "final_value": 28,
+          "label": "Legal Exposure",
+          "net_delta": -6,
+          "start_value": 34,
+          "variable": "legal_exposure"
+        },
+        {
+          "advice": {
+            "adherence": 0.75,
+            "applied_delta": -6,
+            "clamped": false,
+            "expected_delta": -6,
+            "outcome": "reduced",
+            "proposed_delta": -8
+          },
+          "deltas": [
+            {
+              "delta": -6,
+              "reason": "Advice — Full disclosure and emergency conservation order",
+              "source_type": "advice",
+              "value_after": 60,
+              "value_before": 66
+            }
+          ],
+          "direction": "higher_is_better",
+          "final_value": 60,
+          "label": "Public Order",
+          "net_delta": -6,
+          "start_value": 66,
+          "variable": "public_order"
+        },
+        {
+          "advice": {
+            "adherence": 0.75,
+            "applied_delta": -2,
+            "clamped": false,
+            "expected_delta": -2,
+            "outcome": "reduced",
+            "proposed_delta": -3
+          },
+          "deltas": [
+            {
+              "delta": -2,
+              "reason": "Advice — Full disclosure and emergency conservation order",
+              "source_type": "advice",
+              "value_after": 38,
+              "value_before": 40
+            },
+            {
+              "delta": -2,
+              "reason": "Ambient crisis pressure",
+              "source_type": "ambient",
+              "value_after": 36,
+              "value_before": 38
+            }
+          ],
+          "direction": "higher_is_better",
+          "final_value": 36,
+          "label": "Budget Capacity",
+          "net_delta": -4,
+          "start_value": 40,
+          "variable": "budget_capacity"
+        },
+        {
+          "advice": {
+            "adherence": 0.75,
+            "applied_delta": 4,
+            "clamped": false,
+            "expected_delta": 4,
+            "outcome": "reduced",
+            "proposed_delta": 5
+          },
+          "deltas": [
+            {
+              "delta": 4,
+              "reason": "Advice — Full disclosure and emergency conservation order",
+              "source_type": "advice",
+              "value_after": 60,
+              "value_before": 56
+            }
+          ],
+          "direction": "higher_is_better",
+          "final_value": 60,
+          "label": "Public Trust",
+          "net_delta": 4,
+          "start_value": 56,
+          "variable": "public_trust"
+        },
+        {
+          "advice": {
+            "adherence": 0.75,
+            "applied_delta": 2,
+            "clamped": false,
+            "expected_delta": 2,
+            "outcome": "reduced",
+            "proposed_delta": 3
+          },
+          "deltas": [
+            {
+              "delta": 2,
+              "reason": "Advice — Full disclosure and emergency conservation order",
+              "source_type": "advice",
+              "value_after": 52,
+              "value_before": 50
+            }
+          ],
+          "direction": "higher_is_better",
+          "final_value": 52,
+          "label": "Consultant Reputation",
+          "net_delta": 2,
+          "start_value": 50,
+          "variable": "player_reputation"
+        },
+        {
+          "advice": null,
+          "deltas": [
+            {
+              "delta": 2,
+              "reason": "Ambient crisis pressure",
+              "source_type": "ambient",
+              "value_after": 40,
+              "value_before": 38
+            }
+          ],
+          "direction": "higher_is_worse",
+          "final_value": 40,
+          "label": "School Disruption",
+          "net_delta": 2,
+          "start_value": 38,
+          "variable": "school_disruption"
+        },
+        {
+          "advice": null,
+          "deltas": [
+            {
+              "delta": -2,
+              "reason": "Ambient crisis pressure",
+              "source_type": "ambient",
+              "value_after": 44,
+              "value_before": 46
+            }
+          ],
+          "direction": "higher_is_better",
+          "final_value": 44,
+          "label": "Water Security",
+          "net_delta": -2,
+          "start_value": 46,
+          "variable": "water_security"
+        },
+        {
+          "advice": null,
+          "deltas": [
+            {
+              "delta": 1,
+              "reason": "Ambient crisis pressure",
+              "source_type": "ambient",
+              "value_after": 53,
+              "value_before": 52
+            }
+          ],
+          "direction": "higher_is_worse",
+          "final_value": 53,
+          "label": "Contractor Dependency",
+          "net_delta": 1,
+          "start_value": 52,
+          "variable": "contractor_dependency"
+        },
+        {
+          "advice": null,
+          "deltas": [
+            {
+              "delta": -1,
+              "reason": "Ambient crisis pressure",
+              "source_type": "ambient",
+              "value_after": 55,
+              "value_before": 56
+            }
+          ],
+          "direction": "higher_is_better",
+          "final_value": 55,
+          "label": "Hospital Stability",
+          "net_delta": -1,
+          "start_value": 56,
+          "variable": "hospital_stability"
+        },
+        {
+          "advice": null,
+          "deltas": [
+            {
+              "delta": -1,
+              "reason": "Ambient crisis pressure",
+              "source_type": "ambient",
+              "value_after": 49,
+              "value_before": 50
+            }
+          ],
+          "direction": "higher_is_better",
+          "final_value": 49,
+          "label": "Staff Capacity",
+          "net_delta": -1,
+          "start_value": 50,
+          "variable": "staff_capacity"
+        }
+      ]
     },
     "consequence_stack": {
       "canonized_events": [
@@ -512,6 +803,8 @@
         ],
         "outcome_reason": "On-brief: Full disclosure and emergency conservation order was one of the options the Town Manager's Office asked about; the Town Manager's Office acted on it per its own risk posture."
       },
+      "memo_id": "memo_105581b97ec64ce9aa3e20010d6b217b",
+      "memo_revision": 1,
       "modifications": {},
       "off_brief": false,
       "off_brief_adjustments": {},
@@ -643,6 +936,26 @@
       }
     ],
     "failure_reason": null,
+    "sent_memo": {
+      "author": "Continuity Desk",
+      "classification": "proposed",
+      "content": "RECOMMENDATION\nRelease the preliminary result with a conservation order, notify the state agency in writing, and publish the response timeline.\n\nRATIONALE\nMinimizes legal exposure and protects information integrity.\n\nOPERATIONAL STEPS\n- Transmit the preliminary result and response timeline to the state liaison in writing.\n- Issue the conservation order with separate hospital and school operating instructions.\n- Publish the source report, known uncertainties, and the next verification deadline together.\n\nCOMMUNICATIONS\nFrame public communications around Full disclosure and emergency conservation order. State only what the record supports.\n\nLIKELY OPPOSITION\nExpect review or resistance from: Town Manager's Office, Local Media / Rumor Network, Parent and Resident Coalition, Local Business Alliance.\n\nSECOND-ORDER RISKS\n- Short-term public-order shock and media amplification.\n- Business and school disruption spike before mitigation lands.\n\nFALLBACK PLAN\nIf the client deviates from this advice, preserve the written advice of record and revisit at the next call.",
+      "content_digest": "95bd13bbef8d5c824567a6575e58be5b73db32ad6e5fa59a33d69f95c1ef5117",
+      "memo_id": "memo_105581b97ec64ce9aa3e20010d6b217b",
+      "name": "Advice of record — Full disclosure and emergency conservation order",
+      "provenance": {
+        "fallback_used": true,
+        "model_name": "disabled",
+        "model_run_id": null,
+        "prompt_version": null,
+        "provider": "disabled",
+        "validation_status": "fallback",
+        "workflow": "deterministic_fallback"
+      },
+      "revision": 1,
+      "sent_at": "2026-07-10T23:31:02.867086+00:00",
+      "source": "system"
+    },
     "status_after": "ACTIVE",
     "turn_number": 1
   },
@@ -673,7 +986,7 @@
     }
   ],
   "summary": {
-    "created_at": "2026-07-10T18:27:15.531820+00:00",
+    "created_at": "2026-07-10T23:31:02.756286+00:00",
     "failure_reason": null,
     "id": "test-campaign",
     "max_turns": 10,

@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { TurnResult } from "../api/client";
 import { aggregateChanges } from "../domain";
 import AppliedDiffList from "./AppliedDiffList";
+import CausalWaterfall from "./CausalWaterfall";
 
 function StackSection({
   title,
@@ -26,14 +27,19 @@ function StackSection({
 }
 
 /**
- * CONSEQUENCES phase — human-readable fallout first, then a compact "what
- * changed" table (only moved variables, old → new, reason). The raw applied
- * diffs stay hidden behind an expandable "Why did this change?".
+ * CONSEQUENCES phase — human-readable fallout first, then the causal
+ * waterfall: the server's authoritative per-variable reconciliation of how
+ * the starting snapshot became the resolved snapshot (start → your advice as
+ * the client applied it → client action → decision cost → ambient drift →
+ * final). The raw applied diffs stay available behind an expandable
+ * "Authoritative applied-diff record". Turns persisted before the report
+ * existed fall back to the flat net-change table.
  */
 export default function ConsequencesPhase({ result }: { result: TurnResult }) {
   const [showRaw, setShowRaw] = useState(false);
   const stack = result.consequence_stack;
-  const changes = aggregateChanges(result.diffs);
+  const hasReport = (result.consequence_report?.variables?.length ?? 0) > 0;
+  const changes = hasReport ? [] : aggregateChanges(result.diffs);
 
   return (
     <section className="cd-stage-panel cd-consequences">
@@ -59,35 +65,41 @@ export default function ConsequencesPhase({ result }: { result: TurnResult }) {
       </div>
 
       <div className="cd-changes">
-        <h2 className="cd-subhead">State changes</h2>
-        <p className="cd-context-note">
-          Reasons distinguish advice, client modification, and ambient Drift—the
-          crisis pressure applied independently each turn.
-        </p>
-        {changes.length === 0 ? (
-          <p className="cd-muted cd-small">No tracked variable moved this turn.</p>
+        {hasReport ? (
+          <CausalWaterfall result={result} />
         ) : (
-          <ul className="cd-change-list">
-            {changes.map((c) => {
-              const good = c.risk ? c.delta < 0 : c.delta > 0;
-              const sign = c.delta > 0 ? "+" : "";
-              return (
-                <li key={c.variable} className="cd-change-row">
-                  <span className="cd-change-label">{c.label}</span>
-                  <span className="cd-change-move">
-                    {c.oldValue} <span className="cd-change-arrow">→</span> {c.newValue}
-                  </span>
-                  <span className={`cd-change-delta ${good ? "cd-delta-good" : "cd-delta-bad"}`}>
-                    {sign}
-                    {c.delta}
-                  </span>
-                  {c.reasons.length > 0 && (
-                    <span className="cd-change-reason">{c.reasons.join(" · ")}</span>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
+          <>
+            <h2 className="cd-subhead">State changes</h2>
+            <p className="cd-context-note">
+              Reasons distinguish advice, client modification, and ambient
+              Drift—the crisis pressure applied independently each turn.
+            </p>
+            {changes.length === 0 ? (
+              <p className="cd-muted cd-small">No tracked variable moved this turn.</p>
+            ) : (
+              <ul className="cd-change-list">
+                {changes.map((c) => {
+                  const good = c.risk ? c.delta < 0 : c.delta > 0;
+                  const sign = c.delta > 0 ? "+" : "";
+                  return (
+                    <li key={c.variable} className="cd-change-row">
+                      <span className="cd-change-label">{c.label}</span>
+                      <span className="cd-change-move">
+                        {c.oldValue} <span className="cd-change-arrow">→</span> {c.newValue}
+                      </span>
+                      <span className={`cd-change-delta ${good ? "cd-delta-good" : "cd-delta-bad"}`}>
+                        {sign}
+                        {c.delta}
+                      </span>
+                      {c.reasons.length > 0 && (
+                        <span className="cd-change-reason">{c.reasons.join(" · ")}</span>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </>
         )}
 
         {result.diffs.length > 0 && (
@@ -97,7 +109,7 @@ export default function ConsequencesPhase({ result }: { result: TurnResult }) {
               onClick={() => setShowRaw((s) => !s)}
               aria-expanded={showRaw}
             >
-              {showRaw ? "▾" : "▸"} Why did this change?
+              {showRaw ? "▾" : "▸"} Authoritative applied-diff record
             </button>
             {showRaw && (
               <div className="cd-expandable-body">

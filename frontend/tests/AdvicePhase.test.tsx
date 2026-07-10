@@ -180,6 +180,7 @@ describe("ClientDecisionPhase explanation payload", () => {
     },
     failure_reason: null,
     sent_memo: null,
+    consequence_report: { variables: [] },
   };
 
   test("renders human-labeled adherence factors, conflicts, and outcome reason", () => {

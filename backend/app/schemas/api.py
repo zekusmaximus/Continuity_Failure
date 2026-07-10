@@ -414,6 +414,38 @@ class ConsequenceStackModel(BaseModel):
     opened_threads: List[str] = Field(default_factory=list)
 
 
+class ConsequenceDeltaModel(BaseModel):
+    source_type: str = Field(pattern=SOURCE_TYPE_PATTERN)
+    delta: int = Field(ge=-100, le=100)
+    reason: str
+    value_before: int = Field(ge=0, le=100)
+    value_after: int = Field(ge=0, le=100)
+
+
+class AdviceMediationModel(BaseModel):
+    proposed_delta: int = Field(ge=-100, le=100)
+    adherence: float = Field(ge=0.0, le=1.0)
+    expected_delta: int = Field(ge=-100, le=100)
+    applied_delta: int = Field(ge=-100, le=100)
+    outcome: str = Field(pattern=r"^(applied|reduced|delayed|rejected)$")
+    clamped: bool = False
+
+
+class VariableConsequenceModel(BaseModel):
+    variable: str
+    label: str
+    direction: str = Field(pattern=r"^(higher_is_better|higher_is_worse)$")
+    start_value: int = Field(ge=0, le=100)
+    final_value: int = Field(ge=0, le=100)
+    net_delta: int = Field(ge=-100, le=100)
+    deltas: List[ConsequenceDeltaModel] = Field(default_factory=list)
+    advice: Optional[AdviceMediationModel] = None
+
+
+class ConsequenceReportModel(BaseModel):
+    variables: List[VariableConsequenceModel] = Field(default_factory=list)
+
+
 class TurnResultModel(BaseModel):
     turn_number: int = Field(ge=1)
     advice_id: str
@@ -426,6 +458,9 @@ class TurnResultModel(BaseModel):
     consequence_stack: ConsequenceStackModel = Field(default_factory=ConsequenceStackModel)
     failure_reason: Optional[str] = None
     sent_memo: Optional[SentMemoSnapshotModel] = None
+    # Defaulted so idempotent replays recorded before this field existed still
+    # validate; every freshly resolved turn carries the populated report.
+    consequence_report: ConsequenceReportModel = Field(default_factory=ConsequenceReportModel)
 
 
 class SystemStatusModel(BaseModel):

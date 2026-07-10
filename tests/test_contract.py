@@ -65,6 +65,10 @@ FULL_ASDICT_PAIRS = [
     (engine_models.CanonEntry, schemas.CanonEntryModel),
     (engine_models.FactionReaction, schemas.FactionReactionModel),
     (engine_models.ConsequenceStack, schemas.ConsequenceStackModel),
+    (engine_models.ConsequenceDelta, schemas.ConsequenceDeltaModel),
+    (engine_models.AdviceMediation, schemas.AdviceMediationModel),
+    (engine_models.VariableConsequence, schemas.VariableConsequenceModel),
+    (engine_models.ConsequenceReport, schemas.ConsequenceReportModel),
     (engine_models.TurnResult, schemas.TurnResultModel),
 ]
 
@@ -224,6 +228,10 @@ TS_INTERFACE_TO_MODEL = {
     "CanonEntry": schemas.CanonEntryModel,
     "FactionReaction": schemas.FactionReactionModel,
     "ConsequenceStack": schemas.ConsequenceStackModel,
+    "ConsequenceDelta": schemas.ConsequenceDeltaModel,
+    "AdviceMediation": schemas.AdviceMediationModel,
+    "VariableConsequence": schemas.VariableConsequenceModel,
+    "ConsequenceReport": schemas.ConsequenceReportModel,
     "TurnResult": schemas.TurnResultModel,
     "SystemStatus": schemas.SystemStatusModel,
     "MemoContent": schemas.MemoContentModel,

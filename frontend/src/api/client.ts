@@ -251,6 +251,42 @@ export interface ConsequenceStack {
   opened_threads: string[];
 }
 
+/** One attributed step in a variable's start → final reconciliation. */
+export interface ConsequenceDelta {
+  source_type: string; // "advice" | "npc_modification" | "ambient" | "decision"
+  delta: number; // effective (post-clamp) change, never zero
+  reason: string;
+  value_before: number;
+  value_after: number;
+}
+
+/** Proposed-versus-applied record for one variable the advice targeted. */
+export interface AdviceMediation {
+  proposed_delta: number; // the option's effect at full adherence
+  adherence: number;
+  expected_delta: number; // round(proposed * adherence), pre-clamp
+  applied_delta: number; // what the authoritative advice diff actually moved
+  outcome: "applied" | "reduced" | "delayed" | "rejected";
+  clamped: boolean;
+}
+
+/** The causal story of one variable across one resolved turn. */
+export interface VariableConsequence {
+  variable: string;
+  label: string;
+  direction: "higher_is_better" | "higher_is_worse";
+  start_value: number;
+  final_value: number;
+  net_delta: number;
+  deltas: ConsequenceDelta[];
+  advice: AdviceMediation | null;
+}
+
+/** Authoritative per-variable causal decomposition, built server-side. */
+export interface ConsequenceReport {
+  variables: VariableConsequence[];
+}
+
 export interface TurnResult {
   turn_number: number;
   advice_id: string;
@@ -263,6 +299,7 @@ export interface TurnResult {
   consequence_stack: ConsequenceStack;
   failure_reason: string | null;
   sent_memo: SentMemoSnapshot | null;
+  consequence_report: ConsequenceReport;
 }
 
 export interface SystemStatus {

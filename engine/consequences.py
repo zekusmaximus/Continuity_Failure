@@ -12,19 +12,25 @@ randomness: the same campaign state always yields the same consequence text.
 
 from __future__ import annotations
 
-from typing import List, Tuple
+from typing import Dict, List, Tuple
 
 from engine.models import (
+    AdviceEffectOutcome,
+    AdviceMediation,
     AdviceOption,
+    AppliedDiff,
     Campaign,
+    ConsequenceDelta,
+    ConsequenceReport,
     ConsequenceStack,
     DecisionType,
     FactionReaction,
     NpcDecision,
     OpenThread,
     SourceType,
+    VariableConsequence,
 )
-from engine.state import humanize_variable
+from engine.state import humanize_variable, variable_direction
 
 
 # ---------------------------------------------------------------------------
@@ -483,3 +489,97 @@ def build_consequence_stack(
         )
 
     return stack, new_threads
+
+
+# ---------------------------------------------------------------------------
+# Causal consequence report: the per-variable start -> deltas -> final
+# reconciliation the aftermath UI and dossier render verbatim.
+# ---------------------------------------------------------------------------
+
+def _advice_outcome(
+    proposed: int, applied: int, decision: NpcDecision
+) -> str:
+    """Classify how the caller's mediation left one proposed effect."""
+    if applied == proposed:
+        return AdviceEffectOutcome.APPLIED
+    if decision.decision_type == DecisionType.REJECTED:
+        return AdviceEffectOutcome.REJECTED
+    if decision.decision_type == DecisionType.DELAYED and applied == 0:
+        return AdviceEffectOutcome.DELAYED
+    return AdviceEffectOutcome.REDUCED
+
+
+def build_consequence_report(
+    start_values: Dict[str, int],
+    diffs: List[AppliedDiff],
+    advice: AdviceOption,
+    decision: NpcDecision,
+) -> ConsequenceReport:
+    """Build the authoritative per-variable causal decomposition of a turn.
+
+    ``start_values`` is the world-state snapshot captured *before* any of this
+    turn's diffs were applied; ``diffs`` are the ordered authoritative applied
+    diffs. The report is pure bookkeeping over those records -- it never
+    recomputes effects -- plus the proposed-versus-applied advice mediation,
+    which is the one fact the diff list cannot express (a fully rejected
+    proposal leaves no diff at all).
+
+    Invariant: for every entry, ``start_value + sum(d.delta) == final_value``.
+    """
+    by_variable: Dict[str, List[AppliedDiff]] = {}
+    for diff in diffs:
+        by_variable.setdefault(diff.variable, []).append(diff)
+
+    variables = list(by_variable.keys())
+    # Advice-targeted variables that never moved (rejected/delayed/rounded-out
+    # proposals) still get an entry so the mediation is visible, not implied.
+    for variable, proposed in advice.effects.items():
+        if proposed != 0 and variable in start_values and variable not in by_variable:
+            variables.append(variable)
+
+    entries: List[VariableConsequence] = []
+    for variable in variables:
+        var_diffs = by_variable.get(variable, [])
+        start = var_diffs[0].old_value if var_diffs else start_values[variable]
+        final = var_diffs[-1].new_value if var_diffs else start
+
+        mediation = None
+        proposed = advice.effects.get(variable, 0)
+        if proposed != 0:
+            applied = sum(
+                d.delta for d in var_diffs if d.source_type == SourceType.ADVICE
+            )
+            expected = int(round(proposed * decision.adherence))
+            mediation = AdviceMediation(
+                proposed_delta=proposed,
+                adherence=decision.adherence,
+                expected_delta=expected,
+                applied_delta=applied,
+                outcome=_advice_outcome(proposed, applied, decision),
+                clamped=applied != expected,
+            )
+
+        entries.append(
+            VariableConsequence(
+                variable=variable,
+                label=humanize_variable(variable),
+                direction=variable_direction(variable),
+                start_value=start,
+                final_value=final,
+                net_delta=final - start,
+                deltas=[
+                    ConsequenceDelta(
+                        source_type=d.source_type,
+                        delta=d.delta,
+                        reason=d.reason,
+                        value_before=d.old_value,
+                        value_after=d.new_value,
+                    )
+                    for d in var_diffs
+                ],
+                advice=mediation,
+            )
+        )
+
+    entries.sort(key=lambda e: (-abs(e.net_delta), e.variable))
+    return ConsequenceReport(variables=entries)

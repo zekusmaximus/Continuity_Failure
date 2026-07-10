@@ -115,6 +115,29 @@ export const SOURCE_LABEL: Record<string, string> = {
   decision: "Decision",
 };
 
+// Player-facing source attribution for the causal waterfall. Same vocabulary
+// as SOURCE_LABEL, phrased as "who did this": the consultant's advice (as the
+// client applied it), the client's own action, the deterministic cost of the
+// decision (off-brief/red-line), and the per-turn ambient crisis drift.
+export const CAUSAL_SOURCE_LABEL: Record<string, string> = {
+  advice: "Your advice",
+  npc_modification: "Client action",
+  decision: "Decision cost",
+  ambient: "Ambient drift",
+};
+
+// Direction-aware reading of a delta: on a higher-is-worse variable a negative
+// move is an improvement. Returns the text cue shown next to the signed value,
+// so meaning never relies on color alone.
+export function deltaAssessment(delta: number, risk: boolean): "improved" | "worsened" {
+  const good = risk ? delta < 0 : delta > 0;
+  return good ? "improved" : "worsened";
+}
+
+export function signed(delta: number): string {
+  return delta > 0 ? `+${delta}` : `${delta}`;
+}
+
 export function titleCase(s: string): string {
   return s.replace(/_/g, " ").replace(/\w\S*/g, (w) => w.charAt(0).toUpperCase() + w.slice(1));
 }

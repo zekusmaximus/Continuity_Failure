@@ -13,12 +13,72 @@ from __future__ import annotations
 
 from typing import List
 
-from engine.models import Campaign, CampaignStatus
+from engine.models import (
+    AdviceEffectOutcome,
+    Campaign,
+    CampaignStatus,
+    TurnResult,
+    VariableConsequence,
+)
 from engine.state import humanize_variable
 
 
 def _risk_label(variable: str, value: int) -> str:
     return f"{value}/100"
+
+
+_SOURCE_LABEL = {
+    "advice": "advice",
+    "npc_modification": "client action",
+    "decision": "decision cost",
+    "ambient": "ambient drift",
+}
+
+
+def _signed(delta: int) -> str:
+    return f"+{delta}" if delta > 0 else str(delta)
+
+
+def _mediation_note(entry: VariableConsequence) -> str:
+    """One clause describing how the advice proposal was mediated."""
+    med = entry.advice
+    assert med is not None
+    adherence_pct = int(round(med.adherence * 100))
+    if med.outcome == AdviceEffectOutcome.APPLIED:
+        note = f"advice proposed {_signed(med.proposed_delta)}, applied in full"
+    elif med.outcome == AdviceEffectOutcome.REJECTED:
+        note = f"advice proposed {_signed(med.proposed_delta)}, rejected — not applied"
+    elif med.outcome == AdviceEffectOutcome.DELAYED:
+        note = f"advice proposed {_signed(med.proposed_delta)}, delayed — not applied this turn"
+    else:
+        note = (
+            f"advice proposed {_signed(med.proposed_delta)}, applied "
+            f"{_signed(med.applied_delta)} at {adherence_pct}% adherence"
+        )
+    if med.clamped:
+        note += " (clamped at the 0–100 bound)"
+    return note
+
+
+def _reconciliation_lines(turn: TurnResult) -> List[str]:
+    """Render the turn's causal consequence report as compact Markdown lines."""
+    report = turn.consequence_report
+    if not report.variables:
+        return []
+    lines = ["- **State reconciliation (start → attributed deltas → final):**"]
+    for entry in report.variables:
+        steps = "; ".join(
+            f"{_signed(d.delta)} {_SOURCE_LABEL.get(d.source_type, d.source_type)} ({d.reason})"
+            for d in entry.deltas
+        )
+        parts = [steps] if steps else ["no applied change"]
+        if entry.advice is not None:
+            parts.append(_mediation_note(entry))
+        lines.append(
+            f"  - {entry.label}: {entry.start_value} → {entry.final_value} "
+            f"(net {_signed(entry.net_delta)}) — " + " · ".join(parts)
+        )
+    return lines
 
 
 def render_dossier_markdown(campaign: Campaign) -> str:
@@ -78,6 +138,7 @@ def render_dossier_markdown(campaign: Campaign) -> str:
                     f"- **Memo of record:** `{t.sent_memo.memo_id}` revision "
                     f"{t.sent_memo.revision} (`{t.sent_memo.content_digest}`)"
                 )
+            lines.extend(_reconciliation_lines(t))
             if t.consequence_stack.opened_threads:
                 lines.append("- **Threads opened:** "
                              + "; ".join(t.consequence_stack.opened_threads))
