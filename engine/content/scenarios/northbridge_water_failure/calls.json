@@ -1,0 +1,282 @@
+[
+  {
+    "id": "call_01",
+    "turn": 1,
+    "caller": "Town Manager's Office",
+    "caller_faction_id": "town_managers_office",
+    "summary": "Ambiguous preliminary contamination sample and a 12% overnight pressure drop, hours before an emergency council session.",
+    "known_facts": [
+      "Preliminary sample sits ~1.3x the advisory threshold; flagged inconclusive.",
+      "South-zone pressure dropped 12% overnight.",
+      "Confirmatory second-lab result is pending."
+    ],
+    "ask": "How should we handle disclosure and conservation before the second lab returns?",
+    "caller_role": "Mara Velez, Town Manager",
+    "urgency": "critical",
+    "time_horizon": "72 hours",
+    "unknown_facts": [
+      "Whether the indicator elevation is transient (heat-stressed source water) or real.",
+      "Whether the pressure drop is a main failure or a distribution anomaly."
+    ],
+    "immediate_risks": [
+      "Disclosure-timing liability accrues from the moment of awareness.",
+      "A leak before any statement locks in a concealment frame."
+    ],
+    "private_pressure": "Council majority wants a 'maintenance acceleration' frame, not a contamination event, until confirmation.",
+    "attached_document_ids": [
+      "doc_preliminary_lab_report",
+      "doc_town_manager_transcript",
+      "doc_council_session_excerpt"
+    ]
+  },
+  {
+    "id": "call_02",
+    "turn": 2,
+    "caller": "Northbridge Public Schools",
+    "caller_faction_id": "parent_resident_coalition",
+    "summary": "The superintendent demands a written, defensible closure threshold for three south-zone schools as parent pressure builds.",
+    "known_facts": [
+      "Three schools rely on the south pressure zone.",
+      "Parents are organizing carpools to neighboring districts.",
+      "The superintendent will not keep buildings open on an assumption."
+    ],
+    "ask": "How do we keep schools running, or close them responsibly and on the record?",
+    "caller_role": "Superintendent's Office (via parent coalition pressure)",
+    "time_horizon": "48 hours",
+    "unknown_facts": [
+      "The exact pressure floor that compromises school sanitation.",
+      "Whether a staged closure or an all-or-nothing order is defensible."
+    ],
+    "immediate_risks": [
+      "An unwarranted closure wastes trust and budget; a delayed closure endangers children.",
+      "Parents will treat silence as concealment."
+    ],
+    "private_pressure": "Parent coalition threatens to go public if no threshold is issued.",
+    "attached_document_ids": [
+      "doc_school_closure_request"
+    ]
+  },
+  {
+    "id": "call_03",
+    "turn": 3,
+    "caller": "Northbridge Hospital",
+    "caller_faction_id": "hospital",
+    "summary": "Hospital counsel requests documented priority allocation for dialysis and sterilization before a clinical cascade begins.",
+    "known_facts": [
+      "Roughly two days of degraded pressure would force elective cancellations.",
+      "Tanker resupply is available but logistically fragile.",
+      "The state hospital liaison is asking pointed questions."
+    ],
+    "ask": "How do we protect clinical operations without triggering a state takeover?",
+    "caller_role": "Hospital Counsel",
+    "urgency": "critical",
+    "time_horizon": "~2 days of pressure tolerance",
+    "unknown_facts": [
+      "How long mutual-aid or tanker resupply can be sustained.",
+      "Whether priority allocation triggers a fairness dispute with residents."
+    ],
+    "immediate_risks": [
+      "Loss of dialysis/sterilization water becomes a harm event.",
+      "Hospital visibility makes it the public face of the crisis."
+    ],
+    "private_pressure": "State hospital liaison wants to be looped in -- or will loop itself in.",
+    "attached_document_ids": [
+      "doc_hospital_priority_request"
+    ]
+  },
+  {
+    "id": "call_04",
+    "turn": 4,
+    "caller": "Utility Contractor",
+    "caller_faction_id": "utility_contractor",
+    "summary": "The sole qualified contractor demands indemnity on emergency change orders or it will stage crews down to scheduled work.",
+    "known_facts": [
+      "Only this firm holds certifications for the failing valves.",
+      "The proposed repair timeline slips without the premium/indemnity.",
+      "No competitive fallback exists this quarter."
+    ],
+    "ask": "Do we accept the change order, push back, or try to source alternatives?",
+    "caller_role": "Marquotte Utilities, Contracts Office",
+    "time_horizon": "Immediate (crew staging decision)",
+    "unknown_facts": [
+      "Whether the indemnity demand is a real exposure or leverage.",
+      "Whether a credible alternative procurement can even be staged."
+    ],
+    "immediate_risks": [
+      "A work stoppage lets water security degrade on its own.",
+      "Conceding deepens structural dependency and sets precedent."
+    ],
+    "private_pressure": "Contractor knows the town has no near-term alternative.",
+    "attached_document_ids": [
+      "doc_contractor_warning_letter"
+    ]
+  },
+  {
+    "id": "call_05",
+    "turn": 5,
+    "caller": "Local Media / Rumor Network",
+    "caller_faction_id": "media_rumor_network",
+    "summary": "A resident rumor thread leaks prior maintenance warnings and a 'cover-up' frame firms up before any official statement lands.",
+    "known_facts": [
+      "Screenshots of prior internal maintenance warnings are circulating.",
+      "A press inquiry names the contaminant but gets the threshold wrong.",
+      "Council opposition is drafting a statement."
+    ],
+    "ask": "What do we say publicly before the narrative firms up without us?",
+    "caller_role": "Regional desk + community board aggregation",
+    "time_horizon": "Hours (narrative is firming up without us)",
+    "unknown_facts": [
+      "Whether the leaked memo screenshot is authentic.",
+      "How fast the rumor frame hardens into the dominant narrative."
+    ],
+    "immediate_risks": [
+      "The town loses control of the framing permanently.",
+      "Any statement now reads as reactive, not authoritative."
+    ],
+    "public_exposure": "public",
+    "private_pressure": "Opposition is feeding the thread to shape the record.",
+    "attached_document_ids": [
+      "doc_resident_rumor_thread"
+    ]
+  },
+  {
+    "id": "call_06",
+    "turn": 6,
+    "caller": "State Emergency Management Liaison",
+    "caller_faction_id": "state_liaison",
+    "summary": "The state agency asks, on the record, why it was not notified earlier, and signals that an oversight designation may follow.",
+    "known_facts": [
+      "State learned of the instability from press, not from the town.",
+      "Resources (tankers, operators) are available within ~36 hours.",
+      "Opposition favors state help; the majority resists it."
+    ],
+    "ask": "Do we invite state support now, or hold out for a local resolution?",
+    "caller_role": "State Regional Office",
+    "urgency": "elevated",
+    "time_horizon": "Days (written response expected)",
+    "unknown_facts": [
+      "Whether timely notification would have prevented the oversight threat.",
+      "Whether accepting help now lowers or raises long-run oversight risk."
+    ],
+    "immediate_risks": [
+      "A late notification is itself a documented failing.",
+      "Refusing help while failing invites a forced intervention."
+    ],
+    "public_exposure": "public",
+    "private_pressure": "The state wants the record to show it offered help.",
+    "attached_document_ids": [
+      "doc_state_agency_notice"
+    ]
+  },
+  {
+    "id": "call_07",
+    "turn": 7,
+    "caller": "Local Business Alliance",
+    "caller_faction_id": "business_alliance",
+    "summary": "The business coalition threatens legal action over mandatory restrictions and a 'contamination' label it cannot contest.",
+    "known_facts": [
+      "Mandatory restrictions impose uncompensated losses.",
+      "Members fear a lingering 'contaminated town' reputation.",
+      "An injunction could block the emergency response."
+    ],
+    "ask": "How do we keep restrictions enforceable without handing them an injunction?",
+    "caller_role": "Business Coalition",
+    "time_horizon": "Days (injunctive relief threatened)",
+    "unknown_facts": [
+      "Whether a compensation framework is fiscally possible.",
+      "Whether the legal threat is credible or posturing."
+    ],
+    "immediate_risks": [
+      "An injunction freezes conservation measures mid-crisis.",
+      "Conceding framing weakens the public-health posture."
+    ],
+    "public_exposure": "public",
+    "private_pressure": "Coalition wants the town to avoid the word 'contamination' on the record.",
+    "attached_document_ids": [
+      "doc_business_coalition_letter"
+    ]
+  },
+  {
+    "id": "call_08",
+    "turn": 8,
+    "caller": "Town Council Opposition",
+    "caller_faction_id": "council_opposition",
+    "summary": "Excerpts of an internal consultant memo leak; the opposition threatens a public hearing and frames the response as concealment.",
+    "known_facts": [
+      "Leaked memo excerpts are circulating to press and opposition.",
+      "A partial decision-and-memo timeline has been compiled.",
+      "Media is primed to amplify a hearing."
+    ],
+    "ask": "How do we respond to the hearing threat without handing them the narrative?",
+    "caller_role": "Minority bloc leadership",
+    "time_horizon": "Days (hearing threat)",
+    "unknown_facts": [
+      "Whether the leaked excerpts are authentic or selectively edited.",
+      "Whether the hearing surfaces legally damaging timing questions."
+    ],
+    "immediate_risks": [
+      "A hearing converts internal advice into a public liability.",
+      "The consultant's neutrality becomes a political target."
+    ],
+    "public_exposure": "leaked",
+    "private_pressure": "Opposition wants the consultant on the record, under oath or in press.",
+    "attached_document_ids": [
+      "doc_leaked_memo_screenshot"
+    ]
+  },
+  {
+    "id": "call_09",
+    "turn": 9,
+    "caller": "Public Works / Water Authority",
+    "caller_faction_id": "water_authority",
+    "summary": "Operator overtime is exhausted; emergency shifts are unsustainable without external staffing as the system stays under stress.",
+    "known_facts": [
+      "Overtime is at cap; maintenance crews are pulled to emergency coverage.",
+      "Deferred repairs are accumulating elsewhere in the system.",
+      "Current coverage is sustainable for roughly one more cycle."
+    ],
+    "ask": "How do we sustain operations long enough to reach a stable closeout?",
+    "caller_role": "Public Works Operations",
+    "urgency": "critical",
+    "time_horizon": "~1 operational cycle",
+    "unknown_facts": [
+      "Whether mutual-aid or state operators can arrive in time.",
+      "Whether staffing collapse triggers an automatic state escalation."
+    ],
+    "immediate_risks": [
+      "Staffing collapse is itself a failure-grade condition.",
+      "Pulling maintenance crews stores up the next failure."
+    ],
+    "private_pressure": "Operators will not accept indefinite uncovered exposure.",
+    "attached_document_ids": [
+      "doc_public_works_staffing_note"
+    ]
+  },
+  {
+    "id": "call_10",
+    "turn": 10,
+    "caller": "Town Manager's Office",
+    "caller_faction_id": "town_managers_office",
+    "summary": "Final stabilization: the second lab is on the record, repairs are partial, and the state offers support conditioned on oversight.",
+    "known_facts": [
+      "The confirmatory second-lab result is now on the record.",
+      "Contractor work is partially complete.",
+      "State support is available but conditioned on reporting and joint authority."
+    ],
+    "ask": "What is the final advice to lock in stabilization and protect the record?",
+    "caller_role": "Mara Velez, Town Manager",
+    "time_horizon": "Closeout window",
+    "unknown_facts": [
+      "Whether the town can close locally without the state package.",
+      "Whether the oversight conditions are survivable or effectively receivership."
+    ],
+    "immediate_risks": [
+      "Refusing the package risks an unmanaged closeout.",
+      "Accepting it may lock in controls that outlast the crisis."
+    ],
+    "private_pressure": "Majority wants a local close; opposition and state favor the conditioned package.",
+    "attached_document_ids": [
+      "doc_draft_emergency_order"
+    ]
+  }
+]

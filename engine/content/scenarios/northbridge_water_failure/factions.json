@@ -1,0 +1,219 @@
+[
+  {
+    "id": "town_managers_office",
+    "name": "Town Manager's Office",
+    "description": "Appointed executive running day-to-day municipal operations.",
+    "posture": "decisive",
+    "influence": 78,
+    "alignment": "authority",
+    "type": "EXECUTIVE",
+    "public_position": "Treat the situation as an acceleration of deferred maintenance.",
+    "private_incentive": "Keep a stabilization record that survives a council vote and a state review.",
+    "trust_in_player": 58,
+    "risk_tolerance": 45,
+    "current_pressure": 62,
+    "red_lines": [
+      "A state receivership or oversight designation.",
+      "Any documented public falsehood traceable to the Manager's office."
+    ],
+    "tags": [
+      "decision_authority",
+      "engagement_holder"
+    ]
+  },
+  {
+    "id": "council_majority",
+    "name": "Town Council Majority",
+    "description": "Governing bloc controlling appropriations and emergency authorities.",
+    "posture": "confident",
+    "influence": 70,
+    "alignment": "authority",
+    "type": "LEGISLATIVE",
+    "public_position": "Support the Manager while protecting the majority bloc's record.",
+    "private_incentive": "Authorize enough to look decisive without owning the political risk.",
+    "risk_tolerance": 35,
+    "current_pressure": 55,
+    "red_lines": [
+      "Emergency appropriations without a recorded vote.",
+      "Public blame settling on the majority bloc."
+    ],
+    "tags": [
+      "appropriations",
+      "vote"
+    ]
+  },
+  {
+    "id": "council_opposition",
+    "name": "Town Council Opposition",
+    "description": "Minority bloc poised to capitalize on any misstep.",
+    "posture": "circumspect",
+    "influence": 45,
+    "alignment": "opposition",
+    "type": "LEGISLATIVE",
+    "public_position": "Demand transparency and a full public record.",
+    "private_incentive": "Build a record that frames the majority as evasive.",
+    "trust_in_player": 38,
+    "risk_tolerance": 60,
+    "current_pressure": 58,
+    "red_lines": [
+      "Closed-session approvals they cannot scrutinize.",
+      "Being the last to see internal memos."
+    ],
+    "tags": [
+      "oversight",
+      "hearing_threat"
+    ]
+  },
+  {
+    "id": "water_authority",
+    "name": "Public Works / Water Authority",
+    "description": "Operators of the treatment plant, mains, and pressure system.",
+    "posture": "stretched",
+    "influence": 60,
+    "alignment": "service",
+    "type": "UTILITY",
+    "public_position": "We can hold pressure if we get staff and contractor support.",
+    "private_incentive": "Avoid being named as the cause of the failure.",
+    "trust_in_player": 55,
+    "current_pressure": 64,
+    "red_lines": [
+      "Liability for contamination they did not introduce.",
+      "Operating beyond certified staffing."
+    ],
+    "tags": [
+      "operator",
+      "staff_constrained"
+    ]
+  },
+  {
+    "id": "hospital",
+    "name": "Northbridge Hospital",
+    "description": "Regional acute-care facility dependent on municipal water.",
+    "posture": "watchful",
+    "influence": 55,
+    "alignment": "service",
+    "type": "HOSPITAL",
+    "public_position": "Protect clinical operations, especially dialysis and sterilization.",
+    "private_incentive": "Secure priority allocation without becoming the public face of the crisis.",
+    "trust_in_player": 60,
+    "risk_tolerance": 30,
+    "current_pressure": 50,
+    "red_lines": [
+      "An unplanned loss of water for dialysis or sterilization.",
+      "Being blamed for an elective-cancellation cascade."
+    ],
+    "tags": [
+      "critical_facility",
+      "priority_water"
+    ]
+  },
+  {
+    "id": "parent_resident_coalition",
+    "name": "Parent and Resident Coalition",
+    "description": "Organized residents tracking school and household risk.",
+    "posture": "alarmed",
+    "influence": 48,
+    "alignment": "neutral",
+    "type": "RESIDENT_GROUP",
+    "public_position": "Close or protect the schools; tell us the truth about the water.",
+    "private_incentive": "Force visible, on-the-record action before pressure drops further.",
+    "trust_in_player": 44,
+    "risk_tolerance": 55,
+    "current_pressure": 66,
+    "red_lines": [
+      "Schools staying open under unsafe pressure.",
+      "Residents being the last to learn."
+    ],
+    "tags": [
+      "school_pressure",
+      "social_amplification"
+    ]
+  },
+  {
+    "id": "business_alliance",
+    "name": "Local Business Alliance",
+    "description": "Employers and retailers sensitive to disruption and reputation.",
+    "posture": "steady",
+    "influence": 42,
+    "alignment": "neutral",
+    "type": "BUSINESS",
+    "public_position": "Keep the town open for business; compensate mandatory closures.",
+    "private_incentive": "Avoid a contaminated-town reputation that lingers past the crisis.",
+    "trust_in_player": 46,
+    "risk_tolerance": 50,
+    "current_pressure": 44,
+    "red_lines": [
+      "Uncompensated mandatory closures.",
+      "A public 'contamination' label they cannot contest."
+    ],
+    "tags": [
+      "economic",
+      "reputation_sensitive"
+    ]
+  },
+  {
+    "id": "state_liaison",
+    "name": "State Emergency Management Liaison",
+    "description": "State agency observer with authority to trigger oversight.",
+    "posture": "advisory",
+    "influence": 50,
+    "alignment": "authority",
+    "type": "STATE_ACTOR",
+    "public_position": "Offer resources; expect timely notification and documentation.",
+    "private_incentive": "Avoid a visible local failure on the agency's watch.",
+    "trust_in_player": 52,
+    "risk_tolerance": 42,
+    "current_pressure": 48,
+    "red_lines": [
+      "Being notified after the press.",
+      "Quiet local deals that foreclose state response options."
+    ],
+    "tags": [
+      "state_oversight",
+      "intervention_trigger"
+    ]
+  },
+  {
+    "id": "utility_contractor",
+    "name": "Utility Contractor",
+    "description": "Sole qualified firm able to repair the failing system.",
+    "posture": "cooperative",
+    "influence": 58,
+    "alignment": "service",
+    "type": "CONTRACTOR",
+    "public_position": "We can deliver if the town underwrites the emergency scope.",
+    "private_incentive": "Lock in premium rates and indemnity while leverage is high.",
+    "trust_in_player": 40,
+    "risk_tolerance": 65,
+    "current_pressure": 60,
+    "red_lines": [
+      "Indemnification gaps on emergency change orders.",
+      "A competitive procurement that sidelines the firm."
+    ],
+    "tags": [
+      "sole_source",
+      "leverage"
+    ]
+  },
+  {
+    "id": "media_rumor_network",
+    "name": "Local Media / Rumor Network",
+    "description": "Patchwork of outlets and social channels amplifying uncertainty.",
+    "posture": "circulating",
+    "influence": 40,
+    "alignment": "neutral",
+    "type": "MEDIA",
+    "public_position": "Report what we can verify; chase what we can't.",
+    "private_incentive": "A leak or contradiction is the most valuable story available.",
+    "trust_in_player": 30,
+    "risk_tolerance": 70,
+    "current_pressure": 52,
+    "red_lines": [
+      "A clean, well-managed story with no seams to pull."
+    ],
+    "tags": [
+      "narrative",
+      "amplification"
+    ]
+  }
+]

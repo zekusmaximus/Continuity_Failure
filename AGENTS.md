@@ -260,6 +260,10 @@ The interface should begin polished and degrade as systems fail:
 * Prefer Python with FastAPI and Pydantic on the backend.
 * Keep deterministic simulation logic isolated from API routing.
 * Keep prompts in versioned files under `prompts/`.
+* Keep authored scenario content as versioned JSON under
+  `engine/content/scenarios/` (not embedded in engine code); it is validated
+  before a campaign starts. Run `python -m engine.content validate` and see
+  `docs/content-authoring.md`.
 * Keep schemas centralized and reusable.
 * Validate every model response before use.
 * Log every model call with prompt version, input, output, validation result, retries, latency, token use, and cost estimate where available.

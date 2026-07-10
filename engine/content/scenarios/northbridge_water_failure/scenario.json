@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "scenario_id": "northbridge_water_failure",
+  "name": "Northbridge Water Failure",
+  "max_turns": 10,
+  "starting_variables": {
+    "water_security": 46,
+    "power_stability": 72,
+    "public_trust": 56,
+    "public_order": 66,
+    "budget_capacity": 40,
+    "staff_capacity": 50,
+    "legal_exposure": 34,
+    "media_pressure": 28,
+    "hospital_stability": 56,
+    "school_disruption": 38,
+    "state_oversight_risk": 26,
+    "contractor_dependency": 52,
+    "information_integrity": 62,
+    "player_reputation": 50,
+    "player_perceived_neutrality": 60,
+    "player_shadow_authority": 18
+  },
+  "crisis": {
+    "id": "northbridge_water_crisis",
+    "name": "Northbridge Water System Failure",
+    "description": "Heat stress and deferred maintenance have destabilized the municipal water system. A preliminary contamination sample is ambiguous, system pressure is falling in the south zone, hospital and school operations depend on stable supply, and the only qualified repair contractor holds outsized leverage over the town. Each decision narrows the next.",
+    "severity": 54
+  }
+}

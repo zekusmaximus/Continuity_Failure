@@ -1,0 +1,125 @@
+{
+  "2": [
+    {
+      "id": "school_staged_closure",
+      "label": "Issue a staged, threshold-based school closure protocol",
+      "summary": "Publish a written pressure threshold and a staged closure protocol for the three south-zone schools.",
+      "rationale": "Gives the superintendent a defensible, on-the-record rule instead of a guess, and blunts the concealment narrative.",
+      "tags": [
+        "school_closure"
+      ],
+      "effects": {
+        "school_disruption": -6,
+        "public_trust": 4,
+        "legal_exposure": -3,
+        "budget_capacity": -3,
+        "public_order": -2,
+        "media_pressure": 2
+      },
+      "type": "SCHOOL_CLOSURE_PROTOCOL",
+      "recommendation": "Adopt a written pressure floor below which the three south-zone schools close, with a staged reopening test.",
+      "expected_benefits": [
+        "Replaces a guess with a defensible, published threshold.",
+        "Parents see on-the-record action; trust steadies."
+      ],
+      "expected_harms": [
+        "A precautionary closure spends budget and disrupts families even if the water proves fine.",
+        "Publishing a closure rule signals the crisis is real, raising media pressure."
+      ],
+      "operational_steps": [
+        "Set the sanitation and pressure measurements that trigger each closure stage.",
+        "Publish transportation, meal, and remote-learning arrangements with the threshold.",
+        "Require a documented verification check before reopening each building."
+      ],
+      "legal_risk": 25,
+      "political_risk": 40,
+      "operational_risk": 35,
+      "affected_factions": [
+        "parent_resident_coalition",
+        "council_majority",
+        "media_rumor_network"
+      ]
+    }
+  ],
+  "3": [
+    {
+      "id": "hospital_priority_allocation",
+      "label": "Document priority water allocation for the hospital",
+      "summary": "Formally allocate priority pressurized supply to dialysis and sterilization, with tanker resupply as backup.",
+      "rationale": "Protects the most acute clinical need and creates a clean record before a harm event can occur.",
+      "tags": [
+        "hospital_priority"
+      ],
+      "effects": {
+        "hospital_stability": 8,
+        "water_security": -3,
+        "public_trust": 2,
+        "legal_exposure": -2,
+        "budget_capacity": -2
+      },
+      "type": "HOSPITAL_PRIORITY",
+      "recommendation": "Issue documented priority allocation for clinical water and pre-stage tanker resupply for dialysis and sterilization.",
+      "expected_benefits": [
+        "Clinical operations are protected before a cascade begins.",
+        "A documented allocation reduces liability exposure."
+      ],
+      "expected_harms": [
+        "Diverting pressurized supply thins the general system margin.",
+        "A visible priority for the hospital can trigger a fairness dispute with residents."
+      ],
+      "operational_steps": [
+        "Document the dialysis and sterilization volumes that receive priority supply.",
+        "Stage tanker backup and define the pressure reading that triggers delivery.",
+        "Brief resident representatives on the clinical basis and limits of the allocation."
+      ],
+      "legal_risk": 25,
+      "political_risk": 35,
+      "operational_risk": 45,
+      "affected_factions": [
+        "hospital",
+        "water_authority",
+        "parent_resident_coalition"
+      ]
+    }
+  ],
+  "7": [
+    {
+      "id": "business_compensation_framework",
+      "label": "Offer a compensation framework for mandatory closures",
+      "summary": "Pair enforceable conservation restrictions with a limited compensation framework for affected businesses.",
+      "rationale": "Trades fiscal capacity for enforceability, defusing the injunction threat without conceding the public-health line.",
+      "tags": [
+        "business_compensation"
+      ],
+      "effects": {
+        "budget_capacity": -6,
+        "public_order": 4,
+        "legal_exposure": -4,
+        "public_trust": 2,
+        "media_pressure": -2
+      },
+      "type": "BUSINESS_COMPENSATION",
+      "recommendation": "Offer a capped compensation framework tied to compliance so restrictions hold up against an injunction.",
+      "expected_benefits": [
+        "Keeps conservation restrictions enforceable; order improves.",
+        "Removes the coalition's strongest grounds for an injunction."
+      ],
+      "expected_harms": [
+        "Compensation draws down already-thin budget capacity.",
+        "A framework can be read as admitting fault and invite further claims."
+      ],
+      "operational_steps": [
+        "Define eligible closure losses, documentation requirements, and a capped appropriation.",
+        "Tie compensation eligibility to compliance with the conservation order.",
+        "Publish the framework and appeal path before enforcing the next restriction cycle."
+      ],
+      "legal_risk": 35,
+      "political_risk": 45,
+      "affected_factions": [
+        "business_alliance",
+        "council_majority",
+        "town_managers_office"
+      ]
+    }
+  ]
+}

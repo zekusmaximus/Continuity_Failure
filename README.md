@@ -207,6 +207,17 @@ pytest
 
 The engine tests exercise only the `engine` package and require no web server.
 
+Scenario content lives as versioned JSON under `engine/content/scenarios/` and is
+validated before any campaign is seeded. Validate it standalone (also runs in the
+pytest suite):
+
+```bash
+python -m engine.content validate
+```
+
+Authoring rules and the full validation contract are in
+[`docs/content-authoring.md`](docs/content-authoring.md).
+
 Frontend tests live under `frontend/` in two layers — fast component/integration
 tests (Vitest) and real-browser end-to-end tests (Playwright) that drive the
 production build against an isolated backend and SQLite database:

@@ -1,0 +1,24 @@
+[
+  {
+    "id": "thread_disclosure_clock",
+    "title": "Disclosure clock on a preliminary, contested lab result",
+    "summary": "A preliminary sample sits above the advisory threshold; the confirmatory result is pending. Every turn of delay adds legal and narrative risk.",
+    "turn_opened": 1,
+    "tags": [
+      "disclosure",
+      "legal",
+      "narrative"
+    ]
+  },
+  {
+    "id": "thread_contractor_leverage",
+    "title": "Sole-source contractor leverage over the repair",
+    "summary": "Only Marquotte Utilities is certified for the failing valves. Indemnity demands and premium change orders compound dependency.",
+    "turn_opened": 1,
+    "tags": [
+      "contractor",
+      "procurement",
+      "dependency"
+    ]
+  }
+]

@@ -1,0 +1,241 @@
+[
+  {
+    "id": "full_disclosure",
+    "label": "Full disclosure and emergency conservation order",
+    "summary": "Publish the findings, issue a conservation order, and open the record.",
+    "rationale": "Minimizes legal exposure and protects information integrity.",
+    "tags": [
+      "disclosure"
+    ],
+    "effects": {
+      "legal_exposure": -10,
+      "information_integrity": 10,
+      "public_trust": 5,
+      "media_pressure": 10,
+      "public_order": -8,
+      "budget_capacity": -3,
+      "player_reputation": 3
+    },
+    "type": "FULL_DISCLOSURE",
+    "recommendation": "Release the preliminary result with a conservation order, notify the state agency in writing, and publish the response timeline.",
+    "expected_benefits": [
+      "Lowest legal exposure; the disclosure-timing liability is discharged.",
+      "Information integrity holds; the record is clean."
+    ],
+    "expected_harms": [
+      "Short-term public-order shock and media amplification.",
+      "Business and school disruption spike before mitigation lands."
+    ],
+    "operational_steps": [
+      "Transmit the preliminary result and response timeline to the state liaison in writing.",
+      "Issue the conservation order with separate hospital and school operating instructions.",
+      "Publish the source report, known uncertainties, and the next verification deadline together."
+    ],
+    "legal_risk": 15,
+    "political_risk": 70,
+    "operational_risk": 45,
+    "affected_factions": [
+      "town_managers_office",
+      "media_rumor_network",
+      "parent_resident_coalition",
+      "business_alliance"
+    ]
+  },
+  {
+    "id": "controlled_disclosure",
+    "label": "Controlled disclosure with hospital and school mitigation",
+    "summary": "Release a measured statement while pre-positioning mitigation.",
+    "rationale": "Balanced: protects trust without triggering panic.",
+    "tags": [
+      "disclosure"
+    ],
+    "effects": {
+      "information_integrity": 6,
+      "public_trust": 2,
+      "media_pressure": 5,
+      "public_order": -4,
+      "hospital_stability": 3,
+      "school_disruption": -4,
+      "budget_capacity": -3
+    },
+    "recommendation": "Issue a measured public statement, pre-position hospital and school mitigation, and brief the state liaison before press runs the story.",
+    "expected_benefits": [
+      "Trust and information integrity both improve modestly.",
+      "Hospital and schools are buffered before the public learns."
+    ],
+    "expected_harms": [
+      "Vulnerable to a leak narrative if the rumor feed moves first.",
+      "Spends budget and staff on mitigation that may look precautionary."
+    ],
+    "operational_steps": [
+      "Brief the state liaison, hospital, and superintendent before the public statement.",
+      "Pre-position clinical water and school sanitation contingencies before release.",
+      "Publish a measured statement that names the uncertainty and the next verification deadline."
+    ],
+    "legal_risk": 35,
+    "political_risk": 45,
+    "operational_risk": 35,
+    "affected_factions": [
+      "town_managers_office",
+      "hospital",
+      "parent_resident_coalition",
+      "media_rumor_network"
+    ]
+  },
+  {
+    "id": "delay_disclosure",
+    "label": "Delay public disclosure pending confirmatory testing",
+    "summary": "Hold the public line while awaiting second-lab confirmation.",
+    "rationale": "Preserves short-term order and contractor bandwidth.",
+    "tags": [
+      "delay"
+    ],
+    "effects": {
+      "public_order": 4,
+      "information_integrity": -10,
+      "public_trust": -8,
+      "legal_exposure": 8,
+      "media_pressure": 5
+    },
+    "type": "DELAY",
+    "recommendation": "Wait for the confirmatory second-lab result before any public statement; continue quiet mitigation in the meantime.",
+    "expected_benefits": [
+      "Short-term public order is preserved.",
+      "Buys time for contractor repair sequencing."
+    ],
+    "expected_harms": [
+      "Disclosure-timing liability builds sharply.",
+      "A leak converts the delay into a concealment narrative."
+    ],
+    "operational_steps": [
+      "Document the basis and expiration time for withholding the preliminary result.",
+      "Continue quiet hospital, school, and pressure-zone mitigation during the wait.",
+      "Prepare a release package that can be issued immediately if the result leaks or confirms."
+    ],
+    "legal_risk": 85,
+    "political_risk": 60,
+    "operational_risk": 25,
+    "affected_factions": [
+      "council_opposition",
+      "media_rumor_network",
+      "parent_resident_coalition"
+    ]
+  },
+  {
+    "id": "state_support",
+    "label": "Request state emergency support immediately",
+    "summary": "Invoke state emergency assistance for water and logistics.",
+    "rationale": "Fastest path to water security, at a political cost.",
+    "tags": [
+      "state_support"
+    ],
+    "effects": {
+      "water_security": 12,
+      "budget_capacity": 3,
+      "state_oversight_risk": 12,
+      "public_trust": -3,
+      "player_shadow_authority": 3
+    },
+    "type": "STATE_AID_REQUEST",
+    "recommendation": "Formally request state emergency assistance for water, logistics, and operators; document the operational necessity.",
+    "expected_benefits": [
+      "Fastest material improvement to water security.",
+      "Budget pressure eases as state resources arrive."
+    ],
+    "expected_harms": [
+      "Raises the odds of a formal oversight designation.",
+      "Politically costly; the majority bloc resists outside control."
+    ],
+    "operational_steps": [
+      "Send a written request identifying tanker, operator, and logistics requirements.",
+      "Record why local capacity cannot meet the current operational need.",
+      "Negotiate a time-bounded reporting and authority framework before accepting resources."
+    ],
+    "political_risk": 65,
+    "operational_risk": 20,
+    "affected_factions": [
+      "state_liaison",
+      "council_majority",
+      "town_managers_office"
+    ]
+  },
+  {
+    "id": "contractor_pressure",
+    "label": "Pressure the contractor privately while preparing a statement",
+    "summary": "Force a faster repair timeline without public confrontation.",
+    "rationale": "Protects budget and water but deepens dependency.",
+    "tags": [
+      "contractor"
+    ],
+    "effects": {
+      "water_security": 8,
+      "budget_capacity": 4,
+      "contractor_dependency": 10,
+      "legal_exposure": 2,
+      "public_trust": -2
+    },
+    "type": "CONTRACTOR_PRESSURE",
+    "recommendation": "Negotiate a faster emergency timeline privately, with a contingency statement ready if the squeeze fails.",
+    "expected_benefits": [
+      "Water security improves without public escalation.",
+      "Budget terms improve if the town credibly threatens alternatives."
+    ],
+    "expected_harms": [
+      "Deepens structural dependency on a sole-source firm.",
+      "Little leverage if the contractor calls the bluff."
+    ],
+    "operational_steps": [
+      "Set a written repair milestone and crew-staging deadline for the contractor.",
+      "Document the town's alternatives, indemnity limits, and walk-away conditions.",
+      "Prepare a public procurement statement for release if the revised timeline is refused."
+    ],
+    "legal_risk": 40,
+    "political_risk": 35,
+    "operational_risk": 55,
+    "affected_factions": [
+      "utility_contractor",
+      "water_authority",
+      "council_majority"
+    ]
+  },
+  {
+    "id": "mutual_aid",
+    "label": "Convene regional mutual aid before public escalation",
+    "summary": "Pull neighboring utilities and regional hospitals into the response.",
+    "rationale": "Strengthens hospital and water resilience collaboratively.",
+    "tags": [
+      "mutual_aid"
+    ],
+    "effects": {
+      "hospital_stability": 6,
+      "water_security": 6,
+      "budget_capacity": -5,
+      "public_trust": 2,
+      "state_oversight_risk": 3
+    },
+    "type": "MUTUAL_AID",
+    "recommendation": "Activate the regional mutual-aid compact for neighboring utilities and hospital resupply before the crisis goes fully public.",
+    "expected_benefits": [
+      "Hospital and water resilience both improve cooperatively.",
+      "Public trust benefits from visible regional coordination."
+    ],
+    "expected_harms": [
+      "Costs budget and political capital.",
+      "Slightly raises state awareness of the failure."
+    ],
+    "operational_steps": [
+      "Activate the regional compact with named water, staffing, and hospital requests.",
+      "Assign one municipal coordinator to reconcile incoming aid with local operations.",
+      "Publish the scope and duration of mutual aid without overstating system stability."
+    ],
+    "legal_risk": 25,
+    "political_risk": 40,
+    "operational_risk": 40,
+    "affected_factions": [
+      "hospital",
+      "water_authority",
+      "state_liaison",
+      "council_majority"
+    ]
+  }
+]

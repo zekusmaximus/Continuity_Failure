@@ -354,13 +354,59 @@ engine/rules.py
 engine/consequences.py
 engine/dossier.py
 engine/diffs.py
-engine/seed_data.py
+engine/seed_data.py        (compatibility facade over engine/content)
+engine/content/            (versioned, validated scenario content layer)
 ```
 
 > **Status:** `events.py` and `scoring.py` above are the original target list;
 > they are not present. Deterministic consequence-stack generation lives in
 > `engine/consequences.py`, and the framework-free Markdown campaign dossier is
 > built in `engine/dossier.py`.
+
+### Scenario Content Layer
+
+Authored scenario content is separated from executable engine rules. Content
+describes *inputs* (starting state, factions, advice options, per-turn calls,
+evidence documents, seed threads, crisis); the engine rules decide *outcomes*.
+
+```text
+engine/content/
+  __init__.py            single factory API: load_campaign(scenario_id, ...)
+  schema.py              schema version + controlled vocabularies + field specs
+  validator.py           collecting validator (file/field-anchored errors)
+  loader.py              JSON reader, schema-version gate/migration, dataclass build
+  __main__.py            developer command: python -m engine.content validate
+  scenarios/
+    northbridge_water_failure/
+      scenario.json      schema_version, id, name, max_turns, starting_variables, crisis
+      factions.json      the ten Northbridge factions
+      advice.json        the six global advice options
+      per_turn_advice.json   turn -> options that only make sense on that call
+      calls.json         one client call per turn (1..max_turns)
+      documents.json     evidence-board documents (freshness = turn_number)
+      threads.json       open threads seeded at engagement start
+```
+
+Rules of the layer:
+
+* **JSON only** — the format is parsed with the standard library, so the engine
+  keeps its "stdlib + engine only" import boundary
+  (`tests/test_engine_turns.py::test_engine_imports_only_stdlib_and_itself`).
+  No YAML/Pydantic/CMS is introduced into `engine/`.
+* **Validate before seeding.** `load_campaign` validates the *complete* scenario
+  before constructing any authoritative state, so malformed content never
+  partially seeds a campaign. `seed_data.create_northbridge_campaign` is now a
+  thin facade over `engine.content.load_campaign` and keeps its old signature.
+* **Schema version.** `scenario.json` declares `schema_version`. The loader reads
+  `SUPPORTED_SCHEMA_VERSIONS`, applies any registered forward migration, and
+  raises `IncompatibleSchemaVersion` otherwise.
+* **Fail loudly.** A typo in an id, cross-reference, WorldState variable, effect
+  key, enum, range, turn, document tag, or operational step raises
+  `ContentValidationError` — listing every problem with its file and field path —
+  before play begins.
+
+Authoring rules, the validator command, and the full check list live in
+[`docs/content-authoring.md`](content-authoring.md).
 
 ### Engine Responsibilities
 
