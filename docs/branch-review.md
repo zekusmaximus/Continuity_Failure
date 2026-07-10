@@ -64,7 +64,7 @@ workstation and gives Northbridge document-rich, escalating content.
   option (validation-gated, deterministic fallback, never changes state) and
   `GET /api/campaigns/{id}/model-runs` exposes the read-only AI run log.
 
-- **Tests.** The suite now numbers **96 passing**: the original engine/content
+- **Tests.** The suite now numbers **156 passing**: the original engine/content
   tests plus AI boundary, AI runner, AI memo service, and HTTP route
   (`TestClient`) tests covering all endpoints and error paths.
 
@@ -118,7 +118,7 @@ pytest
 ```
 
 The engine tests import only `engine/` and require no server; the AI and route
-tests import the backend. **96 passing**, covering bounds, applied diffs, turn
+tests import the backend. **156 passing**, covering bounds, applied diffs, turn
 increments, every failure threshold, 10-turn completion, determinism,
 engine-independence (AST-based), documents/evidence, advice tradeoffs,
 consequence stacks, open threads, dossier generation, the AI boundary + runner

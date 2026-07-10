@@ -85,7 +85,7 @@ memory/     in-memory CampaignStore (process-local; cleared on restart)
   Case File has a **Model Runs** tab. The frontend reveals the backend's single
   post-advice `TurnResult` across the separate client-decision / consequences /
   archive phases; no backend shape change was required.
-* `pytest` suite (**96 passing**): determinism, 0–100 bounds, failure
+* `pytest` suite (**156 passing**): determinism, 0–100 bounds, failure
   thresholds, completion at turn 10, applied diffs, engine/FastAPI-independence
   (AST-based), documents/evidence, advice tradeoffs, consequence stacks, open
   threads, dossier generation, the AI boundary + runner + memo service path,
@@ -247,7 +247,7 @@ sequence — **one screen, one task, one obvious next action**:
 4. Evidence Review — Critical / Relevant / Background (`Continue to Advice`).
 5. Advice — concise tradeoffs, details expand on selection (`Send Advice`).
 6. Client Decision — how the NPC used the advice (`Resolve Consequences`).
-7. Consequences — human-readable first, raw diffs behind an expander (`Archive Turn`).
+7. Consequences — human-readable first, raw diffs behind an expander (`Close Turn`).
 8. Turn Archive (`Next Call`, or `View Campaign Dossier` when terminal).
 9. Case File drawer (on demand): Evidence · Factions · Full State · Canon ·
    Timeline · Dossier.

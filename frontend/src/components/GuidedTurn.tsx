@@ -23,6 +23,7 @@ interface Props {
   onGoto: (phase: Phase) => void;
   onSendAdvice: () => void;
   onNextCall: () => void;
+  onOpenDossier: () => void;
   onRestart: () => void;
   onOpenCaseFile: () => void;
   memo: MemoDraft | null;
@@ -50,6 +51,7 @@ export default function GuidedTurn(props: Props) {
     onGoto,
     onSendAdvice,
     onNextCall,
+    onOpenDossier,
     onRestart,
     onOpenCaseFile,
     memo,
@@ -73,7 +75,11 @@ export default function GuidedTurn(props: Props) {
           onClick={() => onGoto("BRIEF")}
         />
       ) : (
-        <PrimaryAction label="View Campaign Dossier" onClick={() => onGoto("DOSSIER")} />
+        <PrimaryAction
+          label="View Campaign Dossier"
+          onClick={onOpenDossier}
+          busy={submitting}
+        />
       );
       break;
 
@@ -150,8 +156,8 @@ export default function GuidedTurn(props: Props) {
       panel = lastResult ? <ConsequencesPhase result={lastResult} /> : null;
       action = (
         <PrimaryAction
-          label="Archive Turn"
-          hint="File this turn to the record and move on."
+          label="Close Turn"
+          hint="Close this turn's record and move on."
           onClick={() => onGoto("ARCHIVE")}
         />
       );
@@ -163,13 +169,15 @@ export default function GuidedTurn(props: Props) {
         <PrimaryAction
           label="View Campaign Dossier"
           hint="The engagement has closed. Review the final record."
-          onClick={() => onGoto("DOSSIER")}
+          onClick={onOpenDossier}
+          busy={submitting}
         />
       ) : (
         <PrimaryAction
           label="Next Call"
           hint="Take the next incoming call."
           onClick={onNextCall}
+          busy={submitting}
         />
       );
       break;
@@ -181,6 +189,7 @@ export default function GuidedTurn(props: Props) {
           label="New Engagement"
           hint="Start a fresh Northbridge engagement."
           onClick={onRestart}
+          busy={submitting}
         />
       );
       break;

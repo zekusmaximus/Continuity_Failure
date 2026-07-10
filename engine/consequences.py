@@ -24,6 +24,7 @@ from engine.models import (
     OpenThread,
     SourceType,
 )
+from engine.state import humanize_variable
 
 
 # ---------------------------------------------------------------------------
@@ -476,7 +477,8 @@ def build_consequence_stack(
         top = max(advice_or_npc, key=lambda d: abs(d.delta))
         sign = "+" if top.delta > 0 else ""
         stack.immediate.append(
-            f"Largest registered move: {top.variable} {top.old_value}\u2192{top.new_value} "
+            f"Largest advice/client move: {humanize_variable(top.variable)} "
+            f"{top.old_value}\u2192{top.new_value} "
             f"({sign}{top.delta}, {top.source_type})."
         )
 

@@ -134,6 +134,7 @@ class AdviceOption:
     recommendation: str = ""               # the specific recommended action
     expected_benefits: List[str] = field(default_factory=list)
     expected_harms: List[str] = field(default_factory=list)
+    operational_steps: List[str] = field(default_factory=list)
     legal_risk: int = 30                   # 0-100 descriptive risk estimate
     political_risk: int = 30
     operational_risk: int = 30

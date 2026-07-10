@@ -23,6 +23,11 @@
 
 * { box-sizing: border-box; }
 
+:where(button, input, [tabindex]):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
 html, body, #root { height: 100%; margin: 0; }
 
 body {
@@ -228,6 +233,18 @@ body {
   font-size: 10.5px;
   color: var(--text-dim);
   letter-spacing: 0.03em;
+}
+.cd-keystate-label-wrap {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+}
+.cd-keystate-direction {
+  font-family: var(--mono);
+  font-size: 9px;
+  color: var(--text-dim);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
 }
 .cd-keystate-track {
   height: 5px; width: 64px;
@@ -683,6 +700,9 @@ body {
 .lvl-good { background: var(--good); }
 .lvl-warn { background: var(--warn); }
 .lvl-crit { background: var(--crit); }
+.mag-high { background: var(--info); }
+.mag-mid { background: var(--accent-dim); }
+.mag-low { background: var(--text-dim); }
 .cd-var-value.lvl-good, .cd-keystate-value.lvl-good { color: var(--good); background: transparent; }
 .cd-var-value.lvl-warn, .cd-keystate-value.lvl-warn { color: var(--warn); background: transparent; }
 .cd-var-value.lvl-crit, .cd-keystate-value.lvl-crit { color: var(--crit); background: transparent; }
@@ -746,7 +766,8 @@ body {
 .cd-state-group-title { font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent-dim); margin-bottom: 8px; }
 .cd-var-list { list-style: none; margin: 0; padding: 0; }
 .cd-var-row { display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px; align-items: center; margin-bottom: 7px; }
-.cd-var-label { font-size: 11.5px; color: var(--text); }
+.cd-var-label { font-size: 11.5px; color: var(--text); display: flex; flex-direction: column; line-height: 1.3; }
+.cd-var-direction { font-family: var(--mono); font-size: 8.5px; color: var(--text-dim); text-transform: uppercase; }
 .cd-var-bar { height: 5px; background: var(--bg-inset); border: 1px solid var(--border); border-radius: 2px; overflow: hidden; }
 .cd-var-fill { height: 100%; transition: width 0.3s ease; }
 .cd-var-value { font-family: var(--mono); font-size: 11px; text-align: right; }
@@ -933,3 +954,12 @@ body {
 .cd-run-warn { color: var(--warn); border-color: var(--warn); }
 .cd-run-system { color: var(--text-dim); }
 .cd-run-input { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}

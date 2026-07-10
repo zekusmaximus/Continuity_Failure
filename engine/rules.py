@@ -17,7 +17,7 @@ from engine.models import (
     NpcDecision,
     SourceType,
 )
-from engine.state import clamp
+from engine.state import clamp, humanize_variable
 
 
 # An internal working draft of an NPC decision, before the public NpcDecision
@@ -65,12 +65,12 @@ def check_failure(variables: Dict[str, int]) -> Optional[str]:
         value = variables.get(variable, 50)
         if op == "<=" and value <= threshold:
             return (
-                f"{variable} collapsed to {value} "
+                f"{humanize_variable(variable)} collapsed to {value} "
                 f"(failure threshold {op} {threshold})."
             )
         if op == ">=" and value >= threshold:
             return (
-                f"{variable} reached {value} "
+                f"{humanize_variable(variable)} reached {value} "
                 f"(failure threshold {op} {threshold})."
             )
     return None
@@ -532,7 +532,10 @@ def build_aftermath_summary(
         reverse=True,
     )[:3]
     if top:
-        moves = "; ".join(f"{d.variable} {d.old_value}\u2192{d.new_value}" for d in top)
+        moves = "; ".join(
+            f"{humanize_variable(d.variable)} {d.old_value}\u2192{d.new_value}"
+            for d in top
+        )
         moves = f" Notable shifts: {moves}."
     else:
         moves = ""

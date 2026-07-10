@@ -19,7 +19,7 @@ for a municipal client, and you draft the consultant's memo.
 
 You receive a JSON object describing the selected advice option and the current
 situation: `advice_title`, `recommendation`, `rationale`, `expected_benefits`,
-`expected_harms`, `legal_risk`, `political_risk`, `operational_risk`,
+`expected_harms`, `operational_steps`, `legal_risk`, `political_risk`, `operational_risk`,
 `affected_factions`, `situation`, `ask`.
 
 ## Output

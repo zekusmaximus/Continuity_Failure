@@ -50,14 +50,18 @@ def test_memo_fallback_is_a_valid_memo():
         "rationale": "Transparency limits later legal exposure.",
         "expected_benefits": ["Preserves public trust"],
         "expected_harms": ["Short-term panic risk"],
-        "affected_factions": ["council", "hospital"],
+        "operational_steps": [
+            "Brief the hospital before release.",
+            "Publish the verification deadline.",
+        ],
+        "affected_factions": ["Town Council", "Northbridge Hospital"],
     }
     memo = fallbacks.memo_fallback(payload)
     assert isinstance(memo, MemoDraft)
     assert memo.recommendation
-    assert memo.operational_steps
+    assert memo.operational_steps == payload["operational_steps"]
     assert memo.second_order_risks == ["Short-term panic risk"]
-    assert any("council" in line for line in memo.likely_opposition)
+    assert any("Town Council" in line for line in memo.likely_opposition)
 
 
 # ---------------------------------------------------------------------------
@@ -73,6 +77,8 @@ def test_draft_memo_returns_fallback_and_logs_a_run():
     assert result.source == "system"
     assert result.draft.recommendation
     assert result.draft.fallback_plan
+    assert result.draft.operational_steps
+    assert not any("_" in line for line in result.draft.likely_opposition)
 
     runs = campaign_service.get_model_runs(campaign_id)
     assert len(runs) == 1

@@ -16,6 +16,8 @@ from typing import Optional
 # cheaper drafting tier, or a stronger model for harder roles).
 DEFAULT_MODEL = "claude-opus-4-8"
 DEFAULT_MAX_OUTPUT_TOKENS = 1024
+MIN_OUTPUT_TOKENS = 64
+MAX_OUTPUT_TOKENS = 8192
 
 
 def _env_bool(name: str, default: bool = False) -> bool:
@@ -25,14 +27,20 @@ def _env_bool(name: str, default: bool = False) -> bool:
     return raw.strip().lower() in {"1", "true", "yes", "on"}
 
 
-def _env_int(name: str, default: int) -> int:
+def _env_int(
+    name: str,
+    default: int,
+    minimum: int = MIN_OUTPUT_TOKENS,
+    maximum: int = MAX_OUTPUT_TOKENS,
+) -> int:
     raw = os.environ.get(name)
     if raw is None or not raw.strip():
         return default
     try:
-        return int(raw)
+        value = int(raw)
     except ValueError:
         return default
+    return max(minimum, min(maximum, value))
 
 
 @dataclass(frozen=True)
@@ -43,6 +51,13 @@ class Settings:
     model_name: str
     anthropic_api_key: Optional[str]
     max_output_tokens: int
+
+    def __post_init__(self) -> None:
+        if not MIN_OUTPUT_TOKENS <= self.max_output_tokens <= MAX_OUTPUT_TOKENS:
+            raise ValueError(
+                f"max_output_tokens must be within "
+                f"{MIN_OUTPUT_TOKENS}..{MAX_OUTPUT_TOKENS}"
+            )
 
     @property
     def ai_live(self) -> bool:

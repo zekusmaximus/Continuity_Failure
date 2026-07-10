@@ -38,7 +38,12 @@ export default function StateReadout({ state }: { state: WorldState }) {
                 const level = effectiveLevel(value, meta.risk);
                 return (
                   <li key={key} className="cd-var-row">
-                    <span className="cd-var-label">{meta.label}</span>
+                    <span className="cd-var-label">
+                      <span>{meta.label}</span>
+                      <span className="cd-var-direction">
+                        {meta.risk ? "↑ worse" : "↑ better"}
+                      </span>
+                    </span>
                     <span className="cd-var-bar">
                       <span className={`cd-var-fill ${levelClass(level)}`} style={{ width: `${value}%` }} />
                     </span>

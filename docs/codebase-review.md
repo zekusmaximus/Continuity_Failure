@@ -13,7 +13,7 @@
 ## Executive Verdict
 
 The repository is **coherent, runnable, and now truthfully documented**. The
-deterministic Northbridge MVP is solid: 96 tests pass, the engine is
+deterministic Northbridge MVP is solid: 156 tests pass, the engine is
 framework-free (verified by an AST scan, not a fragile `sys.modules` check),
 the 10-turn loop completes or fails deterministically, every mutation emits an
 `AppliedDiff`, and NPC mediation is real. The frontend builds clean, the
@@ -36,7 +36,7 @@ tools, then durability). The remaining open items are low-severity content and
 scaling debts, none of which block forward progress.
 
 - Coherent? Yes.
-- Playable/runnable? Yes — `pytest` (96 passed), `npm run build` (clean),
+- Playable/runnable? Yes — `pytest` (156 passed), `npm run build` (clean),
   backend imports and serves, full 10-turn campaign + memo draft smoke-tested
   end to end through the HTTP API.
 - Aligned with intended product? Yes, and now documented accurately.
@@ -74,7 +74,7 @@ What exists now (verified by reading the code):
   "AI draft" / "System draft (deterministic fallback)" provenance; the Case File
   has a "Model Runs" tab (`ModelRunPanel`).
 - **`memory/`** — in-memory `CampaignStore`/`MemoryStore` (thread-safe).
-- **`tests/`** — 96 tests: engine turns (incl. AST-based independence), state
+- **`tests/`** — 156 tests: engine turns (incl. AST-based independence), state
   invariants, content/dossier, AI boundary, AI runner, AI memo service path,
   and HTTP route tests (`TestClient`) for all endpoints + error paths.
 - **`prompts/`** — `memo_drafter.v1.md` (implemented, wired to `run_artifact`).
@@ -83,7 +83,7 @@ What exists now (verified by reading the code):
 
 | Command | Result |
 | --- | --- |
-| `python -m pytest -q` | **96 passed** in 0.91s |
+| `python -m pytest -q` | **156 passed** in 1.13s |
 | `cd frontend && npm run build` (`tsc -b && vite build`) | **Clean** — 59 modules, ~730ms, no type errors |
 | `python -c "from app.main import app"` | Backend imports OK; 13 routes incl. `/memo`, `/model-runs` |
 | `TestClient` smoke (create → `/current` → `/memo` → `/model-runs`) | `ai_available=False`, `model_status="AI assist present — off by default (returns system drafts)"`, memo `status=fallback source=system`, 1 run logged |
@@ -325,9 +325,12 @@ Remaining fragile assumptions (still **OPEN**, lower priority):
 
 ## Test Review
 
-- **Count: 146 tests, all passing** (was 96; +50 in this content/correctness
-  pass: 46 parametrized schema-contract checks in `tests/test_contract.py`
-  plus decider, per-turn-advice, and consequence-variation tests). The earlier
+- **Count: 156 tests, all passing** (the 146-test content/correctness baseline
+  plus regression coverage for synchronized turn snapshots, humanized outcome
+  prose, strict request payloads, memo operational steps, and AI token bounds).
+  The earlier content pass added 46 parametrized schema-contract checks in
+  `tests/test_contract.py` plus decider, per-turn-advice, and consequence-
+  variation tests. The earlier
   96 came from +24 over the original 72 (2 AST-based engine-independence tests
   replacing 1 fragile one, plus 21 `TestClient` route tests).
 - **Coverage by area:** state invariants, turn flow/failure/completion/

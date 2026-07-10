@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { api } from "./api/client";
 import type {
   CampaignSummary,
@@ -12,6 +12,40 @@ import IntroScreen from "./components/IntroScreen";
 import ContinuityHeader from "./components/ContinuityHeader";
 import GuidedTurn from "./components/GuidedTurn";
 import CaseFile from "./components/CaseFile";
+
+const CAMPAIGN_STORAGE_KEY = "continuity-failure.campaign-id";
+
+function readSavedCampaignId(): string | null {
+  const fromUrl = new URL(window.location.href).searchParams.get("campaign");
+  if (fromUrl) return fromUrl;
+  try {
+    return window.localStorage.getItem(CAMPAIGN_STORAGE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function saveCampaignId(id: string) {
+  try {
+    window.localStorage.setItem(CAMPAIGN_STORAGE_KEY, id);
+  } catch {
+    // URL persistence still works when storage is unavailable.
+  }
+  const url = new URL(window.location.href);
+  url.searchParams.set("campaign", id);
+  window.history.replaceState({}, "", url);
+}
+
+function clearSavedCampaignId() {
+  try {
+    window.localStorage.removeItem(CAMPAIGN_STORAGE_KEY);
+  } catch {
+    // Nothing else to clear when storage is unavailable.
+  }
+  const url = new URL(window.location.href);
+  url.searchParams.delete("campaign");
+  window.history.replaceState({}, "", url);
+}
 
 /**
  * Continuity Desk — Guided Intake.
@@ -57,14 +91,51 @@ export default function App() {
     setHistory(await api.getTurns(id));
   }, []);
 
+  useEffect(() => {
+    const savedId = readSavedCampaignId();
+    if (!savedId) return;
+
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    Promise.all([api.getCurrent(savedId), api.getTurns(savedId)])
+      .then(([cur, turns]) => {
+        if (cancelled) return;
+        setCampaignId(savedId);
+        setCurrent(cur);
+        setSummary(cur.summary);
+        setHistory(turns);
+        setLastResult(null);
+        setSelected(null);
+        setPhase(cur.summary.status === "ACTIVE" ? "CALL" : "DOSSIER");
+        saveCampaignId(savedId);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        clearSavedCampaignId();
+        setError(
+          "The saved engagement is no longer available. The backend may have restarted; begin a new intake.",
+        );
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const startCampaign = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const created = await api.createCampaign();
       setCampaignId(created.id);
+      saveCampaignId(created.id);
       setLastResult(null);
       setSelected(null);
+      setMemo(null);
+      setMemoError(null);
       await Promise.all([refreshCurrent(created.id), refreshHistory(created.id)]);
       setPhase("CALL");
     } catch (e) {
@@ -81,26 +152,63 @@ export default function App() {
     try {
       const result = await api.submitAdvice(campaignId, selected);
       setLastResult(result);
-      // Refresh state/history so the header + Case File reflect the resolved
-      // turn, then reveal the outcome across the decision → consequences →
-      // archive phases.
-      await Promise.all([refreshCurrent(campaignId), refreshHistory(campaignId)]);
+      // Keep `current` frozen on the turn that was just resolved. That prevents
+      // the header and Case File from exposing the next call, documents, or
+      // state before the player closes this turn. History may safely refresh:
+      // it contains the new decision/canon record but no next-turn package.
+      await refreshHistory(campaignId);
       setPhase("CLIENT_DECISION");
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setSubmitting(false);
     }
-  }, [campaignId, selected, refreshCurrent, refreshHistory]);
+  }, [campaignId, selected, refreshHistory]);
 
-  const handleNextCall = useCallback(() => {
-    // `current` was already refreshed after submit and now holds the next call.
-    setSelected(null);
-    setLastResult(null);
-    setMemo(null);
-    setMemoError(null);
-    setPhase("CALL");
-  }, []);
+  const handleNextCall = useCallback(async () => {
+    if (!campaignId) return;
+    setLoading(true);
+    setError(null);
+    try {
+      await refreshCurrent(campaignId);
+      setSelected(null);
+      setLastResult(null);
+      setMemo(null);
+      setMemoError(null);
+      setPhase("CALL");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setLoading(false);
+    }
+  }, [campaignId, refreshCurrent]);
+
+  const handleOpenDossier = useCallback(async () => {
+    if (!campaignId) return;
+    setLoading(true);
+    setError(null);
+    try {
+      await Promise.all([refreshCurrent(campaignId), refreshHistory(campaignId)]);
+      setLastResult(null);
+      setPhase("DOSSIER");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setLoading(false);
+    }
+  }, [campaignId, refreshCurrent, refreshHistory]);
+
+  const handleRestart = useCallback(() => {
+    if (
+      campaignId &&
+      !window.confirm(
+        "Start a new engagement? Your current campaign remains on the backend, but this desk will switch to the new engagement.",
+      )
+    ) {
+      return;
+    }
+    void startCampaign();
+  }, [campaignId, startCampaign]);
 
   const handleDraftMemo = useCallback(async () => {
     if (!campaignId || !selected) return;
@@ -127,7 +235,17 @@ export default function App() {
     [],
   );
 
-  const terminal = summary?.status === "COMPLETED" || summary?.status === "FAILED";
+  const resolvedStatus = lastResult?.status_after ?? summary?.status;
+  const terminalReason = lastResult?.failure_reason ?? summary?.failure_reason;
+  const terminal = resolvedStatus === "COMPLETED" || resolvedStatus === "FAILED";
+  const headerSummary =
+    summary && lastResult && phase === "ARCHIVE"
+      ? {
+          ...summary,
+          status: lastResult.status_after,
+          failure_reason: lastResult.failure_reason,
+        }
+      : summary;
   const busy = loading || submitting;
 
   if (phase === "INTRO") {
@@ -146,11 +264,11 @@ export default function App() {
   return (
     <div className="cd-app">
       <ContinuityHeader
-        summary={summary}
+        summary={headerSummary}
         worldState={current?.world_state ?? null}
         phase={phase}
         onOpenCaseFile={() => setCaseFileOpen(true)}
-        onRestart={startCampaign}
+        onRestart={handleRestart}
         busy={busy}
       />
 
@@ -160,15 +278,15 @@ export default function App() {
         </div>
       )}
 
-      {terminal && summary && phase !== "DOSSIER" && (
+      {terminal && summary && phase === "ARCHIVE" && (
         <div
           className={`cd-banner-alert cd-alert ${
-            summary.status === "COMPLETED" ? "cd-alert-ok" : "cd-alert-crit"
+            resolvedStatus === "COMPLETED" ? "cd-alert-ok" : "cd-alert-crit"
           }`}
         >
-          <strong>Engagement {summary.status.toLowerCase()}.</strong>{" "}
-          {summary.failure_reason
-            ? summary.failure_reason
+          <strong>Engagement {resolvedStatus?.toLowerCase()}.</strong>{" "}
+          {terminalReason
+            ? terminalReason
             : "The 10-turn stabilization window closed without a critical failure."}
         </div>
       )}
@@ -181,12 +299,13 @@ export default function App() {
         history={history}
         terminal={terminal}
         selected={selected}
-        submitting={submitting}
+        submitting={busy}
         onSelect={handleSelectAdvice}
         onGoto={setPhase}
         onSendAdvice={handleSendAdvice}
         onNextCall={handleNextCall}
-        onRestart={startCampaign}
+        onOpenDossier={handleOpenDossier}
+        onRestart={handleRestart}
         onOpenCaseFile={() => setCaseFileOpen(true)}
         memo={memo}
         memoLoading={memoLoading}

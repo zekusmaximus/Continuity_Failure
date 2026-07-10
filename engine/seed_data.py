@@ -271,6 +271,11 @@ def _advice_options() -> List[AdviceOption]:
                 "Short-term public-order shock and media amplification.",
                 "Business and school disruption spike before mitigation lands.",
             ],
+            operational_steps=[
+                "Transmit the preliminary result and response timeline to the state liaison in writing.",
+                "Issue the conservation order with separate hospital and school operating instructions.",
+                "Publish the source report, known uncertainties, and the next verification deadline together.",
+            ],
             legal_risk=15, political_risk=70, operational_risk=45,
             affected_factions=[
                 "town_managers_office", "media_rumor_network",
@@ -305,6 +310,11 @@ def _advice_options() -> List[AdviceOption]:
                 "Vulnerable to a leak narrative if the rumor feed moves first.",
                 "Spends budget and staff on mitigation that may look precautionary.",
             ],
+            operational_steps=[
+                "Brief the state liaison, hospital, and superintendent before the public statement.",
+                "Pre-position clinical water and school sanitation contingencies before release.",
+                "Publish a measured statement that names the uncertainty and the next verification deadline.",
+            ],
             legal_risk=35, political_risk=45, operational_risk=35,
             affected_factions=[
                 "town_managers_office", "hospital", "parent_resident_coalition",
@@ -336,6 +346,11 @@ def _advice_options() -> List[AdviceOption]:
             expected_harms=[
                 "Disclosure-timing liability builds sharply.",
                 "A leak converts the delay into a concealment narrative.",
+            ],
+            operational_steps=[
+                "Document the basis and expiration time for withholding the preliminary result.",
+                "Continue quiet hospital, school, and pressure-zone mitigation during the wait.",
+                "Prepare a release package that can be issued immediately if the result leaks or confirms.",
             ],
             legal_risk=85, political_risk=60, operational_risk=25,
             affected_factions=[
@@ -369,6 +384,11 @@ def _advice_options() -> List[AdviceOption]:
                 "Raises the odds of a formal oversight designation.",
                 "Politically costly; the majority bloc resists outside control.",
             ],
+            operational_steps=[
+                "Send a written request identifying tanker, operator, and logistics requirements.",
+                "Record why local capacity cannot meet the current operational need.",
+                "Negotiate a time-bounded reporting and authority framework before accepting resources.",
+            ],
             legal_risk=30, political_risk=65, operational_risk=20,
             affected_factions=[
                 "state_liaison", "council_majority", "town_managers_office",
@@ -400,6 +420,11 @@ def _advice_options() -> List[AdviceOption]:
                 "Deepens structural dependency on a sole-source firm.",
                 "Little leverage if the contractor calls the bluff.",
             ],
+            operational_steps=[
+                "Set a written repair milestone and crew-staging deadline for the contractor.",
+                "Document the town's alternatives, indemnity limits, and walk-away conditions.",
+                "Prepare a public procurement statement for release if the revised timeline is refused.",
+            ],
             legal_risk=40, political_risk=35, operational_risk=55,
             affected_factions=[
                 "utility_contractor", "water_authority", "council_majority",
@@ -430,6 +455,11 @@ def _advice_options() -> List[AdviceOption]:
             expected_harms=[
                 "Costs budget and political capital.",
                 "Slightly raises state awareness of the failure.",
+            ],
+            operational_steps=[
+                "Activate the regional compact with named water, staffing, and hospital requests.",
+                "Assign one municipal coordinator to reconcile incoming aid with local operations.",
+                "Publish the scope and duration of mutual aid without overstating system stability.",
             ],
             legal_risk=25, political_risk=40, operational_risk=40,
             affected_factions=[
@@ -485,6 +515,11 @@ def _per_turn_advice() -> Dict[int, List[AdviceOption]]:
                     "Publishing a closure rule signals the crisis is real, "
                     "raising media pressure.",
                 ],
+                operational_steps=[
+                    "Set the sanitation and pressure measurements that trigger each closure stage.",
+                    "Publish transportation, meal, and remote-learning arrangements with the threshold.",
+                    "Require a documented verification check before reopening each building.",
+                ],
                 legal_risk=25, political_risk=40, operational_risk=35,
                 affected_factions=[
                     "parent_resident_coalition", "council_majority",
@@ -526,6 +561,11 @@ def _per_turn_advice() -> Dict[int, List[AdviceOption]]:
                     "A visible priority for the hospital can trigger a fairness "
                     "dispute with residents.",
                 ],
+                operational_steps=[
+                    "Document the dialysis and sterilization volumes that receive priority supply.",
+                    "Stage tanker backup and define the pressure reading that triggers delivery.",
+                    "Brief resident representatives on the clinical basis and limits of the allocation.",
+                ],
                 legal_risk=25, political_risk=35, operational_risk=45,
                 affected_factions=[
                     "hospital", "water_authority", "parent_resident_coalition",
@@ -565,6 +605,11 @@ def _per_turn_advice() -> Dict[int, List[AdviceOption]]:
                     "Compensation draws down already-thin budget capacity.",
                     "A framework can be read as admitting fault and invite further "
                     "claims.",
+                ],
+                operational_steps=[
+                    "Define eligible closure losses, documentation requirements, and a capped appropriation.",
+                    "Tie compensation eligibility to compliance with the conservation order.",
+                    "Publish the framework and appeal path before enforcing the next restriction cycle.",
                 ],
                 legal_risk=35, political_risk=45, operational_risk=30,
                 affected_factions=[

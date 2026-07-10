@@ -42,7 +42,7 @@ export default function IntroScreen({ onBegin, loading }: Props) {
         </button>
 
         <p className="cd-intro-foot">
-          Deterministic engine · No AI systems in this build
+          Deterministic engine · Optional AI assist is validation-gated and off by default
         </p>
       </div>
     </div>

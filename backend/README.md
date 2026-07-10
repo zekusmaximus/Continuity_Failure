@@ -3,8 +3,10 @@
 FastAPI orchestration layer for the **Northbridge Water Failure** MVP.
 
 The backend never mutates world state directly. It receives requests, calls the
-deterministic `engine` package, and serializes the result. AI integration is
-**not** implemented in this slice.
+deterministic `engine` package, and serializes the result. A validation-gated
+AI-assist layer is implemented for advisory memo drafting and is **off by
+default**. With AI off, memo requests return a deterministic system draft; no
+model call can mutate authoritative state.
 
 ## Layout
 
@@ -17,6 +19,8 @@ backend/
     services/
       campaign_service.py # engine <-> memory <-> pydantic bridge (the only mutator path)
     schemas/api.py        # Pydantic request/response models
+    ai/                   # provider, validation runner, memo fallback, run log
+    config.py             # offline-first AI settings
 ```
 
 The `engine/` and `memory/` packages live at the repository root. They are made
@@ -62,9 +66,18 @@ The API is served at `http://localhost:8000`. Interactive docs:
 | GET    | `/api/campaigns/{id}/current` | Current turn package (state, call, advice, last turn) |
 | POST   | `/api/campaigns/{id}/advice` | Submit advice, resolve NPC decision, advance one turn |
 | GET    | `/api/campaigns/{id}/turns` | Full turn history + canon archive |
+| GET    | `/api/campaigns/{id}/dossier` | Campaign dossier as Markdown |
+| POST   | `/api/campaigns/{id}/memo` | Draft an advisory memo without advancing state |
+| GET    | `/api/campaigns/{id}/model-runs` | Read-only AI/model run log |
 
 `POST /api/campaigns` accepts an optional `{"name": "..."}` body.
 `POST /api/campaigns/{id}/advice` accepts `{"advice_id": "..."}`.
+Request bodies reject unknown fields and enforce bounded names and advice IDs.
+
+To enable the optional Anthropic provider, install `backend[ai]` and set both
+`CF_AI_ENABLED=true` and `ANTHROPIC_API_KEY`. `CF_AI_MAX_TOKENS` is bounded to
+64–8192 output tokens. Without a live provider configuration, the memo endpoint
+remains available through its deterministic fallback.
 
 ## Persistence
 

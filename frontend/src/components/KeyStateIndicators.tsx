@@ -20,10 +20,28 @@ export default function KeyStateIndicators({ state }: { state: WorldState | null
         const has = typeof value === "number";
         const level = has ? effectiveLevel(value, meta.risk) : 0;
         const cls = has ? levelClass(level) : "";
+        const direction = meta.risk ? "Higher is worse" : "Higher is better";
         return (
-          <div key={key} className="cd-keystate-item">
-            <span className="cd-keystate-label">{meta.label}</span>
-            <span className="cd-keystate-track">
+          <div
+            key={key}
+            className="cd-keystate-item"
+            aria-label={`${meta.label}: ${has ? value : "unavailable"} of 100. ${direction}.`}
+          >
+            <span className="cd-keystate-label-wrap">
+              <span className="cd-keystate-label">{meta.label}</span>
+              <span className="cd-keystate-direction">
+                {meta.risk ? "↑ risk" : "↑ better"}
+              </span>
+            </span>
+            <span
+              className="cd-keystate-track"
+              role="progressbar"
+              aria-label={meta.label}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={has ? value : undefined}
+              aria-valuetext={has ? `${value} of 100. ${direction}.` : "Unavailable"}
+            >
               <span
                 className={`cd-keystate-fill ${cls}`}
                 style={{ width: has ? `${value}%` : "0%" }}

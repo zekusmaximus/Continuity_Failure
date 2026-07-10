@@ -100,6 +100,19 @@ def test_create_campaign_with_name(client):
     assert res.json()["name"] == "Custom Engagement"
 
 
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"name": "x" * 81},
+        {"name": "   "},
+        {"name": "Valid", "unexpected": True},
+    ],
+)
+def test_create_campaign_rejects_invalid_payloads(client, payload):
+    res = client.post("/api/campaigns", json=payload)
+    assert res.status_code == 422
+
+
 def test_get_campaign(client, campaign):
     res = client.get(f"/api/campaigns/{campaign}")
     assert res.status_code == 200
@@ -157,6 +170,20 @@ def test_submit_unknown_advice_returns_400(client, campaign):
     )
     assert res.status_code == 400
     assert "unknown advice" in res.json()["detail"].lower()
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"advice_id": ""},
+        {"advice_id": "x" * 65},
+        {"advice_id": "NOT VALID"},
+        {"advice_id": "mutual_aid", "unexpected": True},
+    ],
+)
+def test_submit_advice_rejects_invalid_payloads(client, campaign, payload):
+    res = client.post(f"/api/campaigns/{campaign}/advice", json=payload)
+    assert res.status_code == 422
 
 
 def test_submit_advice_unknown_campaign_returns_404(client):

@@ -22,7 +22,7 @@ from engine.rules import (
     AMBIENT_DRIFT,
     check_failure,
 )
-from engine.state import MIN_VALUE, clamp
+from engine.state import MIN_VALUE, clamp, humanize_variable
 
 
 VALID_DECISION_TYPES = {
@@ -63,6 +63,10 @@ def test_advance_turn_increments_turn_number():
     result = turn.advance_turn(campaign, "controlled_disclosure")
     assert result.turn_number == 1           # the turn that was just resolved
     assert campaign.turn_number == 2         # advanced to next
+    assert campaign.world_state.turn_number == campaign.turn_number
+    assert campaign.world_state.last_verified == (
+        "Turn 2 · Operational snapshot (deterministic)"
+    )
     assert len(campaign.turn_history) == 1
 
 
@@ -108,7 +112,7 @@ def test_check_failure_detects_each_threshold(variable, op, threshold):
     campaign.world_state.variables[variable] = threshold if op == ">=" else threshold
     reason = check_failure(campaign.world_state.variables)
     assert reason is not None
-    assert variable in reason
+    assert humanize_variable(variable) in reason
 
     # One step back to the safe side must not trip it.
     campaign.world_state.variables[variable] = threshold - 1 if op == ">=" else threshold + 1
@@ -124,7 +128,7 @@ def test_advancing_from_collapsed_state_marks_campaign_failed():
     result = turn.advance_turn(campaign, "controlled_disclosure")
     assert campaign.status == CampaignStatus.FAILED
     assert campaign.failure_reason is not None
-    assert "water_security" in campaign.failure_reason
+    assert "Water Security" in campaign.failure_reason
     assert result.status_after == CampaignStatus.FAILED
 
 
@@ -163,6 +167,20 @@ def test_completion_requires_exactly_ten_resolved_turns():
     # The tenth resolution pushes turn_number past max_turns -> COMPLETED.
     turn.advance_turn(campaign, SURVIVAL_SEQUENCE[9])
     assert campaign.status == CampaignStatus.COMPLETED
+    assert campaign.world_state.turn_number == campaign.turn_number == 11
+    assert campaign.world_state.last_verified == (
+        "Turn 10 · Final operational snapshot (deterministic)"
+    )
+
+
+def test_aftermath_uses_player_facing_variable_names():
+    campaign = _fresh_campaign()
+    result = turn.advance_turn(campaign, "controlled_disclosure")
+    assert "Information Integrity" in result.aftermath_summary
+    assert "information_integrity" not in result.aftermath_summary
+    immediate = " ".join(result.consequence_stack.immediate)
+    assert "Information Integrity" in immediate
+    assert "information_integrity" not in immediate
 
 
 # ---------------------------------------------------------------------------

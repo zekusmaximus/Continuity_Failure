@@ -98,6 +98,7 @@ def test_advice_options_have_tradeoff_fields():
         # Tradeoffs must be non-vacuous: at least one benefit and one harm.
         assert opt.expected_benefits, f"{opt.id} has no expected benefits"
         assert opt.expected_harms, f"{opt.id} has no expected harms"
+        assert opt.operational_steps, f"{opt.id} has no operational steps"
         for risk in (opt.legal_risk, opt.political_risk, opt.operational_risk):
             assert 0 <= risk <= 100
         # Effects (authoritative) must remain intact for the engine to resolve.

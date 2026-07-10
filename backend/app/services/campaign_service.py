@@ -223,7 +223,11 @@ def draft_memo(
     if option is None:
         raise turn_engine.UnknownAdviceOption(advice_id)
 
-    payload = fallbacks.build_memo_input(option, campaign.current_call())
+    payload = fallbacks.build_memo_input(
+        option,
+        campaign.current_call(),
+        campaign.world_state.factions,
+    )
     artifact = run_artifact(
         prompt_name="memo_drafter",
         prompt_version="v1",

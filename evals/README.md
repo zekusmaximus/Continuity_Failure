@@ -5,20 +5,23 @@ evaluation harnesses.
 
 ## Current status
 
-No AI integration exists yet, so there are no model-output evaluations. The
-deterministic engine is, however, fully covered by property-style tests in
-`tests/` that serve as the first evaluation layer:
+The first AI-assist tool (memo drafting) is implemented behind structured
+validation, deterministic fallback, and `ModelRun` logging, but a dedicated
+model-output evaluation harness is not implemented yet. The deterministic
+engine and AI boundary are covered by tests in `tests/` that serve as the first
+evaluation layer:
 
 * State values are always clamped to `0..100`.
 * Every turn produces explainable `AppliedDiff` records.
 * Failure thresholds and 10-turn completion are verified.
 * Identical advice sequences produce bit-for-bit identical runs (determinism).
 
-## Planned evaluations (post-MVP, once AI systems are introduced)
+## Planned evaluations
 
 Per `AGENTS.md`, model output must be **validated before use** and never
-directly mutates world state. When AI tools (research console, memo drafter,
-scenario simulator, rumor classifier) are added, this directory will hold:
+directly mutates world state. As the research console, scenario simulator,
+rumor classifier, and additional artifact roles are added, this directory will
+hold:
 
 * **Schema-conformance checks** — every model response parsed and validated
   against a Pydantic schema before acceptance.
@@ -30,5 +33,6 @@ scenario simulator, rumor classifier) are added, this directory will hold:
   state; only the engine produces `AppliedDiff` records.
 
 Model call logging (prompt version, input, output, validation result, retries,
-latency, token use, cost estimate) will be captured by the orchestration layer
-and consumed by the harnesses here.
+latency, and token use) is already captured by the orchestration layer. Future
+evaluation harnesses will consume those records and add cost and quality
+scoring.

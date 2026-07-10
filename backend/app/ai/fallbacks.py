@@ -15,22 +15,32 @@ from __future__ import annotations
 from app.ai.schemas import MemoDraft
 
 
-def build_memo_input(option, call) -> dict:
+def build_memo_input(option, call, factions=()) -> dict:
     """Flatten a selected advice option (+ current call) into a prompt payload.
 
     Duck-typed on purpose: reads attributes off the engine's advice/call objects
     without importing them, so this module stays free of engine dependencies.
     """
+    faction_names = {
+        getattr(faction, "id", ""): getattr(faction, "name", "")
+        for faction in factions
+    }
+    affected_factions = [
+        faction_names.get(faction_id, faction_id.replace("_", " ").title())
+        for faction_id in list(getattr(option, "affected_factions", []) or [])
+    ]
+
     return {
         "advice_title": getattr(option, "title", "") or getattr(option, "label", ""),
         "recommendation": getattr(option, "recommendation", "") or getattr(option, "summary", ""),
         "rationale": getattr(option, "rationale", ""),
         "expected_benefits": list(getattr(option, "expected_benefits", []) or []),
         "expected_harms": list(getattr(option, "expected_harms", []) or []),
+        "operational_steps": list(getattr(option, "operational_steps", []) or []),
         "legal_risk": getattr(option, "legal_risk", 0),
         "political_risk": getattr(option, "political_risk", 0),
         "operational_risk": getattr(option, "operational_risk", 0),
-        "affected_factions": list(getattr(option, "affected_factions", []) or []),
+        "affected_factions": affected_factions,
         "situation": (getattr(call, "summary", "") if call else ""),
         "ask": (getattr(call, "ask", "") if call else ""),
     }
@@ -39,16 +49,16 @@ def build_memo_input(option, call) -> dict:
 def memo_fallback(payload: dict) -> MemoDraft:
     """Assemble a deterministic memo from the advice payload (no model call)."""
     title = payload.get("advice_title") or "the selected recommendation"
-    benefits = payload.get("expected_benefits") or []
     harms = payload.get("expected_harms") or []
     factions = payload.get("affected_factions") or []
 
-    steps = [f"Pursue: {b}" for b in benefits] or [
-        "Proceed per the selected advisory option and document the rationale of record.",
+    steps = payload.get("operational_steps") or [
+        "Document the selected recommendation, responsible official, and execution deadline.",
+        "Confirm that affected institutions received the same statement of facts and uncertainties.",
     ]
 
     opposition = (
-        [f"Parties with a stake in this decision: {', '.join(factions)}."]
+        [f"Expect review or resistance from: {', '.join(factions)}."]
         if factions
         else ["No specific opposition identified in the current record."]
     )

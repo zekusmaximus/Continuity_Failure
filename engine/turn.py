@@ -105,6 +105,11 @@ def advance_turn(campaign: Campaign, advice_id: str) -> TurnResult:
     if campaign.status == CampaignStatus.ACTIVE and campaign.turn_number > campaign.max_turns:
         campaign.status = CampaignStatus.COMPLETED
 
+    # Keep the nested world-state cursor aligned with the campaign cursor. A
+    # terminal campaign uses max_turns + 1 to mean "all turns resolved", while
+    # its freshness label below remains anchored to the final playable turn.
+    world_state.turn_number = campaign.turn_number
+
     aftermath = rules.build_aftermath_summary(
         advice, decision, diffs, campaign.status, failure_reason
     )
@@ -129,7 +134,14 @@ def advance_turn(campaign: Campaign, advice_id: str) -> TurnResult:
     )
     consequence_stack.canonized_events = [canon_entry.title]
     campaign.canon.append(canon_entry)
-    world_state.last_verified = f"Turn {resolving_turn + 1} \u00b7 Operational snapshot (deterministic)"
+    if campaign.is_terminal():
+        world_state.last_verified = (
+            f"Turn {resolving_turn} \u00b7 Final operational snapshot (deterministic)"
+        )
+    else:
+        world_state.last_verified = (
+            f"Turn {campaign.turn_number} \u00b7 Operational snapshot (deterministic)"
+        )
 
     turn_result = TurnResult(
         turn_number=resolving_turn,

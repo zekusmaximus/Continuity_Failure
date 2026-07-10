@@ -21,7 +21,12 @@ _BACKEND = os.path.join(_ROOT, "backend")
 if _BACKEND not in sys.path:
     sys.path.insert(0, _BACKEND)
 
-from app.config import get_settings  # noqa: E402
+from app.config import (  # noqa: E402
+    MAX_OUTPUT_TOKENS,
+    MIN_OUTPUT_TOKENS,
+    Settings,
+    get_settings,
+)
 from app.ai.provider import NullProvider, ModelProvider, ModelRequest, get_provider  # noqa: E402
 from app.ai.logging import ModelRun, ModelRunStore, ValidationStatus  # noqa: E402
 
@@ -57,6 +62,25 @@ def test_ai_live_requires_both_enabled_and_key(monkeypatch):
     # Both -> live.
     monkeypatch.setenv("CF_AI_ENABLED", "on")
     assert get_settings().ai_live is True
+
+
+def test_ai_max_output_tokens_are_bounded(monkeypatch):
+    _clear_ai_env(monkeypatch)
+    monkeypatch.setenv("CF_AI_MAX_TOKENS", "1")
+    assert get_settings().max_output_tokens == MIN_OUTPUT_TOKENS
+    monkeypatch.setenv("CF_AI_MAX_TOKENS", "999999")
+    assert get_settings().max_output_tokens == MAX_OUTPUT_TOKENS
+    monkeypatch.setenv("CF_AI_MAX_TOKENS", "not-a-number")
+    assert MIN_OUTPUT_TOKENS <= get_settings().max_output_tokens <= MAX_OUTPUT_TOKENS
+
+
+def test_settings_reject_out_of_range_output_tokens():
+    import pytest
+
+    with pytest.raises(ValueError):
+        Settings(False, "test", None, MIN_OUTPUT_TOKENS - 1)
+    with pytest.raises(ValueError):
+        Settings(False, "test", None, MAX_OUTPUT_TOKENS + 1)
 
 
 def test_get_provider_is_null_when_disabled(monkeypatch):

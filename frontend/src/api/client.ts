@@ -40,6 +40,7 @@ export interface AdviceOption {
   recommendation: string;
   expected_benefits: string[];
   expected_harms: string[];
+  operational_steps: string[];
   legal_risk: number;
   political_risk: number;
   operational_risk: number;

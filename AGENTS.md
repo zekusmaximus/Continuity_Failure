@@ -267,7 +267,7 @@ When making changes:
 
 ## Current Priority
 
-The deterministic Northbridge MVP is implemented, playable, and tested (96
+The deterministic Northbridge MVP is implemented, playable, and tested (156
 tests). A dormant, validation-gated AI-assist layer (memo drafter +
 `ModelRun` logging) is wired end to end and off by default. Build out the
 remaining read-only AI tools and add durable persistence before implementing

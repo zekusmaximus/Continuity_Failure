@@ -1,5 +1,17 @@
 import type { Faction } from "../api/client";
-import { levelClass, titleCase } from "../domain";
+import { titleCase } from "../domain";
+
+function influenceClass(value: number): string {
+  if (value >= 70) return "mag-high";
+  if (value >= 40) return "mag-mid";
+  return "mag-low";
+}
+
+function pressureClass(value: number): string {
+  if (value >= 65) return "lvl-crit";
+  if (value >= 40) return "lvl-warn";
+  return "lvl-good";
+}
 
 export default function FactionCard({ faction }: { faction: Faction }) {
   return (
@@ -12,14 +24,14 @@ export default function FactionCard({ faction }: { faction: Faction }) {
         <div className="cd-faction-bar">
           <span className="cd-faction-bar-k">Influence</span>
           <span className="cd-faction-bar-track">
-            <span className={`cd-faction-bar-fill ${levelClass(faction.influence)}`} style={{ width: `${faction.influence}%` }} />
+            <span className={`cd-faction-bar-fill ${influenceClass(faction.influence)}`} style={{ width: `${faction.influence}%` }} />
           </span>
           <span className="cd-faction-bar-v">{faction.influence}</span>
         </div>
         <div className="cd-faction-bar">
           <span className="cd-faction-bar-k">Pressure</span>
           <span className="cd-faction-bar-track">
-            <span className={`cd-faction-bar-fill ${levelClass(faction.current_pressure)}`} style={{ width: `${faction.current_pressure}%` }} />
+            <span className={`cd-faction-bar-fill ${pressureClass(faction.current_pressure)}`} style={{ width: `${faction.current_pressure}%` }} />
           </span>
           <span className="cd-faction-bar-v">{faction.current_pressure}</span>
         </div>
