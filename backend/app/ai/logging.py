@@ -1,10 +1,9 @@
 """Model-run logging.
 
 Every model invocation — success, validation failure, or deterministic fallback —
-produces exactly one :class:`ModelRun` record. The field set mirrors the logging
-contract in ``prompts/README.md`` so that AI-assisted turns stay inspectable and
-replayable. Storage is process-local and in-memory, mirroring
-``memory.persistence.CampaignStore``; the API exposes it read-only.
+produces exactly one :class:`ModelRun` record. Production calls use the same
+SQLite repository boundary as campaigns. ``ModelRunStore`` remains as a small
+in-memory test double for isolated validation-boundary tests.
 """
 
 from __future__ import annotations
@@ -44,11 +43,7 @@ class ModelRun(BaseModel):
 
 
 class ModelRunStore:
-    """Append-only, thread-safe, in-memory log of :class:`ModelRun` records.
-
-    Process-local and cleared on restart, matching the rest of the skeleton's
-    persistence. Never mutates game state; it only records what happened.
-    """
+    """Append-only in-memory test double for :class:`ModelRun` records."""
 
     def __init__(self) -> None:
         self._lock = threading.RLock()
@@ -71,9 +66,31 @@ class ModelRunStore:
             self._runs.clear()
 
 
-# Module-level store, mirroring campaign_service._STORE.
-_STORE = ModelRunStore()
+class RepositoryModelRunStore:
+    """Typed adapter over repository JSON records; never touches game state."""
+
+    def __init__(self, repository) -> None:
+        self._repository = repository
+
+    def add(self, run: ModelRun) -> None:
+        self._repository.add_model_run(run.model_dump(mode="json"))
+
+    def all(self) -> List[ModelRun]:
+        return [ModelRun.model_validate(row) for row in self._repository.all_model_runs()]
+
+    def for_campaign(self, campaign_id: str) -> List[ModelRun]:
+        return [
+            ModelRun.model_validate(row)
+            for row in self._repository.model_runs_for_campaign(campaign_id)
+        ]
+
+    def clear(self) -> None:
+        self._repository.clear_model_runs()
 
 
-def get_run_store() -> ModelRunStore:
-    return _STORE
+def get_run_store() -> RepositoryModelRunStore:
+    # Imported lazily so standalone validation-boundary tests can continue to
+    # use the in-memory test double without constructing a database.
+    from app.repository import get_repository
+
+    return RepositoryModelRunStore(get_repository())

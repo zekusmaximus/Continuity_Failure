@@ -1,5 +1,9 @@
+import type { RecentCampaign } from "../api/client";
+
 interface Props {
   onBegin: () => void;
+  onResume: (campaignId: string) => void;
+  recentCampaigns: RecentCampaign[];
   loading: boolean;
 }
 
@@ -7,7 +11,12 @@ interface Props {
  * Boot / intake screen. Orients the player before any state, factions, or raw
  * game data appear. One task: begin the engagement.
  */
-export default function IntroScreen({ onBegin, loading }: Props) {
+export default function IntroScreen({
+  onBegin,
+  onResume,
+  recentCampaigns,
+  loading,
+}: Props) {
   return (
     <div className="cd-intro">
       <div className="cd-intro-card">
@@ -40,6 +49,31 @@ export default function IntroScreen({ onBegin, loading }: Props) {
         >
           {loading ? "Opening desk…" : "Begin Intake"}
         </button>
+
+        {recentCampaigns.length > 0 && (
+          <section className="cd-intro-recent" aria-labelledby="recent-engagements">
+            <h2 id="recent-engagements">Recent engagements</h2>
+            <div className="cd-intro-recent-list">
+              {recentCampaigns.map((campaign) => (
+                <button
+                  key={campaign.id}
+                  className="cd-intro-resume"
+                  onClick={() => onResume(campaign.id)}
+                  disabled={loading}
+                >
+                  <span>
+                    <strong>{campaign.name}</strong>
+                    <small>
+                      Turn {Math.min(campaign.turn_number, campaign.max_turns)} of{" "}
+                      {campaign.max_turns} · {campaign.status.toLowerCase()}
+                    </small>
+                  </span>
+                  <span className="cd-intro-resume-action">Reopen</span>
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
 
         <p className="cd-intro-foot">
           Deterministic engine · Optional AI assist is validation-gated and off by default

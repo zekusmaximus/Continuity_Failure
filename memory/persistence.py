@@ -1,81 +1,410 @@
-"""In-memory persistence for the skeleton.
+"""Durable SQLite boundary for campaigns and advisory model-run records.
 
-``CampaignStore`` holds live ``Campaign`` objects keyed by id. It is the single
-mutable container the FastAPI service talks to. A thin JSON snapshot helper is
-included for future durability; live play does not depend on it.
+The deterministic engine knows nothing about this module. Complete, versioned
+campaign documents rebuild plain engine dataclasses on read. Turn snapshots
+are separate append-only records and cannot be replaced by later saves.
 """
 
 from __future__ import annotations
 
 import json
+import sqlite3
 import threading
+import types
+from dataclasses import MISSING, asdict, fields, is_dataclass
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, Iterator, List, Optional
+from typing import Any, Dict, List, Mapping, Optional, Protocol, Union, get_args, get_origin, get_type_hints
+
+from engine.models import Campaign
 
 
-class MemoryStore:
-    """Generic thread-safe key/value store for arbitrary in-memory data.
+SCHEMA_VERSION = 1
+DOCUMENT_VERSION = 1
 
-    Used today for campaign objects and reserved for future canon snapshots.
-    """
 
-    def __init__(self) -> None:
+class StorageError(RuntimeError):
+    """Base class for repository failures that callers may report cleanly."""
+
+
+class CorruptRecordError(StorageError):
+    """A stored JSON document cannot be validated as its typed record."""
+
+
+class ImmutableSnapshotError(StorageError):
+    """A save attempted to change an already-recorded turn snapshot."""
+
+
+class CampaignRepository(Protocol):
+    """Narrow persistence contract used by the orchestration service."""
+
+    def put(self, campaign: Campaign, snapshot_turn: Optional[int] = None) -> None: ...
+    def get(self, campaign_id: str) -> Optional[Campaign]: ...
+    def list_recent(self, limit: int = 5) -> List[dict]: ...
+    def add_model_run(self, payload: Mapping[str, Any]) -> None: ...
+    def model_runs_for_campaign(self, campaign_id: str) -> List[dict]: ...
+
+
+def _utc_now() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _json_document(kind: str, value: Any) -> str:
+    return json.dumps(
+        {"document_version": DOCUMENT_VERSION, "kind": kind, "data": value},
+        ensure_ascii=False,
+        separators=(",", ":"),
+        sort_keys=True,
+    )
+
+
+def _read_document(raw: str, expected_kind: str) -> Any:
+    try:
+        document = json.loads(raw)
+    except (TypeError, json.JSONDecodeError) as exc:
+        raise CorruptRecordError(f"Invalid JSON for {expected_kind}") from exc
+    if not isinstance(document, dict):
+        raise CorruptRecordError(f"Invalid {expected_kind} document envelope")
+    if document.get("document_version") != DOCUMENT_VERSION:
+        raise CorruptRecordError(
+            f"Unsupported {expected_kind} document version: "
+            f"{document.get('document_version')!r}"
+        )
+    if document.get("kind") != expected_kind or "data" not in document:
+        raise CorruptRecordError(f"Invalid {expected_kind} document envelope")
+    return document["data"]
+
+
+def _convert(value: Any, annotation: Any, path: str) -> Any:
+    """Strictly rebuild nested engine dataclasses from decoded JSON."""
+    if annotation is Any:
+        return value
+
+    origin = get_origin(annotation)
+    args = get_args(annotation)
+    if origin in (Union, types.UnionType):
+        if value is None and type(None) in args:
+            return None
+        failures = []
+        for option in args:
+            if option is type(None):
+                continue
+            try:
+                return _convert(value, option, path)
+            except CorruptRecordError as exc:
+                failures.append(str(exc))
+        raise CorruptRecordError(f"{path} does not match its declared union: {failures}")
+
+    if origin in (list, List):
+        if not isinstance(value, list):
+            raise CorruptRecordError(f"{path} must be a list")
+        item_type = args[0] if args else Any
+        return [
+            _convert(item, item_type, f"{path}[{index}]")
+            for index, item in enumerate(value)
+        ]
+
+    if origin in (dict, Dict):
+        if not isinstance(value, dict):
+            raise CorruptRecordError(f"{path} must be an object")
+        key_type, item_type = args if args else (Any, Any)
+        result = {}
+        for key, item in value.items():
+            converted_key = (
+                int(key)
+                if key_type is int and isinstance(key, str)
+                else _convert(key, key_type, f"{path}.<key>")
+            )
+            result[converted_key] = _convert(item, item_type, f"{path}.{key}")
+        return result
+
+    if isinstance(annotation, type) and is_dataclass(annotation):
+        if not isinstance(value, dict):
+            raise CorruptRecordError(f"{path} must be an object")
+        hints = get_type_hints(annotation)
+        kwargs = {}
+        for field in fields(annotation):
+            if field.name in value:
+                kwargs[field.name] = _convert(
+                    value[field.name], hints[field.name], f"{path}.{field.name}"
+                )
+            elif field.default is MISSING and field.default_factory is MISSING:
+                raise CorruptRecordError(f"Missing required field {path}.{field.name}")
+        try:
+            return annotation(**kwargs)
+        except (TypeError, ValueError) as exc:
+            raise CorruptRecordError(f"Invalid {path}: {exc}") from exc
+
+    if annotation is bool:
+        if type(value) is not bool:
+            raise CorruptRecordError(f"{path} must be a boolean")
+        return value
+    if annotation is int:
+        if type(value) is not int:
+            raise CorruptRecordError(f"{path} must be an integer")
+        return value
+    if annotation is float:
+        if type(value) not in (int, float):
+            raise CorruptRecordError(f"{path} must be a number")
+        return float(value)
+    if annotation is str:
+        if not isinstance(value, str):
+            raise CorruptRecordError(f"{path} must be a string")
+        return value
+    if value is None and annotation is type(None):
+        return None
+    return value
+
+
+def encode_campaign(campaign: Campaign) -> str:
+    return _json_document("campaign", asdict(campaign))
+
+
+def decode_campaign(raw: str) -> Campaign:
+    return _convert(_read_document(raw, "campaign"), Campaign, "campaign")
+
+
+class SQLiteRepository:
+    """SQLite implementation of the campaign/model-run storage boundary."""
+
+    def __init__(self, database_path: str | Path) -> None:
+        self.path = Path(database_path).expanduser().resolve()
+        self.path.parent.mkdir(parents=True, exist_ok=True)
         self._lock = threading.RLock()
-        self._data: Dict[str, object] = {}
+        self._migrate()
 
-    def set(self, key: str, value: object) -> None:
-        with self._lock:
-            self._data[key] = value
+    def _connect(self) -> sqlite3.Connection:
+        connection = sqlite3.connect(str(self.path), timeout=10)
+        connection.row_factory = sqlite3.Row
+        connection.execute("PRAGMA foreign_keys = ON")
+        return connection
 
-    def get(self, key: str, default: Optional[object] = None) -> Optional[object]:
-        with self._lock:
-            return self._data.get(key, default)
+    def _migrate(self) -> None:
+        with self._lock, self._connect() as connection:
+            connection.execute(
+                "CREATE TABLE IF NOT EXISTS schema_migrations "
+                "(version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL)"
+            )
+            row = connection.execute(
+                "SELECT COALESCE(MAX(version), 0) AS version FROM schema_migrations"
+            ).fetchone()
+            current = int(row["version"])
+            if current > SCHEMA_VERSION:
+                raise StorageError(
+                    f"Database schema {current} is newer than supported {SCHEMA_VERSION}"
+                )
+            if current < 1:
+                connection.executescript(
+                    """
+                    CREATE TABLE campaigns (
+                        id TEXT PRIMARY KEY,
+                        name TEXT NOT NULL,
+                        scenario_id TEXT NOT NULL,
+                        status TEXT NOT NULL,
+                        turn_number INTEGER NOT NULL,
+                        max_turns INTEGER NOT NULL,
+                        failure_reason TEXT,
+                        created_at TEXT NOT NULL,
+                        updated_at TEXT NOT NULL,
+                        payload_json TEXT NOT NULL
+                    );
+                    CREATE INDEX campaigns_recent_idx ON campaigns(updated_at DESC);
 
-    def has(self, key: str) -> bool:
-        with self._lock:
-            return key in self._data
+                    CREATE TABLE turn_snapshots (
+                        campaign_id TEXT NOT NULL,
+                        turn_number INTEGER NOT NULL,
+                        created_at TEXT NOT NULL,
+                        snapshot_json TEXT NOT NULL,
+                        PRIMARY KEY (campaign_id, turn_number),
+                        FOREIGN KEY (campaign_id) REFERENCES campaigns(id) ON DELETE CASCADE
+                    );
 
-    def remove(self, key: str) -> None:
-        with self._lock:
-            self._data.pop(key, None)
+                    CREATE TABLE model_runs (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        campaign_id TEXT,
+                        turn_number INTEGER,
+                        created_at TEXT NOT NULL,
+                        payload_json TEXT NOT NULL
+                    );
+                    CREATE INDEX model_runs_campaign_idx
+                        ON model_runs(campaign_id, id);
+                    """
+                )
+                connection.execute(
+                    "INSERT INTO schema_migrations(version, applied_at) VALUES (?, ?)",
+                    (1, _utc_now()),
+                )
 
-    def all(self) -> List[object]:
-        with self._lock:
-            return list(self._data.values())
+    def put(self, campaign: Campaign, snapshot_turn: Optional[int] = None) -> None:
+        payload = encode_campaign(campaign)
+        now = _utc_now()
+        with self._lock, self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            # The live campaign document is convenient for reconstruction, but
+            # its embedded history may not contradict an existing immutable
+            # snapshot. This prevents an ordinary re-save from rewriting truth
+            # merely because snapshots live in a separate table.
+            historical = connection.execute(
+                "SELECT turn_number, snapshot_json FROM turn_snapshots "
+                "WHERE campaign_id = ? ORDER BY turn_number",
+                (campaign.id,),
+            ).fetchall()
+            results_by_turn = {turn.turn_number: asdict(turn) for turn in campaign.turn_history}
+            canon_by_id = {entry.id: asdict(entry) for entry in campaign.canon}
+            for row in historical:
+                turn_number = int(row["turn_number"])
+                snapshot_data = _read_document(row["snapshot_json"], "turn_snapshot")
+                try:
+                    stored_campaign = snapshot_data["campaign"]
+                    stored_result = stored_campaign["turn_history"][-1]
+                except (KeyError, IndexError, TypeError) as exc:
+                    raise CorruptRecordError(
+                        f"Turn {turn_number} snapshot for campaign {campaign.id} is corrupt"
+                    ) from exc
+                if results_by_turn.get(turn_number) != stored_result:
+                    raise ImmutableSnapshotError(
+                        f"Turn {turn_number} history for campaign {campaign.id} is immutable"
+                    )
+                for stored_entry in stored_campaign.get("canon", []):
+                    if canon_by_id.get(stored_entry.get("id")) != stored_entry:
+                        raise ImmutableSnapshotError(
+                            f"Canon entry {stored_entry.get('id')} for campaign "
+                            f"{campaign.id} is immutable"
+                        )
+            connection.execute(
+                """
+                INSERT INTO campaigns(
+                    id, name, scenario_id, status, turn_number, max_turns,
+                    failure_reason, created_at, updated_at, payload_json
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET
+                    name=excluded.name,
+                    scenario_id=excluded.scenario_id,
+                    status=excluded.status,
+                    turn_number=excluded.turn_number,
+                    max_turns=excluded.max_turns,
+                    failure_reason=excluded.failure_reason,
+                    updated_at=excluded.updated_at,
+                    payload_json=excluded.payload_json
+                """,
+                (
+                    campaign.id,
+                    campaign.name,
+                    campaign.scenario_id,
+                    campaign.status,
+                    campaign.turn_number,
+                    campaign.max_turns,
+                    campaign.failure_reason,
+                    campaign.created_at,
+                    now,
+                    payload,
+                ),
+            )
+            if snapshot_turn is not None:
+                if (
+                    not campaign.turn_history
+                    or campaign.turn_history[-1].turn_number != snapshot_turn
+                ):
+                    raise StorageError(
+                        f"Snapshot turn {snapshot_turn} is not the latest resolved turn"
+                    )
+                snapshot = _json_document(
+                    "turn_snapshot",
+                    {
+                        "campaign_id": campaign.id,
+                        "turn_number": snapshot_turn,
+                        "campaign": asdict(campaign),
+                    },
+                )
+                existing = connection.execute(
+                    "SELECT snapshot_json FROM turn_snapshots "
+                    "WHERE campaign_id = ? AND turn_number = ?",
+                    (campaign.id, snapshot_turn),
+                ).fetchone()
+                if existing is None:
+                    connection.execute(
+                        "INSERT INTO turn_snapshots"
+                        "(campaign_id, turn_number, created_at, snapshot_json) "
+                        "VALUES (?, ?, ?, ?)",
+                        (campaign.id, snapshot_turn, now, snapshot),
+                    )
+                elif existing["snapshot_json"] != snapshot:
+                    raise ImmutableSnapshotError(
+                        f"Turn {snapshot_turn} snapshot for campaign "
+                        f"{campaign.id} is immutable"
+                    )
+
+    def get(self, campaign_id: str) -> Optional[Campaign]:
+        with self._lock, self._connect() as connection:
+            row = connection.execute(
+                "SELECT payload_json FROM campaigns WHERE id = ?", (campaign_id,)
+            ).fetchone()
+        if row is None:
+            return None
+        try:
+            campaign = decode_campaign(row["payload_json"])
+        except CorruptRecordError as exc:
+            raise CorruptRecordError(f"Campaign {campaign_id} is corrupt: {exc}") from exc
+        if campaign.id != campaign_id:
+            raise CorruptRecordError(
+                f"Campaign {campaign_id} is corrupt: payload identity mismatch"
+            )
+        return campaign
+
+    def list_recent(self, limit: int = 5) -> List[dict]:
+        with self._lock, self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT id, name, scenario_id, status, turn_number, max_turns,
+                       failure_reason, created_at, updated_at
+                FROM campaigns ORDER BY updated_at DESC LIMIT ?
+                """,
+                (limit,),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def snapshot_json(self, campaign_id: str, turn_number: int) -> Optional[str]:
+        """Inspection hook used by persistence regression tests."""
+        with self._lock, self._connect() as connection:
+            row = connection.execute(
+                "SELECT snapshot_json FROM turn_snapshots "
+                "WHERE campaign_id = ? AND turn_number = ?",
+                (campaign_id, turn_number),
+            ).fetchone()
+        return None if row is None else str(row["snapshot_json"])
+
+    def add_model_run(self, payload: Mapping[str, Any]) -> None:
+        data = dict(payload)
+        raw = _json_document("model_run", data)
+        with self._lock, self._connect() as connection:
+            connection.execute(
+                "INSERT INTO model_runs(campaign_id, turn_number, created_at, payload_json) "
+                "VALUES (?, ?, ?, ?)",
+                (data.get("campaign_id"), data.get("turn_number"), _utc_now(), raw),
+            )
+
+    def model_runs_for_campaign(self, campaign_id: str) -> List[dict]:
+        with self._lock, self._connect() as connection:
+            rows = connection.execute(
+                "SELECT payload_json FROM model_runs "
+                "WHERE campaign_id = ? ORDER BY id",
+                (campaign_id,),
+            ).fetchall()
+        return [_read_document(row["payload_json"], "model_run") for row in rows]
+
+    def all_model_runs(self) -> List[dict]:
+        with self._lock, self._connect() as connection:
+            rows = connection.execute(
+                "SELECT payload_json FROM model_runs ORDER BY id"
+            ).fetchall()
+        return [_read_document(row["payload_json"], "model_run") for row in rows]
+
+    def clear_model_runs(self) -> None:
+        with self._lock, self._connect() as connection:
+            connection.execute("DELETE FROM model_runs")
 
     def clear(self) -> None:
-        with self._lock:
-            self._data.clear()
-
-    def save_json(self, path: str) -> None:
-        """Dump the store to JSON. Values must be JSON-serializable dicts."""
-        with self._lock:
-            Path(path).write_text(json.dumps(self._data, indent=2, default=str))
-
-    def load_json(self, path: str) -> None:
-        text = Path(path).read_text()
-        with self._lock:
-            self._data = json.loads(text) if text.strip() else {}
-
-
-class CampaignStore:
-    """Convenience wrapper around ``MemoryStore`` for live campaign objects."""
-
-    def __init__(self) -> None:
-        self._store = MemoryStore()
-
-    def put(self, campaign) -> None:
-        self._store.set(campaign.id, campaign)
-
-    def get(self, campaign_id: str):
-        return self._store.get(campaign_id)
-
-    def has(self, campaign_id: str) -> bool:
-        return self._store.has(campaign_id)
-
-    def list(self) -> Iterator:
-        for value in self._store.all():
-            yield value
-
-    def clear(self) -> None:
-        self._store.clear()
+        """Delete all local records. Intended for explicit reset/tests only."""
+        with self._lock, self._connect() as connection:
+            connection.execute("DELETE FROM campaigns")
+            connection.execute("DELETE FROM model_runs")

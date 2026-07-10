@@ -1,9 +1,8 @@
 """Campaign service.
 
-This is the only place the FastAPI layer touches engine + memory. It owns the
-in-memory campaign store and converts engine dataclasses into Pydantic API
-models. No game logic lives here -- all state transitions delegate to the
-engine so the deterministic core stays framework-free.
+This is the only place the FastAPI layer touches engine + persistence. It loads
+detached typed campaigns from SQLite, delegates state transitions to the
+engine, then durably saves the result. No game logic lives here.
 """
 
 from __future__ import annotations
@@ -14,28 +13,23 @@ from typing import Optional
 from engine import dossier as dossier_engine
 from engine import seed_data, turn as turn_engine
 from engine.models import Campaign
-from memory.persistence import CampaignStore
-
 from app.ai import fallbacks
 from app.ai.logging import get_run_store
 from app.ai.provider import get_provider
 from app.ai.runner import run_artifact
 from app.ai.schemas import MemoDraft
 from app.config import get_settings
+from app.repository import configure_repository, get_repository
 from app.schemas import api as schemas
 
 
-# Module-level in-memory store. Reset on process restart, which is acceptable
-# for the skeleton slice (see AGENTS.md: "over-engineer persistence" avoided).
-_STORE = CampaignStore()
-
-
-def get_store() -> CampaignStore:
-    return _STORE
+def get_store():
+    """Backward-compatible name for callers that only need the repository."""
+    return get_repository()
 
 
 def _require_campaign(campaign_id: str) -> Campaign:
-    campaign = _STORE.get(campaign_id)
+    campaign = get_repository().get(campaign_id)
     if campaign is None:
         raise KeyError(campaign_id)
     return campaign
@@ -110,7 +104,7 @@ def _system_status(campaign: Campaign) -> schemas.SystemStatusModel:
 
 def create_campaign(name: Optional[str] = None) -> schemas.CampaignCreatedModel:
     campaign = seed_data.create_northbridge_campaign(name=name or "")
-    _STORE.put(campaign)
+    get_repository().put(campaign)
     return schemas.CampaignCreatedModel(
         id=campaign.id,
         name=campaign.name,
@@ -121,13 +115,21 @@ def create_campaign(name: Optional[str] = None) -> schemas.CampaignCreatedModel:
 
 
 def get_campaign(campaign_id: str) -> Optional[schemas.CampaignModel]:
-    campaign = _STORE.get(campaign_id)
+    campaign = get_repository().get(campaign_id)
     if campaign is None:
         return None
     return schemas.CampaignModel(
         summary=_summary(campaign),
         world_state=_world_state(campaign),
     )
+
+
+def list_recent_campaigns(limit: int = 5) -> list[schemas.RecentCampaignModel]:
+    """Return only resume-screen metadata, never campaign/model payloads."""
+    return [
+        schemas.RecentCampaignModel.model_validate(row)
+        for row in get_repository().list_recent(limit=limit)
+    ]
 
 
 def get_current(campaign_id: str) -> Optional[schemas.CurrentTurnModel]:
@@ -167,8 +169,9 @@ def submit_advice(
         return None
 
     result = turn_engine.advance_turn(campaign, advice_id)
-    # The campaign object is mutated in place and already referenced by the
-    # store, so no explicit re-put is required.
+    # Save the authoritative document and immutable end-of-turn snapshot in
+    # one SQLite transaction.
+    get_repository().put(campaign, snapshot_turn=result.turn_number)
     return schemas.TurnResultModel.model_validate(asdict(result))
 
 
@@ -266,4 +269,4 @@ def get_model_runs(campaign_id: str) -> Optional[list[schemas.ModelRunModel]]:
 
 
 def _require_campaign_or_none(campaign_id: str) -> Optional[Campaign]:
-    return _STORE.get(campaign_id)
+    return get_repository().get(campaign_id)

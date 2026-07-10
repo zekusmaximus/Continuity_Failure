@@ -80,7 +80,9 @@ def render_prompt(
             "tool. Respond only with a single JSON object matching the required "
             "schema. Do not invent facts beyond the supplied input."
         )
-    user = json.dumps(input_payload, default=str, indent=2)
+    # Prompt inputs are part of the logged structured contract. Refuse unknown
+    # Python objects instead of silently stringifying them into lossy payloads.
+    user = json.dumps(input_payload, ensure_ascii=False, indent=2)
     return system, user
 
 

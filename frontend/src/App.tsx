@@ -6,6 +6,7 @@ import type {
   TurnHistory,
   TurnResult,
   MemoDraft,
+  RecentCampaign,
 } from "./api/client";
 import type { Phase } from "./domain";
 import IntroScreen from "./components/IntroScreen";
@@ -68,6 +69,7 @@ export default function App() {
   const [history, setHistory] = useState<TurnHistory | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [caseFileOpen, setCaseFileOpen] = useState(false);
+  const [recentCampaigns, setRecentCampaigns] = useState<RecentCampaign[]>([]);
 
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -91,39 +93,82 @@ export default function App() {
     setHistory(await api.getTurns(id));
   }, []);
 
+  const reopenCampaign = useCallback(async (id: string) => {
+    const [cur, turns] = await Promise.all([
+      api.getCurrent(id),
+      api.getTurns(id),
+    ]);
+    setCampaignId(id);
+    setCurrent(cur);
+    setSummary(cur.summary);
+    setHistory(turns);
+    setLastResult(null);
+    setSelected(null);
+    setMemo(null);
+    setMemoError(null);
+    setPhase(cur.summary.status === "ACTIVE" ? "CALL" : "DOSSIER");
+    saveCampaignId(id);
+  }, []);
+
   useEffect(() => {
     const savedId = readSavedCampaignId();
-    if (!savedId) return;
-
     let cancelled = false;
     setLoading(true);
     setError(null);
-    Promise.all([api.getCurrent(savedId), api.getTurns(savedId)])
-      .then(([cur, turns]) => {
-        if (cancelled) return;
-        setCampaignId(savedId);
-        setCurrent(cur);
-        setSummary(cur.summary);
-        setHistory(turns);
-        setLastResult(null);
-        setSelected(null);
-        setPhase(cur.summary.status === "ACTIVE" ? "CALL" : "DOSSIER");
-        saveCampaignId(savedId);
-      })
-      .catch(() => {
-        if (cancelled) return;
-        clearSavedCampaignId();
-        setError(
-          "The saved engagement is no longer available. The backend may have restarted; begin a new intake.",
-        );
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
+    void (async () => {
+      try {
+        const recent = await api.listRecentCampaigns();
+        if (!cancelled) setRecentCampaigns(recent);
+      } catch (e) {
+        if (!cancelled && !savedId) {
+          setError(
+            `Could not load saved engagements: ${
+              e instanceof Error ? e.message : String(e)
+            }`,
+          );
+        }
+      }
+
+      if (savedId) {
+        try {
+          await reopenCampaign(savedId);
+        } catch (e) {
+          if (!cancelled) {
+            clearSavedCampaignId();
+            setError(
+              `The saved engagement could not be reopened: ${
+                e instanceof Error ? e.message : String(e)
+              }. Choose another recent engagement or begin a new intake.`,
+            );
+          }
+        }
+      }
+      if (!cancelled) setLoading(false);
+    })();
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [reopenCampaign]);
+
+  const handleResume = useCallback(
+    async (id: string) => {
+      setLoading(true);
+      setError(null);
+      try {
+        await reopenCampaign(id);
+      } catch (e) {
+        if (readSavedCampaignId() === id) clearSavedCampaignId();
+        setError(
+          `Engagement ${id} could not be reopened: ${
+            e instanceof Error ? e.message : String(e)
+          }. It may have been deleted or its record may be damaged.`,
+        );
+      } finally {
+        setLoading(false);
+      }
+    },
+    [reopenCampaign],
+  );
 
   const startCampaign = useCallback(async () => {
     setLoading(true);
@@ -251,7 +296,12 @@ export default function App() {
   if (phase === "INTRO") {
     return (
       <div className="cd-app cd-app-intro">
-        <IntroScreen onBegin={startCampaign} loading={loading} />
+        <IntroScreen
+          onBegin={startCampaign}
+          onResume={handleResume}
+          recentCampaigns={recentCampaigns}
+          loading={loading}
+        />
         {error && (
           <div className="cd-banner-alert cd-alert cd-alert-error">
             <strong>System alert:</strong> {error}

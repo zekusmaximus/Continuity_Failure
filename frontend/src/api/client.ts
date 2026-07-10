@@ -107,6 +107,10 @@ export interface CampaignSummary {
   created_at: string;
 }
 
+export interface RecentCampaign extends CampaignSummary {
+  updated_at: string;
+}
+
 export interface NpcDecision {
   advice_id: string;
   decision_type: string;
@@ -277,6 +281,8 @@ export const api = {
       method: "POST",
       body: JSON.stringify(name ? { name } : {}),
     }),
+  listRecentCampaigns: (limit = 5) =>
+    request<RecentCampaign[]>(`/api/campaigns?limit=${limit}`),
   getCampaign: (id: string) =>
     request<{ summary: CampaignSummary; world_state: WorldState }>(
       `/api/campaigns/${id}`,

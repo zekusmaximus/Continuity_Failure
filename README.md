@@ -126,10 +126,10 @@ state-mutation code.
 
 ```text
 frontend/   React + TypeScript + Vite Continuity Desk workstation
-backend/    FastAPI orchestration layer (Pydantic, in-memory persistence)
+backend/    FastAPI orchestration layer (Pydantic, durable SQLite persistence)
             app/ai/ — dormant, validation-gated AI-assist layer (memo drafter)
 engine/     Deterministic simulation engine (no web dependencies)
-memory/     In-memory persistence (durable canon store is a later milestone)
+memory/     Versioned SQLite repository for campaigns, snapshots, and model runs
 tests/      pytest suite for engine invariants, content, the turn loop,
             the AI boundary, and HTTP routes
 evals/      Reserved for future model-output evaluation harnesses
@@ -162,7 +162,10 @@ uvicorn app.main:app --reload
 
 The API is served at `http://localhost:8000` (interactive docs at `/docs`).
 The `engine/` and `memory/` packages at the repo root are made importable by
-the editable install. To enable the live (Anthropic) AI provider, also install
+the editable install. Campaigns persist by default in
+`data/continuity_failure.sqlite3`; set `CF_DATABASE_PATH` to override it. Stop
+the backend before copying that file for backup or deleting it for a clean
+reset. To enable the live (Anthropic) AI provider, also install
 the optional extra and set two environment variables:
 
 ```bash
@@ -224,6 +227,9 @@ Implemented:
   `public_trust`, `budget_capacity`, `state_oversight_risk`, `legal_exposure`)
   and successful 10-turn completion.
 * Full turn history, canon archive, and open-thread tracking.
+* Durable SQLite storage for complete typed campaigns, append-only end-of-turn
+  snapshots, and advisory model-run logs. URL/local-storage campaign IDs resume
+  after backend restart, and the intro screen lists recent engagements.
 * **Continuity Desk — Guided Intake** web UI: a boot/intro screen, then a
   phased turn flow (incoming call → situation brief → evidence review → advice →
   client decision → consequences → turn archive → next call), each screen with a
@@ -254,7 +260,6 @@ Intentionally **not** implemented yet:
   review) and their resource costs (power, bandwidth, privacy, latency).
 * Autonomous agents and multi-agent behavior.
 * Vector database / semantic memory.
-* Durable persistence (SQLite/Postgres canon store).
 * Statewide or regional gameplay beyond the town level.
 * Authentication and deployment tooling.
 
@@ -267,8 +272,9 @@ back to a deterministic system draft on any failure, and logs every call as a
 
 The deterministic loop is document-rich, the Continuity Desk is playable end to
 end, and the first AI-assist tool (memo drafter + `ModelRun` logging) is wired
-through the UI behind the validation boundary. The next step is to **extend the
-AI-assist layer with the remaining read-only tools** before adding durability:
+through the UI behind the validation boundary, and campaign/model-run records
+now survive backend restarts in SQLite. The next step is to **extend the
+AI-assist layer with the remaining read-only tools and in-world costs**:
 
 1. Add a validated Research Console that only *proposes* classified facts
    (proposed / unverified / rumor), never canon — the engine remains the sole
@@ -278,8 +284,8 @@ AI-assist layer with the remaining read-only tools** before adding durability:
    `run_artifact` boundary and deterministic fallbacks already in place.
 3. Add in-world AI tool costs (power, bandwidth, privacy, latency, confidence)
    so the memo drafter and later tools carry gameplay tradeoffs.
-4. Introduce durable persistence (SQLite canon store) once the AI layer's
-   read/write boundary is proven.
+4. Add retention/export policy for durable advisory model payloads before live
+   model use expands.
 
 See `docs/branch-review.md` for the full branch review.
 

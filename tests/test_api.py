@@ -14,6 +14,7 @@ Lives in its own file so the engine-independence AST scan in
 from __future__ import annotations
 
 import os
+import sqlite3
 import sys
 
 import pytest
@@ -27,7 +28,6 @@ from fastapi.testclient import TestClient  # noqa: E402
 
 from app.main import app  # noqa: E402
 from app.services import campaign_service  # noqa: E402
-from app.ai.logging import get_run_store  # noqa: E402
 
 
 SURVIVAL_SEQUENCE = [
@@ -45,13 +45,12 @@ SURVIVAL_SEQUENCE = [
 
 
 @pytest.fixture(autouse=True)
-def _clean_stores():
-    """Isolate the module-level campaign + model-run stores between tests."""
-    campaign_service.get_store().clear()
-    get_run_store().clear()
+def _isolated_database(tmp_path, monkeypatch):
+    """Every API test gets a fresh SQLite file, never the developer database."""
+    monkeypatch.setenv("CF_DATABASE_PATH", str(tmp_path / "api.sqlite3"))
+    campaign_service.configure_repository()
     yield
-    campaign_service.get_store().clear()
-    get_run_store().clear()
+    campaign_service.configure_repository()
 
 
 @pytest.fixture()
@@ -126,6 +125,50 @@ def test_get_campaign_unknown_returns_404(client):
     res = client.get("/api/campaigns/does-not-exist")
     assert res.status_code == 404
     assert "not found" in res.json()["detail"].lower()
+
+
+def test_recent_campaigns_expose_resume_metadata_only(client):
+    first = client.post("/api/campaigns", json={"name": "Earlier"}).json()
+    second = client.post("/api/campaigns", json={"name": "Most Recent"}).json()
+    res = client.get("/api/campaigns?limit=2")
+    assert res.status_code == 200
+    body = res.json()
+    assert [row["id"] for row in body] == [second["id"], first["id"]]
+    assert set(body[0]) == {
+        "id",
+        "name",
+        "scenario_id",
+        "status",
+        "turn_number",
+        "max_turns",
+        "failure_reason",
+        "created_at",
+        "updated_at",
+    }
+
+
+def test_campaign_resumes_after_service_repository_reconstruction(client, campaign):
+    client.post(
+        f"/api/campaigns/{campaign}/advice",
+        json={"advice_id": "controlled_disclosure"},
+    )
+    before = client.get(f"/api/campaigns/{campaign}/turns").json()
+    campaign_service.configure_repository()
+    after = client.get(f"/api/campaigns/{campaign}/turns")
+    assert after.status_code == 200
+    assert after.json() == before
+
+
+def test_corrupt_saved_campaign_returns_clear_error(client, campaign):
+    repository = campaign_service.get_repository()
+    with sqlite3.connect(repository.path) as connection:
+        connection.execute(
+            "UPDATE campaigns SET payload_json = ? WHERE id = ?",
+            ("{broken", campaign),
+        )
+    res = client.get(f"/api/campaigns/{campaign}/current")
+    assert res.status_code == 500
+    assert "corrupt" in res.json()["detail"].lower()
 
 
 def test_get_current_has_turn_package(client, campaign):
@@ -278,6 +321,17 @@ def test_draft_memo_logs_a_model_run(client, campaign):
     assert runs[0]["prompt_name"] == "memo_drafter"
     assert runs[0]["validation_status"] == "fallback"
     assert runs[0]["model_name"] == "disabled"
+
+
+def test_model_run_survives_service_repository_reconstruction(client, campaign):
+    client.post(
+        f"/api/campaigns/{campaign}/memo", json={"advice_id": "mutual_aid"}
+    )
+    campaign_service.configure_repository()
+    runs = client.get(f"/api/campaigns/{campaign}/model-runs")
+    assert runs.status_code == 200
+    assert len(runs.json()) == 1
+    assert runs.json()[0]["validation_status"] == "fallback"
 
 
 def test_draft_memo_unknown_advice_returns_400(client, campaign):

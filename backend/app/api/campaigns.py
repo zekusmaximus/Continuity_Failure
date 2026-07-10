@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Query, status
 
 from engine.turn import UnknownAdviceOption
 
@@ -28,6 +28,15 @@ def _not_found(campaign_id: str):
 def create_campaign(payload: schemas.CreateCampaignRequest | None = None):
     name = payload.name if payload and payload.name else None
     return campaign_service.create_campaign(name=name)
+
+
+@router.get(
+    "",
+    response_model=list[schemas.RecentCampaignModel],
+    summary="List recent campaigns for the resume screen",
+)
+def list_recent_campaigns(limit: int = Query(default=5, ge=1, le=20)):
+    return campaign_service.list_recent_campaigns(limit=limit)
 
 
 @router.get(

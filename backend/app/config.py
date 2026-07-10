@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Optional
 
 # Default model. Overridable via CF_AI_MODEL (e.g. "claude-haiku-4-5" for a
@@ -18,6 +19,9 @@ DEFAULT_MODEL = "claude-opus-4-8"
 DEFAULT_MAX_OUTPUT_TOKENS = 1024
 MIN_OUTPUT_TOKENS = 64
 MAX_OUTPUT_TOKENS = 8192
+DEFAULT_DATABASE_PATH = (
+    Path(__file__).resolve().parents[2] / "data" / "continuity_failure.sqlite3"
+)
 
 
 def _env_bool(name: str, default: bool = False) -> bool:
@@ -51,6 +55,7 @@ class Settings:
     model_name: str
     anthropic_api_key: Optional[str]
     max_output_tokens: int
+    database_path: str = str(DEFAULT_DATABASE_PATH)
 
     def __post_init__(self) -> None:
         if not MIN_OUTPUT_TOKENS <= self.max_output_tokens <= MAX_OUTPUT_TOKENS:
@@ -76,4 +81,7 @@ def get_settings() -> Settings:
         model_name=os.environ.get("CF_AI_MODEL", DEFAULT_MODEL) or DEFAULT_MODEL,
         anthropic_api_key=os.environ.get("ANTHROPIC_API_KEY") or None,
         max_output_tokens=_env_int("CF_AI_MAX_TOKENS", DEFAULT_MAX_OUTPUT_TOKENS),
+        database_path=(
+            os.environ.get("CF_DATABASE_PATH") or str(DEFAULT_DATABASE_PATH)
+        ),
     )

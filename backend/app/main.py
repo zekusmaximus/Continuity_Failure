@@ -10,12 +10,14 @@ layer only routes requests and serializes results.
 
 from __future__ import annotations
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from app.api import campaigns as campaigns_api
 from app.schemas import api as schemas
 from engine import seed_data
+from memory.persistence import CorruptRecordError
 
 app = FastAPI(
     title="Continuity Failure",
@@ -37,6 +39,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.exception_handler(CorruptRecordError)
+def corrupt_record_handler(_request: Request, exc: CorruptRecordError):
+    return JSONResponse(status_code=500, content={"detail": str(exc)})
 
 
 @app.get("/health", response_model=schemas.HealthModel, tags=["meta"])

@@ -149,6 +149,19 @@ class CampaignModel(BaseModel):
     world_state: WorldStateModel
 
 
+class RecentCampaignModel(BaseModel):
+    """Minimal metadata projection for the resume screen."""
+    id: str
+    name: str
+    scenario_id: str
+    status: str = Field(pattern=CAMPAIGN_STATUS_PATTERN)
+    turn_number: int = Field(ge=1)
+    max_turns: int = Field(ge=1)
+    failure_reason: Optional[str] = None
+    created_at: str
+    updated_at: str
+
+
 class AdviceRequest(StrictRequestModel):
     advice_id: str = Field(
         min_length=1,

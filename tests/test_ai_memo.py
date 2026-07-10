@@ -19,17 +19,18 @@ if _BACKEND not in sys.path:
 import pytest  # noqa: E402
 
 from app.ai import fallbacks  # noqa: E402
-from app.ai.logging import get_run_store, ValidationStatus  # noqa: E402
+from app.ai.logging import ValidationStatus  # noqa: E402
 from app.ai.schemas import MemoDraft  # noqa: E402
 from app.services import campaign_service  # noqa: E402
 from engine.turn import UnknownAdviceOption  # noqa: E402
 
 
 @pytest.fixture(autouse=True)
-def _clean_run_store():
-    get_run_store().clear()
+def _isolated_database(tmp_path, monkeypatch):
+    monkeypatch.setenv("CF_DATABASE_PATH", str(tmp_path / "memo.sqlite3"))
+    campaign_service.configure_repository()
     yield
-    get_run_store().clear()
+    campaign_service.configure_repository()
 
 
 def _new_campaign_with_advice():

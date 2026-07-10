@@ -15,9 +15,10 @@ backend/
   pyproject.toml          # installable project; also wires engine/ and memory/
   app/
     main.py               # FastAPI app, CORS, /health
+    repository.py         # configurable SQLite repository construction
     api/campaigns.py      # /api/campaigns routes
     services/
-      campaign_service.py # engine <-> memory <-> pydantic bridge (the only mutator path)
+      campaign_service.py # engine <-> SQLite repository <-> pydantic bridge
     schemas/api.py        # Pydantic request/response models
     ai/                   # provider, validation runner, memo fallback, run log
     config.py             # offline-first AI settings
@@ -62,6 +63,7 @@ The API is served at `http://localhost:8000`. Interactive docs:
 | ------ | ---- | ------- |
 | GET    | `/health` | Service liveness + active scenario id |
 | POST   | `/api/campaigns` | Start a new Northbridge campaign |
+| GET    | `/api/campaigns?limit=5` | Minimal recent-campaign metadata for resume |
 | GET    | `/api/campaigns/{id}` | Campaign summary + current world state |
 | GET    | `/api/campaigns/{id}/current` | Current turn package (state, call, advice, last turn) |
 | POST   | `/api/campaigns/{id}/advice` | Submit advice, resolve NPC decision, advance one turn |
@@ -81,8 +83,23 @@ remains available through its deterministic fallback.
 
 ## Persistence
 
-In-memory only for this slice (see `memory/persistence.py`). Restarting the
-process clears all campaigns. A durable canon store is a later milestone.
+Campaigns, immutable end-of-turn snapshots, and complete advisory `ModelRun`
+records are stored in SQLite through `memory/persistence.py`. The default file
+is `data/continuity_failure.sqlite3` at the repository root. Override it with
+`CF_DATABASE_PATH` (an absolute path is recommended for service deployments):
+
+```bash
+export CF_DATABASE_PATH=/path/to/continuity_failure.sqlite3
+```
+
+The repository uses Python's standard-library `sqlite3`. Schema changes are
+tracked in `schema_migrations`; campaign, snapshot, and model-run JSON envelopes
+currently use document version 1. Tests always override the path with isolated
+temporary databases.
+
+To back up local play, stop the backend and copy the database file. To reset
+local play, stop the backend and delete that file; it is recreated and migrated
+on the next request. SQLite files are ignored by git.
 
 ## Tests
 

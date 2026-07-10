@@ -4,8 +4,9 @@
 
 > **Implementation status (this branch).** This is a forward-looking design
 > spec. The Northbridge deterministic MVP is implemented and runnable today;
-> the AI, persistence, and deployment layers described below are **planned**,
-> not present. See § "Current Architecture (as built)" for what actually
+> broader AI and deployment layers described below are **planned**. SQLite
+> persistence and the first validation-gated AI tool are present. See
+> § "Current Architecture (as built)" for what actually
 > exists, and § "Intentionally Not Present Yet" for what is deliberately
 > deferred.
 
@@ -28,22 +29,23 @@ in this section is verified by passing tests and a working dev server.
 frontend/   React 18 + TypeScript + Vite  (no UI framework, plain CSS)
    |        Vite dev server proxies /api and /health to the backend
    ↓ HTTP (JSON)
-backend/    FastAPI + Pydantic v2, in-memory only
+backend/    FastAPI + Pydantic v2
    |        app/api/campaigns.py        routes (incl. /memo, /model-runs)
    |        app/services/campaign_service.py  engine <-> memory <-> ai <-> schemas
    |        app/schemas/api.py          Pydantic request/response models
+   |        app/repository.py           neutral SQLite repository provider
    |        app/ai/                     dormant, validation-gated AI-assist layer
    |          provider.py               NullProvider (default) / AnthropicProvider
    |          runner.py                 run_artifact: validate -> retry -> fallback
    |          schemas.py                MemoDraft output contract
    |          fallbacks.py              deterministic memo builder
-   |          logging.py                ModelRun store (append-only, in-memory)
-   |        app/config.py               Settings (AI off by default; ai_live flag)
+   |          logging.py                durable ModelRun repository adapter
+   |        app/config.py               AI + configurable database settings
    ↓ imports
 engine/     framework-free deterministic engine (dataclasses, no web deps)
    |        models.py state.py diffs.py rules.py turn.py seed_data.py
    ↓ used by
-memory/     in-memory CampaignStore (process-local; cleared on restart)
+memory/     versioned SQLite repository (campaigns, immutable snapshots, model runs)
 ```
 
 **Implemented now**
@@ -58,11 +60,18 @@ memory/     in-memory CampaignStore (process-local; cleared on restart)
   The engine also ships a framework-free Markdown dossier builder
   (`engine/dossier.py`).
 * FastAPI endpoints: `GET /health`, `POST /api/campaigns`,
+  `GET /api/campaigns` (recent resume metadata),
   `GET /api/campaigns/{id}`, `GET /api/campaigns/{id}/current`,
   `POST /api/campaigns/{id}/advice`, `GET /api/campaigns/{id}/turns`,
   `GET /api/campaigns/{id}/dossier`, `POST /api/campaigns/{id}/memo`
   (advisory memo draft), `GET /api/campaigns/{id}/model-runs` (read-only AI
   run log).
+* **Durable SQLite boundary** (`memory/persistence.py`): complete versioned
+  campaign JSON reconstructs typed engine dataclasses exactly; separate
+  append-only end-of-turn snapshots prevent later history rewrites; model runs
+  use the same repository without gaining state-mutation authority. The path is
+  configurable with `CF_DATABASE_PATH` and schema version 1 is forward-migrated
+  through `schema_migrations` using only Python's standard library.
 * **Dormant, validation-gated AI-assist layer** (`backend/app/ai/`): a memo
   drafter is the first implemented tool. `run_artifact` renders the versioned
   prompt, calls a provider (default `NullProvider`, which never succeeds), 
@@ -85,11 +94,13 @@ memory/     in-memory CampaignStore (process-local; cleared on restart)
   Case File has a **Model Runs** tab. The frontend reveals the backend's single
   post-advice `TurnResult` across the separate client-decision / consequences /
   archive phases; no backend shape change was required.
-* `pytest` suite (**156 passing**): determinism, 0–100 bounds, failure
+* `pytest` suite: determinism, 0–100 bounds, failure
   thresholds, completion at turn 10, applied diffs, engine/FastAPI-independence
   (AST-based), documents/evidence, advice tradeoffs, consequence stacks, open
   threads, dossier generation, the AI boundary + runner + memo service path,
-  and HTTP route tests (`TestClient`) covering all endpoints and error paths.
+  HTTP route tests (`TestClient`) covering all endpoints and error paths, plus
+  SQLite restart, corruption, terminal recovery, and snapshot-immutability
+  regressions.
 
 **Actual current repository structure**
 
@@ -102,12 +113,13 @@ frontend/   src/{main,App,domain}.tsx, api/client.ts, styles/global.css,
             CaseFile drawer (+ DocumentDetail, ModelRunPanel), MemoDraftPanel,
             and the reused dense views (EvidenceBoard, FactionPanel,
             StateReadout, CanonPanel, TurnHistory, CampaignDossier)
-backend/    app/{main,config,api/campaigns,services/campaign_service,schemas/api}.py
+backend/    app/{main,config,repository,api/campaigns,services/campaign_service,schemas/api}.py
             app/ai/{provider,runner,schemas,fallbacks,logging}.py  (dormant by default)
 engine/     {models,state,diffs,rules,turn,seed_data,consequences,dossier}.py
-memory/     {persistence}.py            (CampaignStore, MemoryStore)
+memory/     {persistence}.py            (CampaignRepository, SQLiteRepository)
 tests/      test_engine_turns.py, test_state_invariants.py, test_content_and_dossier.py,
-            test_ai_boundary.py, test_ai_runner.py, test_ai_memo.py, test_api.py
+            test_ai_boundary.py, test_ai_runner.py, test_ai_memo.py, test_api.py,
+            test_persistence.py
 evals/      README.md                    (reserved)
 docs/       *.md
 prompts/    README.md, memo_drafter.v1.md
@@ -126,9 +138,8 @@ prompts/    README.md, memo_drafter.v1.md
   privacy, latency). The validation boundary and `ModelRun` logging they would
   use *are* present.
 * Autonomous agents / multi-agent behavior.
-* Durable storage: no SQLite, Postgres, SQLAlchemy, or SQLModel. State is
-  process-local in-memory only (campaigns and model-run logs are lost on
-  restart).
+* Multi-process conflict handling, account ownership, and cloud sync. The local
+  SQLite boundary intentionally does not solve these yet.
 * Vector database / semantic retrieval.
 * Authentication and deployment configuration.
 * Statewide / regional / interstate progression beyond the town level.
@@ -273,17 +284,17 @@ The backend coordinates game state, persistence, model calls, turn resolution, a
 
 Initial backend stack:
 
-> **Status:** As built, persistence is **in-memory only** (no SQLite/SQLAlchemy
-> yet) for both campaign state and `ModelRun` logs. The list below is the
-> intended stack for a later durability milestone. The AI-assist layer
-> (`app/ai/`) is present and dormant by default; see "AI Layer" below.
+> **Status:** As built, persistence uses standard-library SQLite with versioned
+> JSON documents and append-only turn snapshots. SQLAlchemy/SQLModel are not
+> needed for the current narrow repository. The AI-assist layer (`app/ai/`) is
+> present and dormant by default; see "AI Layer" below.
 
 ```text
 Python
 FastAPI
 Pydantic
 SQLite for MVP
-SQLAlchemy or SQLModel
+Standard-library sqlite3 repository
 ```
 
 SQLite is sufficient for the first milestone. Postgres can be introduced later if the project needs richer querying, concurrency, deployment scale, or full-text search beyond MVP needs.
