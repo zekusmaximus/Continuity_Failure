@@ -93,6 +93,7 @@ The generator uses its own temporary database and never touches real saves.
 | Terminal campaign cannot advance; dossier stays usable | `e2e/terminal.spec.ts` |
 | Core turn flow, drawers, and overlays operate by keyboard | `e2e/keyboard.spec.ts` |
 | Narrow + wide viewports: no clipped controls, no horizontal overflow | `e2e/responsive.spec.ts` |
+| Causal waterfall: exact server-reported reconciliation, source attribution, proposed-vs-applied advice mediation, direction semantics, legacy fallback | `tests/ConsequencesPhase.test.tsx`, `e2e/turn-flow.spec.ts` |
 | API loading / error / retry states; restart confirmation | `tests/CampaignDossier.test.tsx`, `tests/apiClient.test.ts`, `tests/App.test.tsx` |
 | Accessibility smoke (structural WCAG A/AA, serious+critical) | `e2e/accessibility.spec.ts` |
 

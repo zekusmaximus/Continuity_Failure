@@ -85,6 +85,22 @@ memory/     versioned SQLite repository (campaigns/memos, immutable snapshots, m
   turn; the loser sees `stale_turn`. `(campaign_id, idempotency_key)` is a
   primary key, so an exact retry replays the stored response
   (`Idempotent-Replay: true`) and never resolves a second turn.
+* **Causal consequence report** (`engine/consequences.build_consequence_report`):
+  every resolved turn's `TurnResult` carries a `ConsequenceReport` — the
+  authoritative per-variable decomposition of how the starting snapshot became
+  the resolved snapshot. Each `VariableConsequence` reconciles exactly
+  (`start_value` + ordered attributed deltas = `final_value`), attributes every
+  step to its `AppliedDiff` source (advice / npc_modification / decision cost /
+  ambient), and records the proposed-versus-applied advice mediation
+  (`AdviceMediation`: proposed delta, adherence, expected delta, applied delta,
+  outcome applied/reduced/delayed/rejected, clamp flag) — the one fact the diff
+  list cannot express, because a fully rejected proposal leaves no diff. The
+  report crosses the API boundary as `ConsequenceReportModel` on
+  `TurnResultModel`, feeds the aftermath causal-waterfall UI (which only
+  formats it, never recomputes), and is exported verbatim into the dossier's
+  per-turn "State reconciliation" lines. `engine/state.py` also exposes the
+  authoritative direction vocabulary (`variable_direction`,
+  higher_is_better / higher_is_worse).
 * **Persistent advice of record**: manual and validation-gated assisted drafts
   are `AdviceMemo` aggregates with append-only revisions and explicit
   provenance. A submission identifies one memo revision; resolution seals an

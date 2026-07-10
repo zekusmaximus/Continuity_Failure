@@ -47,6 +47,31 @@ def humanize_variable(variable: str) -> str:
     )
 
 
+# Variables where a HIGHER value is WORSE for the town/consultant. Everything
+# else on the 0-100 scale is higher-is-better. This is the authoritative
+# direction vocabulary the API exposes so the UI never has to guess semantics.
+HIGHER_IS_WORSE = frozenset(
+    {
+        "legal_exposure",
+        "media_pressure",
+        "state_oversight_risk",
+        "contractor_dependency",
+        "school_disruption",
+        "player_shadow_authority",
+    }
+)
+
+DIRECTION_HIGHER_IS_BETTER = "higher_is_better"
+DIRECTION_HIGHER_IS_WORSE = "higher_is_worse"
+
+
+def variable_direction(variable: str) -> str:
+    """Return the direction semantics for a state variable."""
+    if variable in HIGHER_IS_WORSE:
+        return DIRECTION_HIGHER_IS_WORSE
+    return DIRECTION_HIGHER_IS_BETTER
+
+
 def clamp(value: float) -> int:
     """Clamp a numeric value to the inclusive ``[0, 100]`` integer range."""
     if value <= MIN_VALUE:

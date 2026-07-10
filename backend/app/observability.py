@@ -98,6 +98,14 @@ class RequestContextMiddleware:
 
     def _route_template(self, scope) -> str:
         """Prefer the route template so log routes stay low-cardinality."""
+        # Starlette sets the matched route on the scope once routing has run;
+        # its ``path`` is the template ("/api/campaigns/{campaign_id}/advice").
+        route = scope.get("route")
+        template = getattr(route, "path", None)
+        if template:
+            return str(template)
+        # Older Starlette versions only expose the endpoint; map it back to the
+        # declaring route's template.
         endpoint = scope.get("endpoint")
         if endpoint is not None:
             if self._routes is None:

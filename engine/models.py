@@ -233,6 +233,70 @@ class AppliedDiff:
     source_type: str        # one of SourceType.*
 
 
+class AdviceEffectOutcome:
+    """How the caller's mediation left one proposed advice effect."""
+    APPLIED = "applied"     # landed at the full proposed size
+    REDUCED = "reduced"     # partially adopted (adherence scaling and/or clamp)
+    DELAYED = "delayed"     # deferred by the client; nothing landed this turn
+    REJECTED = "rejected"   # refused outright; nothing landed
+
+
+@dataclass
+class AdviceMediation:
+    """Proposed-versus-applied record for ONE variable the advice targeted.
+
+    ``proposed_delta`` is what the advice option would do at full adherence;
+    ``expected_delta`` is the deterministic post-adherence request; and
+    ``applied_delta`` is what actually landed after the 0-100 clamp. When the
+    three disagree, the aftermath can say exactly where the effect was lost.
+    """
+    proposed_delta: int
+    adherence: float
+    expected_delta: int     # int(round(proposed_delta * adherence)), pre-clamp
+    applied_delta: int      # the authoritative advice-sourced diff total
+    outcome: str            # one of AdviceEffectOutcome.*
+    clamped: bool = False   # applied differs from expected due to 0-100 bounds
+
+
+@dataclass
+class ConsequenceDelta:
+    """One attributed step in a variable's start -> final reconciliation."""
+    source_type: str        # one of SourceType.*
+    delta: int              # effective (post-clamp) change, never zero
+    reason: str
+    value_before: int
+    value_after: int
+
+
+@dataclass
+class VariableConsequence:
+    """The causal story of one variable across one resolved turn.
+
+    ``start_value`` + the ordered ``deltas`` reconcile exactly to
+    ``final_value``; a variable the advice targeted but that never moved keeps
+    an empty delta list and carries the rejection in ``advice``.
+    """
+    variable: str
+    label: str              # humanized, player-facing
+    direction: str          # "higher_is_better" / "higher_is_worse"
+    start_value: int
+    final_value: int
+    net_delta: int
+    deltas: List["ConsequenceDelta"] = field(default_factory=list)
+    advice: Optional[AdviceMediation] = None
+
+
+@dataclass
+class ConsequenceReport:
+    """Authoritative per-variable causal decomposition of one resolved turn.
+
+    Built by the deterministic engine from the applied diffs plus the advice
+    option and NPC decision -- never recomputed client-side. Ordered by the
+    size of the net move so the largest consequences read first.
+    """
+    variables: List[VariableConsequence] = field(default_factory=list)
+
+
 @dataclass
 class AdherenceFactor:
     """One human-labeled input into how the NPC weighed the advice.
@@ -411,6 +475,9 @@ class TurnResult:
     consequence_stack: ConsequenceStack = field(default_factory=ConsequenceStack)
     failure_reason: Optional[str] = None
     sent_memo: Optional[SentMemoSnapshot] = None
+    # Defaulted so pre-existing persisted turns rebuild cleanly with an empty
+    # report; every newly resolved turn carries the full causal decomposition.
+    consequence_report: ConsequenceReport = field(default_factory=ConsequenceReport)
 
 
 @dataclass
