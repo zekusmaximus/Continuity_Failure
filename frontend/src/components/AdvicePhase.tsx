@@ -1,9 +1,10 @@
-import type { AdviceOption, Faction, MemoDraft } from "../api/client";
-import { levelClass, titleCase } from "../domain";
+import type { AdviceOption, ClientCall, Faction, MemoDraft } from "../api/client";
+import { levelClass, titleCase, VARIABLE_META } from "../domain";
 import MemoDraftPanel from "./MemoDraftPanel";
 
 interface Props {
   options: AdviceOption[];
+  call: ClientCall | null;
   factions: Faction[];
   selected: string | null;
   onSelect: (id: string) => void;
@@ -42,17 +43,27 @@ function clientConcern(opt: AdviceOption): string {
   return "The client will weigh whether operations can absorb this right now.";
 }
 
+function variableLabel(name: string): string {
+  return VARIABLE_META[name]?.label ?? titleCase(name);
+}
+
 function AdviceCard({
   option,
   selected,
   onSelect,
   factions,
+  offBrief,
+  crossesRedLine,
+  callerName,
   readOnly = false,
 }: {
   option: AdviceOption;
   selected: boolean;
   onSelect: (id: string) => void;
   factions: Faction[];
+  offBrief: boolean;
+  crossesRedLine: boolean;
+  callerName: string;
   readOnly?: boolean;
 }) {
   const factionName = (id: string) => factions.find((f) => f.id === id)?.name ?? id;
@@ -61,7 +72,7 @@ function AdviceCard({
 
   return (
     <li>
-      <label className={`cd-advice ${selected ? "cd-advice-sel" : ""}`}>
+      <label className={`cd-advice ${selected ? "cd-advice-sel" : ""} ${offBrief ? "cd-advice-off" : ""}`}>
         <input
           type="radio"
           name="advice"
@@ -74,8 +85,32 @@ function AdviceCard({
           <div className="cd-advice-top">
             <span className="cd-advice-chip">{titleCase(option.type)}</span>
             <span className="cd-advice-title">{option.title || option.label}</span>
+            {offBrief && !crossesRedLine && (
+              <span className="cd-advice-flag cd-flag-off">Off-brief</span>
+            )}
+            {crossesRedLine && (
+              <span className="cd-advice-flag cd-flag-redline">Crosses a red line</span>
+            )}
           </div>
           <div className="cd-advice-rec">{option.recommendation || option.summary}</div>
+
+          {/* Off-brief tradeoff shown before submission, not after. */}
+          {crossesRedLine ? (
+            <div className="cd-offbrief-note cd-offbrief-redline">
+              ⚠ This crosses a line the {callerName} has already drawn. Expect an
+              outright rejection — and a legal-exposure and oversight cost for
+              having proposed it.
+            </div>
+          ) : (
+            offBrief && (
+              <div className="cd-offbrief-note">
+                Off-brief — the {callerName} did not ask for this. Expect lower
+                adherence and a small hit to your perceived neutrality and
+                reputation. Choose it only if its own effects are worth the
+                friction.
+              </div>
+            )
+          )}
 
           <div className="cd-advice-quick">
             {bestFor && (
@@ -143,17 +178,21 @@ function AdviceCard({
 }
 
 /**
- * ADVICE phase — concise tradeoffs up front; details expand only for the option
- * the player is actually considering. No consequence stack is shown here; the
- * player commits before the fallout is revealed.
+ * ADVICE phase — a call-specific decision space, not a reusable global menu.
  *
- * Selecting an option also unlocks an optional "Draft memo" affordance, which
- * asks the AI-assist layer (off by default → deterministic fallback) to draft a
- * consultant memo for that option. The draft is advisory only: it never
- * advances the turn or changes state.
+ * The caller declares the 3-4 options it is actually asking about (its
+ * "primary" recommendations); every other known option is a strategic
+ * alternative shown behind a labeled path, with its off-brief cost or red-line
+ * risk surfaced *before* the player commits. The player still advises and the
+ * client still decides — this only makes the relevance and tradeoff of each
+ * option legible up front.
+ *
+ * Selecting an option also unlocks an optional "Draft memo" affordance
+ * (advisory only; never advances the turn or changes state).
  */
 export default function AdvicePhase({
   options,
+  call,
   factions,
   selected,
   onSelect,
@@ -163,6 +202,33 @@ export default function AdvicePhase({
   onDraftMemo,
   readOnly,
 }: Props) {
+  const callerName = call?.caller ?? "client";
+  const primaryIds = new Set(call?.primary_advice_ids ?? []);
+  const redLineTags = new Set(call?.decision_profile?.red_line_tags ?? []);
+  const profile = call?.decision_profile ?? null;
+
+  // With no declared primary set (older payloads), treat everything as on-brief.
+  const hasPrimary = primaryIds.size > 0;
+  const isOffBrief = (o: AdviceOption) => hasPrimary && !primaryIds.has(o.id);
+  const crosses = (o: AdviceOption) => o.tags.some((t) => redLineTags.has(t));
+
+  const primary = hasPrimary ? options.filter((o) => primaryIds.has(o.id)) : options;
+  const alternatives = hasPrimary ? options.filter((o) => !primaryIds.has(o.id)) : [];
+
+  const card = (opt: AdviceOption) => (
+    <AdviceCard
+      key={opt.id}
+      option={opt}
+      selected={selected === opt.id}
+      onSelect={onSelect}
+      factions={factions}
+      offBrief={isOffBrief(opt)}
+      crossesRedLine={isOffBrief(opt) && crosses(opt)}
+      callerName={callerName}
+      readOnly={readOnly}
+    />
+  );
+
   return (
     <section className="cd-stage-panel cd-advisory">
       <h1 className="cd-eyebrow">
@@ -173,26 +239,54 @@ export default function AdvicePhase({
         You advise; the client decides. No option is risk-free — every path
         creates a record.
       </p>
+
+      {profile && (profile.mandate || profile.priorities.length > 0) && (
+        <div className="cd-callout cd-caller-weighs">
+          <span className="cd-callout-k">What the {callerName} weighs</span>
+          <span>
+            {profile.mandate}
+            {profile.priorities.length > 0 && (
+              <>
+                {" "}
+                Weighs first:{" "}
+                {profile.priorities.map(variableLabel).join(", ")}.
+              </>
+            )}
+          </span>
+        </div>
+      )}
+
       <details className="cd-context-help">
         <summary>How client decisions mediate advice</summary>
         <p>
           The client may follow, modify, delay, or reject your recommendation.
           Adherence determines how much of its stated effects enter resolution;
-          any client modification is recorded as a separate change.
+          any client modification is recorded as a separate change. Advice the
+          caller did not ask for is resolved off-brief: lower adherence and a
+          small, recorded cost to your standing.
         </p>
       </details>
-      <ul className="cd-advice-list-outer">
-        {options.map((opt) => (
-          <AdviceCard
-            key={opt.id}
-            option={opt}
-            selected={selected === opt.id}
-            onSelect={onSelect}
-            factions={factions}
-            readOnly={readOnly}
-          />
-        ))}
-      </ul>
+
+      {hasPrimary && (
+        <h2 className="cd-advice-group-head">
+          Primary recommendations
+          <span className="cd-muted"> · what the {callerName} is asking about</span>
+        </h2>
+      )}
+      <ul className="cd-advice-list-outer">{primary.map(card)}</ul>
+
+      {alternatives.length > 0 && (
+        <details className="cd-alt-advice">
+          <summary>
+            Strategic alternatives · off-brief ({alternatives.length})
+          </summary>
+          <p className="cd-muted cd-alt-note">
+            These are not what the {callerName} called about. Each shows its
+            off-brief cost or red-line risk before you commit.
+          </p>
+          <ul className="cd-advice-list-outer">{alternatives.map(card)}</ul>
+        </details>
+      )}
 
       {selected && (
         <div className="cd-advice-memo">

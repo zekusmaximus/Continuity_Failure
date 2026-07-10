@@ -26,6 +26,7 @@ from engine.content.validator import (
 )
 from engine.models import (
     AdviceOption,
+    CallDecisionProfile,
     Campaign,
     CampaignStatus,
     ClientCall,
@@ -170,7 +171,13 @@ def _build_per_turn_advice(raw: Dict[str, list]) -> Dict[int, List[AdviceOption]
 
 
 def _build_calls(raw: List[dict]) -> Dict[int, ClientCall]:
-    calls = [ClientCall(**c) for c in raw]
+    calls = []
+    for c in raw:
+        data = dict(c)
+        profile = data.get("decision_profile")
+        if isinstance(profile, dict):
+            data["decision_profile"] = CallDecisionProfile(**profile)
+        calls.append(ClientCall(**data))
     return {call.turn: call for call in calls}
 
 

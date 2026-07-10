@@ -125,6 +125,7 @@ export default function GuidedTurn(props: Props) {
       panel = current ? (
         <AdvicePhase
           options={current.advice_options}
+          call={call}
           factions={current.world_state.factions}
           selected={selected}
           onSelect={onSelect}

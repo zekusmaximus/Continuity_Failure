@@ -298,6 +298,17 @@
     "caller_faction_id": "parent_resident_coalition",
     "caller_role": "Superintendent's Office (via parent coalition pressure)",
     "crisis_id": null,
+    "decision_profile": {
+      "mandate": "Force visible, on-the-record action before pressure drops further.",
+      "off_brief_tolerance": 45,
+      "priorities": [
+        "school_disruption",
+        "public_trust"
+      ],
+      "red_line_tags": [
+        "delay"
+      ]
+    },
     "id": "call_02",
     "immediate_risks": [
       "An unwarranted closure wastes trust and budget; a delayed closure endangers children.",
@@ -307,6 +318,11 @@
       "Three schools rely on the south pressure zone.",
       "Parents are organizing carpools to neighboring districts.",
       "The superintendent will not keep buildings open on an assumption."
+    ],
+    "primary_advice_ids": [
+      "school_staged_closure",
+      "controlled_disclosure",
+      "full_disclosure"
     ],
     "private_pressure": "Parent coalition threatens to go public if no threshold is issued.",
     "public_exposure": "private",
@@ -456,10 +472,49 @@
     "decision": {
       "adherence": 0.75,
       "advice_id": "full_disclosure",
+      "cost_reason": "",
       "decider": "Town Manager's Office",
       "decision_type": "PARTIALLY_FOLLOWED",
       "deviation": "Adopted the spirit of the disclosure but narrowed its public scope.",
+      "explanation": {
+        "adherence_factors": [
+          {
+            "detail": "On-brief — one of the options the caller asked about.",
+            "direction": "increase",
+            "label": "Institutional fit"
+          },
+          {
+            "detail": "Town Manager's Office risk tolerance 45; this advice reads as risk 43.",
+            "direction": "increase",
+            "label": "Caller risk appetite"
+          },
+          {
+            "detail": "Town Manager's Office is under 62/100 pressure to act.",
+            "direction": "increase",
+            "label": "Caller pressure"
+          }
+        ],
+        "caller": "Town Manager's Office",
+        "conflicts": [],
+        "incentives": [
+          "Publicly: Treat the situation as an acceleration of deferred maintenance.",
+          "Privately: Keep a stabilization record that survives a council vote and a state review.",
+          "Weighs first: Information Integrity, Legal Exposure, Public Trust"
+        ],
+        "institutional_mandate": "Keep a stabilization record that survives a council vote and a state review.",
+        "off_brief": false,
+        "off_brief_note": "",
+        "on_brief_options": [
+          "Controlled disclosure with hospital and school mitigation",
+          "Full disclosure and emergency conservation order",
+          "Delay public disclosure pending confirmatory testing",
+          "Convene regional mutual aid before public escalation"
+        ],
+        "outcome_reason": "On-brief: Full disclosure and emergency conservation order was one of the options the Town Manager's Office asked about; the Town Manager's Office acted on it per its own risk posture."
+      },
       "modifications": {},
+      "off_brief": false,
+      "off_brief_adjustments": {},
       "private_motive": "Wanted the credit for openness without the cost of full exposure.",
       "public_explanation": "A controlled statement has been issued with mitigation pre-positioned.",
       "rationale": "The Town Manager's Office adopted the spirit of Full disclosure and emergency conservation order but trimmed the public-facing scope. Media pressure 28, public trust 56.",
@@ -618,7 +673,7 @@
     }
   ],
   "summary": {
-    "created_at": "2026-07-10T15:43:03.282955+00:00",
+    "created_at": "2026-07-10T18:27:15.531820+00:00",
     "failure_reason": null,
     "id": "test-campaign",
     "max_turns": 10,

@@ -142,6 +142,24 @@ class AdviceOption:
 
 
 @dataclass
+class CallDecisionProfile:
+    """Structured, call-specific incentive context for the NPC on the line.
+
+    This is the legible input the deterministic decision logic reads to explain
+    *why* a caller weighs advice the way it does on this particular call. It is
+    authored content (not model output): ``mandate`` is the institutional charge
+    the caller is under, ``priorities`` are the WorldState variables they care
+    most about, ``red_line_tags`` are advice decision-tags that cross a stated
+    red line (so proposing one is rejected outright), and ``off_brief_tolerance``
+    is how willing the caller is to entertain advice they did not ask for.
+    """
+    mandate: str = ""
+    priorities: List[str] = field(default_factory=list)     # WorldState variable names
+    red_line_tags: List[str] = field(default_factory=list)  # advice decision-tags
+    off_brief_tolerance: int = 50                           # 0-100
+
+
+@dataclass
 class ClientCall:
     id: str
     turn: int
@@ -160,6 +178,12 @@ class ClientCall:
     public_exposure: str = PublicStatus.PRIVATE
     private_pressure: str = ""
     attached_document_ids: List[str] = field(default_factory=list)
+    # --- Call-specific decision space (Batch 6) ---
+    # The 3-4 on-brief advice options this call is really asking about. Any other
+    # known option is a "strategic alternative" the caller did not request, and
+    # carries a visible, deterministic off-brief tradeoff at resolution.
+    primary_advice_ids: List[str] = field(default_factory=list)
+    decision_profile: Optional[CallDecisionProfile] = None
 
 
 @dataclass
@@ -205,6 +229,39 @@ class AppliedDiff:
 
 
 @dataclass
+class AdherenceFactor:
+    """One human-labeled input into how the NPC weighed the advice.
+
+    Deliberately not an opaque score: ``label`` names the factor, ``detail``
+    explains it in plain civic language, and ``direction`` says whether it
+    pushed the caller toward or away from adopting the advice.
+    """
+    label: str
+    detail: str
+    direction: str          # "increase" / "decrease" / "neutral"
+
+
+@dataclass
+class DecisionExplanation:
+    """Aftermath-facing account of why the NPC decided as it did.
+
+    Surfaces the caller's incentives, any conflicts the advice raised, the
+    human-labeled adherence factors, and whether the advice was on- or off-brief
+    for this call -- so the consultant can read the mediation without seeing raw
+    internal scoring.
+    """
+    caller: str
+    institutional_mandate: str = ""
+    incentives: List[str] = field(default_factory=list)
+    conflicts: List[str] = field(default_factory=list)
+    adherence_factors: List[AdherenceFactor] = field(default_factory=list)
+    off_brief: bool = False
+    off_brief_note: str = ""
+    outcome_reason: str = ""
+    on_brief_options: List[str] = field(default_factory=list)   # labels the caller asked for
+
+
+@dataclass
 class NpcDecision:
     advice_id: str
     decision_type: str      # one of DecisionType.*
@@ -217,6 +274,11 @@ class NpcDecision:
     public_explanation: str = ""   # what the client said publicly
     private_motive: str = ""       # what actually drove the deviation
     resulting_risk: str = ""       # the new exposure created by the deviation
+    # --- Off-brief mediation (Batch 6) ---
+    off_brief: bool = False        # advice was not among the call's primary options
+    off_brief_adjustments: Dict[str, int] = field(default_factory=dict)  # deterministic cost deltas
+    cost_reason: str = ""          # AppliedDiff reason for the off-brief/red-line cost
+    explanation: Optional["DecisionExplanation"] = None
 
 
 @dataclass

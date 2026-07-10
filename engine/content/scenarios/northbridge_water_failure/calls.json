@@ -27,7 +27,19 @@
       "doc_preliminary_lab_report",
       "doc_town_manager_transcript",
       "doc_council_session_excerpt"
-    ]
+    ],
+    "primary_advice_ids": [
+      "controlled_disclosure",
+      "full_disclosure",
+      "delay_disclosure",
+      "mutual_aid"
+    ],
+    "decision_profile": {
+      "mandate": "Keep a stabilization record that survives a council vote and a state review.",
+      "priorities": ["information_integrity", "legal_exposure", "public_trust"],
+      "red_line_tags": [],
+      "off_brief_tolerance": 50
+    }
   },
   {
     "id": "call_02",
@@ -54,7 +66,18 @@
     "private_pressure": "Parent coalition threatens to go public if no threshold is issued.",
     "attached_document_ids": [
       "doc_school_closure_request"
-    ]
+    ],
+    "primary_advice_ids": [
+      "school_staged_closure",
+      "controlled_disclosure",
+      "full_disclosure"
+    ],
+    "decision_profile": {
+      "mandate": "Force visible, on-the-record action before pressure drops further.",
+      "priorities": ["school_disruption", "public_trust"],
+      "red_line_tags": ["delay"],
+      "off_brief_tolerance": 45
+    }
   },
   {
     "id": "call_03",
@@ -82,7 +105,18 @@
     "private_pressure": "State hospital liaison wants to be looped in -- or will loop itself in.",
     "attached_document_ids": [
       "doc_hospital_priority_request"
-    ]
+    ],
+    "primary_advice_ids": [
+      "hospital_priority_allocation",
+      "mutual_aid",
+      "state_support"
+    ],
+    "decision_profile": {
+      "mandate": "Protect clinical operations; avoid becoming the public face of the crisis.",
+      "priorities": ["hospital_stability", "water_security"],
+      "red_line_tags": ["delay"],
+      "off_brief_tolerance": 35
+    }
   },
   {
     "id": "call_04",
@@ -109,7 +143,18 @@
     "private_pressure": "Contractor knows the town has no near-term alternative.",
     "attached_document_ids": [
       "doc_contractor_warning_letter"
-    ]
+    ],
+    "primary_advice_ids": [
+      "contractor_pressure",
+      "state_support",
+      "mutual_aid"
+    ],
+    "decision_profile": {
+      "mandate": "Lock in premium terms and indemnity while leverage is high.",
+      "priorities": ["water_security", "contractor_dependency", "budget_capacity"],
+      "red_line_tags": [],
+      "off_brief_tolerance": 55
+    }
   },
   {
     "id": "call_05",
@@ -137,7 +182,18 @@
     "private_pressure": "Opposition is feeding the thread to shape the record.",
     "attached_document_ids": [
       "doc_resident_rumor_thread"
-    ]
+    ],
+    "primary_advice_ids": [
+      "full_disclosure",
+      "controlled_disclosure",
+      "mutual_aid"
+    ],
+    "decision_profile": {
+      "mandate": "A leak or contradiction is the most valuable story available.",
+      "priorities": ["media_pressure", "information_integrity", "public_trust"],
+      "red_line_tags": ["delay"],
+      "off_brief_tolerance": 60
+    }
   },
   {
     "id": "call_06",
@@ -166,7 +222,19 @@
     "private_pressure": "The state wants the record to show it offered help.",
     "attached_document_ids": [
       "doc_state_agency_notice"
-    ]
+    ],
+    "primary_advice_ids": [
+      "state_support",
+      "mutual_aid",
+      "controlled_disclosure",
+      "full_disclosure"
+    ],
+    "decision_profile": {
+      "mandate": "Avoid a visible local failure on the agency's watch.",
+      "priorities": ["state_oversight_risk", "water_security"],
+      "red_line_tags": ["delay"],
+      "off_brief_tolerance": 40
+    }
   },
   {
     "id": "call_07",
@@ -194,7 +262,18 @@
     "private_pressure": "Coalition wants the town to avoid the word 'contamination' on the record.",
     "attached_document_ids": [
       "doc_business_coalition_letter"
-    ]
+    ],
+    "primary_advice_ids": [
+      "business_compensation_framework",
+      "controlled_disclosure",
+      "mutual_aid"
+    ],
+    "decision_profile": {
+      "mandate": "Avoid a contaminated-town reputation that lingers past the crisis.",
+      "priorities": ["public_order", "budget_capacity", "legal_exposure"],
+      "red_line_tags": [],
+      "off_brief_tolerance": 50
+    }
   },
   {
     "id": "call_08",
@@ -222,7 +301,18 @@
     "private_pressure": "Opposition wants the consultant on the record, under oath or in press.",
     "attached_document_ids": [
       "doc_leaked_memo_screenshot"
-    ]
+    ],
+    "primary_advice_ids": [
+      "full_disclosure",
+      "controlled_disclosure",
+      "mutual_aid"
+    ],
+    "decision_profile": {
+      "mandate": "Build a record that frames the majority as evasive.",
+      "priorities": ["information_integrity", "public_trust", "legal_exposure"],
+      "red_line_tags": ["delay"],
+      "off_brief_tolerance": 45
+    }
   },
   {
     "id": "call_09",
@@ -250,7 +340,18 @@
     "private_pressure": "Operators will not accept indefinite uncovered exposure.",
     "attached_document_ids": [
       "doc_public_works_staffing_note"
-    ]
+    ],
+    "primary_advice_ids": [
+      "state_support",
+      "mutual_aid",
+      "contractor_pressure"
+    ],
+    "decision_profile": {
+      "mandate": "Avoid being named as the cause of the failure; operate only within certified staffing.",
+      "priorities": ["staff_capacity", "water_security"],
+      "red_line_tags": [],
+      "off_brief_tolerance": 45
+    }
   },
   {
     "id": "call_10",
@@ -277,6 +378,18 @@
     "private_pressure": "Majority wants a local close; opposition and state favor the conditioned package.",
     "attached_document_ids": [
       "doc_draft_emergency_order"
-    ]
+    ],
+    "primary_advice_ids": [
+      "state_support",
+      "mutual_aid",
+      "controlled_disclosure",
+      "full_disclosure"
+    ],
+    "decision_profile": {
+      "mandate": "Lock in stabilization and protect the record at closeout.",
+      "priorities": ["water_security", "state_oversight_risk", "legal_exposure"],
+      "red_line_tags": [],
+      "off_brief_tolerance": 50
+    }
   }
 ]

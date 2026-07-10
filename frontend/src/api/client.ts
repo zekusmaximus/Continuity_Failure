@@ -47,6 +47,13 @@ export interface AdviceOption {
   affected_factions: string[];
 }
 
+export interface CallDecisionProfile {
+  mandate: string;
+  priorities: string[];
+  red_line_tags: string[];
+  off_brief_tolerance: number;
+}
+
 export interface ClientCall {
   id: string;
   turn: number;
@@ -64,6 +71,10 @@ export interface ClientCall {
   public_exposure: string;
   private_pressure: string;
   attached_document_ids: string[];
+  // Batch 6: the 3-4 on-brief options this call is really asking about; any
+  // other known option is a strategic alternative with an off-brief tradeoff.
+  primary_advice_ids: string[];
+  decision_profile: CallDecisionProfile | null;
 }
 
 export interface DocumentRecord {
@@ -111,6 +122,24 @@ export interface RecentCampaign extends CampaignSummary {
   updated_at: string;
 }
 
+export interface AdherenceFactor {
+  label: string;
+  detail: string;
+  direction: "increase" | "decrease" | "neutral" | string;
+}
+
+export interface DecisionExplanation {
+  caller: string;
+  institutional_mandate: string;
+  incentives: string[];
+  conflicts: string[];
+  adherence_factors: AdherenceFactor[];
+  off_brief: boolean;
+  off_brief_note: string;
+  outcome_reason: string;
+  on_brief_options: string[];
+}
+
 export interface NpcDecision {
   advice_id: string;
   decision_type: string;
@@ -122,6 +151,10 @@ export interface NpcDecision {
   public_explanation: string;
   private_motive: string;
   resulting_risk: string;
+  off_brief: boolean;
+  off_brief_adjustments: Record<string, number>;
+  cost_reason: string;
+  explanation: DecisionExplanation | null;
 }
 
 export interface AppliedDiff {

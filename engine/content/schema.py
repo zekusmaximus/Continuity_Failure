@@ -21,6 +21,7 @@ from typing import Dict, Set
 from engine import rules
 from engine.models import (
     AdviceOption,
+    CallDecisionProfile,
     ClientCall,
     Crisis,
     Document,
@@ -131,10 +132,16 @@ FIELD_SPECS: Dict[str, FieldSpec] = {
     "faction": FieldSpec(Faction),
     "advice": FieldSpec(AdviceOption),
     "call": FieldSpec(ClientCall),
+    "call_decision_profile": FieldSpec(CallDecisionProfile),
     "document": FieldSpec(Document),
     "thread": FieldSpec(OpenThread),
     "crisis": FieldSpec(Crisis),
 }
+
+# A client call presents roughly 3-4 on-brief ("primary") options; any other
+# known option is a strategic alternative with a visible off-brief tradeoff.
+MIN_PRIMARY_ADVICE_OPTIONS = 3
+MAX_PRIMARY_ADVICE_OPTIONS = 5
 
 # Scenario metadata is not a dataclass; its contract is spelled out directly.
 SCENARIO_REQUIRED_KEYS: Set[str] = {

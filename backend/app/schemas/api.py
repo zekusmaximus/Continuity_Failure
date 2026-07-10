@@ -78,6 +78,13 @@ class AdviceOptionModel(BaseModel):
         return effects
 
 
+class CallDecisionProfileModel(BaseModel):
+    mandate: str = ""
+    priorities: List[str] = Field(default_factory=list)
+    red_line_tags: List[str] = Field(default_factory=list)
+    off_brief_tolerance: int = Field(default=50, ge=0, le=100)
+
+
 class ClientCallModel(BaseModel):
     id: str
     turn: int = Field(ge=1)
@@ -95,6 +102,8 @@ class ClientCallModel(BaseModel):
     public_exposure: str = Field(default="private", pattern=PUBLIC_STATUS_PATTERN)
     private_pressure: str = ""
     attached_document_ids: List[str] = Field(default_factory=list)
+    primary_advice_ids: List[str] = Field(default_factory=list)
+    decision_profile: Optional[CallDecisionProfileModel] = None
 
 
 class DocumentModel(BaseModel):
@@ -229,6 +238,24 @@ class CreateCampaignRequest(StrictRequestModel):
         return name.strip() if name is not None else None
 
 
+class AdherenceFactorModel(BaseModel):
+    label: str
+    detail: str
+    direction: str = Field(pattern=r"^(increase|decrease|neutral)$")
+
+
+class DecisionExplanationModel(BaseModel):
+    caller: str
+    institutional_mandate: str = ""
+    incentives: List[str] = Field(default_factory=list)
+    conflicts: List[str] = Field(default_factory=list)
+    adherence_factors: List[AdherenceFactorModel] = Field(default_factory=list)
+    off_brief: bool = False
+    off_brief_note: str = ""
+    outcome_reason: str = ""
+    on_brief_options: List[str] = Field(default_factory=list)
+
+
 class NpcDecisionModel(BaseModel):
     advice_id: str
     decision_type: str = Field(pattern=DECISION_TYPE_PATTERN)
@@ -240,8 +267,12 @@ class NpcDecisionModel(BaseModel):
     public_explanation: str = ""
     private_motive: str = ""
     resulting_risk: str = ""
+    off_brief: bool = False
+    off_brief_adjustments: Dict[str, int] = Field(default_factory=dict)
+    cost_reason: str = ""
+    explanation: Optional[DecisionExplanationModel] = None
 
-    @field_validator("modifications")
+    @field_validator("modifications", "off_brief_adjustments")
     @classmethod
     def validate_modification_ranges(
         cls, modifications: Dict[str, int]

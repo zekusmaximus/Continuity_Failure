@@ -259,6 +259,16 @@
     "caller_faction_id": "town_managers_office",
     "caller_role": "Mara Velez, Town Manager",
     "crisis_id": null,
+    "decision_profile": {
+      "mandate": "Keep a stabilization record that survives a council vote and a state review.",
+      "off_brief_tolerance": 50,
+      "priorities": [
+        "information_integrity",
+        "legal_exposure",
+        "public_trust"
+      ],
+      "red_line_tags": []
+    },
     "id": "call_01",
     "immediate_risks": [
       "Disclosure-timing liability accrues from the moment of awareness.",
@@ -268,6 +278,12 @@
       "Preliminary sample sits ~1.3x the advisory threshold; flagged inconclusive.",
       "South-zone pressure dropped 12% overnight.",
       "Confirmatory second-lab result is pending."
+    ],
+    "primary_advice_ids": [
+      "controlled_disclosure",
+      "full_disclosure",
+      "delay_disclosure",
+      "mutual_aid"
     ],
     "private_pressure": "Council majority wants a 'maintenance acceleration' frame, not a contamination event, until confirmation.",
     "public_exposure": "private",
@@ -357,7 +373,7 @@
     }
   ],
   "summary": {
-    "created_at": "2026-07-10T15:43:03.282955+00:00",
+    "created_at": "2026-07-10T18:27:15.531820+00:00",
     "failure_reason": null,
     "id": "test-campaign",
     "max_turns": 10,

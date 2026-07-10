@@ -259,6 +259,69 @@ def test_reject_per_turn_advice_out_of_range_key():
 
 
 # ---------------------------------------------------------------------------
+# 9b. Call-specific advice space (Batch 6)
+# ---------------------------------------------------------------------------
+
+def test_reject_call_missing_primary_advice():
+    bundle = valid_bundle()
+    del bundle.calls[0]["primary_advice_ids"]
+    exc = _expect_invalid(bundle)
+    assert any("must declare primary_advice_ids" in m for m in _messages(exc))
+
+
+def test_reject_primary_advice_unknown_option():
+    bundle = valid_bundle()
+    bundle.calls[0]["primary_advice_ids"][0] = "not_a_real_option"
+    exc = _expect_invalid(bundle)
+    assert any("not an option available on turn 1" in m for m in _messages(exc))
+
+
+def test_reject_primary_advice_out_of_count_range():
+    bundle = valid_bundle()
+    bundle.calls[0]["primary_advice_ids"] = ["controlled_disclosure"]
+    exc = _expect_invalid(bundle)
+    assert any("primary advice options, got 1" in m for m in _messages(exc))
+
+
+def test_reject_primary_option_crossing_a_red_line():
+    bundle = valid_bundle()
+    # Turn 3 (hospital) red-lines "delay"; listing the delay option as on-brief
+    # must be caught.
+    hospital_call = next(c for c in bundle.calls if c["turn"] == 3)
+    hospital_call["primary_advice_ids"][0] = "delay_disclosure"
+    exc = _expect_invalid(bundle)
+    assert any("carries a red-line tag" in m for m in _messages(exc))
+
+
+def test_reject_unknown_decision_priority_variable():
+    bundle = valid_bundle()
+    bundle.calls[0]["decision_profile"]["priorities"] = ["watr_security"]
+    exc = _expect_invalid(bundle)
+    assert any("unknown WorldState variable 'watr_security'" in m for m in _messages(exc))
+
+
+def test_reject_unknown_red_line_tag():
+    bundle = valid_bundle()
+    bundle.calls[2]["decision_profile"]["red_line_tags"] = ["dilly_dally"]
+    exc = _expect_invalid(bundle)
+    assert any("unknown decision tag 'dilly_dally'" in m for m in _messages(exc))
+
+
+def test_reject_out_of_range_off_brief_tolerance():
+    bundle = valid_bundle()
+    bundle.calls[0]["decision_profile"]["off_brief_tolerance"] = 250
+    exc = _expect_invalid(bundle)
+    assert any("within [0, 100]" in m for m in _messages(exc))
+
+
+def test_reject_unknown_field_on_decision_profile():
+    bundle = valid_bundle()
+    bundle.calls[0]["decision_profile"]["mood"] = "grumpy"
+    exc = _expect_invalid(bundle)
+    assert any("unknown field 'mood'" in m for m in _messages(exc))
+
+
+# ---------------------------------------------------------------------------
 # 10. Schema version incompatibility
 # ---------------------------------------------------------------------------
 

@@ -85,6 +85,16 @@ def advance_turn(campaign: Campaign, advice_id: str) -> TurnResult:
             reason=f"NPC modification ({decision.decision_type})",
             source_type=SourceType.NPC_MODIFICATION,
         )
+    # Off-brief / red-line advice carries a deterministic, legible cost. It is
+    # recorded as its own diff batch (source_type "decision") with a concrete
+    # reason so the aftermath can always show why the consultant's standing moved.
+    if decision.off_brief_adjustments:
+        diffs += apply_diffs(
+            variables,
+            decision.off_brief_adjustments,
+            reason=decision.cost_reason or "Off-brief advice",
+            source_type=SourceType.DECISION,
+        )
     diffs += apply_diffs(
         variables,
         rules.AMBIENT_DRIFT,

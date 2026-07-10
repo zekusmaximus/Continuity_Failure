@@ -11,9 +11,13 @@ from __future__ import annotations
 from typing import Dict, List, Optional, Tuple
 
 from engine.models import (
+    AdherenceFactor,
     AdviceOption,
     Campaign,
+    ClientCall,
+    DecisionExplanation,
     DecisionType,
+    Faction,
     NpcDecision,
     SourceType,
 )
@@ -370,14 +374,274 @@ _ADVICE_TAG_DISPATCH = {
 }
 
 
+# ---------------------------------------------------------------------------
+# Call-specific / faction-driven modulation (Batch 6).
+#
+# The tag handler above gives a *cooperative baseline* driven by world state.
+# On top of it, the specific caller's incentives modulate the outcome so the
+# same advice lands differently depending on who is on the line and whether it
+# is on-brief for what they actually asked. Everything is a legible threshold;
+# there is no randomness and no hidden score.
+# ---------------------------------------------------------------------------
+
+# Ordered from most cooperative (all advice effect survives) to least. An
+# off-brief caller is "downgraded" one or more rungs along this ladder.
+_DECISION_LADDER = [
+    DecisionType.FOLLOWED,
+    DecisionType.PARTIALLY_FOLLOWED,
+    DecisionType.MODIFIED,
+    DecisionType.DELAYED,
+    DecisionType.REJECTED,
+]
+
+# The adherence a rung caps at when a caller is forced down to it.
+_LADDER_ADHERENCE = {
+    DecisionType.FOLLOWED: 1.0,
+    DecisionType.PARTIALLY_FOLLOWED: 0.6,
+    DecisionType.MODIFIED: 0.4,
+    DecisionType.DELAYED: 0.3,
+    DecisionType.REJECTED: 0.0,
+}
+
+# Off-brief advice (something the caller did not ask for) costs the consultant a
+# little standing and gets less conviction. Deliberately small so an off-brief
+# strategic play is a real option, not an obvious mistake.
+OFF_BRIEF_ADHERENCE_FACTOR = 0.85
+OFF_BRIEF_COST = {"player_perceived_neutrality": -2, "player_reputation": -1}
+
+# Proposing advice that crosses a stated red line is rejected outright and the
+# caller escalates: neutrality/reputation fall while oversight, scrutiny, and the
+# disclosure-timing legal record all rise. A consultant who keeps crossing red
+# lines therefore drives the engagement toward a legal/oversight failure.
+RED_LINE_COST = {
+    "public_trust": -3,
+    "player_perceived_neutrality": -4,
+    "player_reputation": -3,
+    "state_oversight_risk": +4,
+    "media_pressure": +3,
+    "legal_exposure": +4,
+}
+
+# How far an off-brief caller's discomfort must reach before they pare the
+# advice back (BALK) or refuse it entirely (REJECT). Discomfort combines how far
+# the advice's risk runs ahead of the caller's appetite with how little slack
+# they have for off-brief proposals.
+OFF_BRIEF_BALK = 20
+OFF_BRIEF_REJECT = 55
+
+
+def _caller_faction(campaign: Campaign, call: Optional[ClientCall]) -> Optional[Faction]:
+    if call is None:
+        return None
+    for faction in campaign.world_state.factions:
+        if faction.id == call.caller_faction_id:
+            return faction
+    return None
+
+
+def _advice_risk(advice: AdviceOption) -> int:
+    """A single legible risk figure for an option (mean of its risk dimensions)."""
+    return round(
+        (advice.legal_risk + advice.political_risk + advice.operational_risk) / 3
+    )
+
+
+def _downgrade(decision_type: str, steps: int) -> str:
+    try:
+        idx = _DECISION_LADDER.index(decision_type)
+    except ValueError:
+        idx = 1
+    return _DECISION_LADDER[min(idx + steps, len(_DECISION_LADDER) - 1)]
+
+
+def _option_label(campaign: Campaign, advice_id: str) -> str:
+    for option in campaign.available_advice():
+        if option.id == advice_id:
+            return option.label
+    return advice_id
+
+
+def _modulate(
+    campaign: Campaign,
+    advice: AdviceOption,
+    call: Optional[ClientCall],
+    draft: _DecisionDraft,
+    decider: str,
+):
+    """Apply call/faction incentives to a baseline draft.
+
+    Returns ``(decision_type, adherence, modifications, off_brief,
+    adjustments, cost_reason, explanation)``. Pure and deterministic.
+    """
+    faction = _caller_faction(campaign, call)
+    profile = call.decision_profile if call is not None else None
+
+    risk_tol = faction.risk_tolerance if faction is not None else 50
+    pressure = faction.current_pressure if faction is not None else 50
+    advice_risk = _advice_risk(advice)
+    risk_gap = advice_risk - risk_tol
+
+    primary = list(call.primary_advice_ids) if call is not None else []
+    off_brief = bool(primary) and advice.id not in primary
+    red_line_tags = set(profile.red_line_tags) if profile is not None else set()
+    crossed = sorted(set(advice.tags) & red_line_tags)
+    red_line_hit = bool(crossed)
+    off_brief_tolerance = profile.off_brief_tolerance if profile is not None else 50
+
+    decision_type = draft.decision_type
+    adherence = draft.adherence
+    modifications = dict(draft.modifications)
+    adjustments: dict = {}
+    cost_reason = ""
+    conflicts: list = []
+    outcome_reason = ""
+
+    if red_line_hit:
+        decision_type = DecisionType.REJECTED
+        adherence = 0.0
+        modifications = {}
+        adjustments = dict(RED_LINE_COST)
+        cost_reason = (
+            f"Red line — {advice.label} crossed a stated red line for the {decider} "
+            f"({', '.join(crossed)})"
+        )
+        conflicts.append(
+            f"{advice.label} crosses a stated red line for the {decider}: "
+            f"{', '.join(crossed)}."
+        )
+        outcome_reason = (
+            f"The {decider} rejected the advice outright because it crossed a red line "
+            f"they had already drawn."
+        )
+    elif off_brief:
+        adjustments = dict(OFF_BRIEF_COST)
+        cost_reason = f"Off-brief advice — not what the {decider} called about ({advice.label})"
+        # Discomfort = how far the advice outruns their appetite + how little
+        # slack they have for unsolicited advice.
+        discomfort = max(0, risk_gap) + (50 - off_brief_tolerance)
+        conflicts.append(
+            f"This is not what the {decider} called about — they asked: “{call.ask}”."
+            if call is not None else
+            "This advice is off-brief for the caller."
+        )
+        if discomfort >= OFF_BRIEF_REJECT:
+            decision_type = DecisionType.REJECTED
+            adherence = 0.0
+            modifications = {}
+            outcome_reason = (
+                f"The {decider} refused off-brief advice whose risk ({advice_risk}) ran far "
+                f"beyond its appetite ({risk_tol})."
+            )
+        elif discomfort >= OFF_BRIEF_BALK:
+            decision_type = _downgrade(decision_type, 1)
+            adherence = min(adherence, _LADDER_ADHERENCE[decision_type])
+            outcome_reason = (
+                f"The {decider} pared back off-brief advice that ran ahead of its risk "
+                f"appetite (advice risk {advice_risk} vs tolerance {risk_tol})."
+            )
+        else:
+            adherence = round(adherence * OFF_BRIEF_ADHERENCE_FACTOR, 3)
+            outcome_reason = (
+                f"The {decider} acted on off-brief advice, but with less conviction than on "
+                f"what it had actually asked for."
+            )
+    else:
+        outcome_reason = (
+            f"On-brief: {advice.label} was one of the options the {decider} asked about; "
+            f"the {decider} acted on it per its own risk posture."
+        )
+
+    explanation = _build_explanation(
+        campaign, advice, call, faction, profile, decider,
+        off_brief=off_brief, risk_tol=risk_tol, pressure=pressure,
+        advice_risk=advice_risk, risk_gap=risk_gap, red_line_hit=red_line_hit,
+        conflicts=conflicts, outcome_reason=outcome_reason, primary=primary,
+    )
+    return (
+        decision_type, adherence, modifications, off_brief,
+        adjustments, cost_reason, explanation,
+    )
+
+
+def _build_explanation(
+    campaign, advice, call, faction, profile, decider, *,
+    off_brief, risk_tol, pressure, advice_risk, risk_gap, red_line_hit,
+    conflicts, outcome_reason, primary,
+) -> DecisionExplanation:
+    incentives: list = []
+    if faction is not None:
+        if faction.public_position:
+            incentives.append(f"Publicly: {faction.public_position}")
+        if faction.private_incentive:
+            incentives.append(f"Privately: {faction.private_incentive}")
+    mandate = profile.mandate if profile is not None else ""
+    if profile is not None and profile.priorities:
+        priority_labels = ", ".join(humanize_variable(p) for p in profile.priorities)
+        incentives.append(f"Weighs first: {priority_labels}")
+
+    factors = [
+        AdherenceFactor(
+            "Institutional fit",
+            (
+                "Off-brief — outside what the caller asked for on this call."
+                if off_brief else
+                "On-brief — one of the options the caller asked about."
+            ),
+            "decrease" if off_brief else "increase",
+        ),
+        AdherenceFactor(
+            "Caller risk appetite",
+            f"{decider} risk tolerance {risk_tol}; this advice reads as risk {advice_risk}.",
+            "decrease" if risk_gap > 0 else "increase",
+        ),
+        AdherenceFactor(
+            "Caller pressure",
+            f"{decider} is under {pressure}/100 pressure to act.",
+            "increase" if pressure >= 55 else "neutral",
+        ),
+    ]
+    if red_line_hit:
+        factors.append(
+            AdherenceFactor(
+                "Red line",
+                "The advice crossed a line the caller had already refused to cross.",
+                "decrease",
+            )
+        )
+
+    off_brief_note = ""
+    if off_brief and not red_line_hit and call is not None:
+        off_brief_note = (
+            f"Off-brief: the {decider} called about “{call.ask}”, but the "
+            f"recommendation was {advice.label}."
+        )
+
+    on_brief_options = [_option_label(campaign, aid) for aid in primary]
+
+    return DecisionExplanation(
+        caller=decider,
+        institutional_mandate=mandate,
+        incentives=incentives,
+        conflicts=conflicts,
+        adherence_factors=factors,
+        off_brief=off_brief,
+        off_brief_note=off_brief_note,
+        outcome_reason=outcome_reason,
+        on_brief_options=on_brief_options,
+    )
+
+
 def decide(campaign: Campaign, advice: AdviceOption) -> NpcDecision:
     """Resolve how the NPC client uses the player's chosen advice.
 
-    Returns a fully deterministic ``NpcDecision``. ``adherence`` scales the
-    advice's base effects; ``modifications`` are extra deltas the NPC imposed.
-    The ``deviation`` / ``public_explanation`` / ``private_motive`` /
-    ``resulting_risk`` fields are descriptive overlays so the player can read
-    the mediation; they do not change state.
+    Returns a fully deterministic ``NpcDecision``. A world-state-driven tag
+    handler gives the cooperative baseline; the specific caller's incentives
+    (risk tolerance, pressure, off-brief tolerance, red lines) then modulate the
+    outcome so the same advice lands differently depending on who asked and
+    whether it was on-brief. ``adherence`` scales the advice's base effects;
+    ``modifications`` are extra deltas the NPC imposed; ``off_brief_adjustments``
+    are the deterministic off-brief/red-line cost (applied as their own diffs);
+    ``explanation`` is the human-labeled account for the aftermath.
     """
     draft: _DecisionDraft
     handler = None
@@ -401,21 +665,32 @@ def decide(campaign: Campaign, advice: AdviceOption) -> NpcDecision:
     media = v.get("media_pressure", 0)
     trust = v.get("public_trust", 50)
 
+    call = campaign.current_call()
     decider = _resolve_decider(campaign)
+
+    (decision_type, adherence, modifications, off_brief,
+     adjustments, cost_reason, explanation) = _modulate(
+        campaign, advice, call, draft, decider
+    )
+
     rationale = _build_rationale(
-        advice, draft.decision_type, media, trust, campaign.turn_number, decider
+        advice, decision_type, media, trust, campaign.turn_number, decider
     )
     return NpcDecision(
         advice_id=advice.id,
-        decision_type=draft.decision_type,
+        decision_type=decision_type,
         decider=decider,
         rationale=rationale,
-        adherence=draft.adherence,
-        modifications=draft.modifications,
+        adherence=adherence,
+        modifications=modifications,
         deviation=draft.deviation,
         public_explanation=draft.public_explanation,
         private_motive=draft.private_motive,
         resulting_risk=draft.resulting_risk,
+        off_brief=off_brief,
+        off_brief_adjustments=adjustments,
+        cost_reason=cost_reason,
+        explanation=explanation,
     )
 
 

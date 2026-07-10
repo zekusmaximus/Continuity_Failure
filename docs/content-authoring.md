@@ -76,6 +76,16 @@ one pass):
 - **Advice routing** — every advice option carries at least one decision tag the
   rules recognize (`engine/rules.py::_ADVICE_TAG_DISPATCH`), so it can't fall
   through to the generic handler.
+- **Call-specific advice space** — each call declares
+  `primary_advice_ids` (3–5 on-brief options), each of which must be an advice id
+  available on that turn (global ∪ that turn's per-turn options) and must **not**
+  carry one of the call's `red_line_tags`. Each call also declares a
+  `decision_profile` (`mandate`, `priorities` = known WorldState variables,
+  `red_line_tags` = recognized decision tags, `off_brief_tolerance` 0–100). The
+  caller's faction risk tolerance / pressure plus this profile feed the
+  deterministic NPC decision; any option *not* in `primary_advice_ids` resolves
+  off-brief (lower adherence + a recorded standing cost), and a red-line tag is
+  rejected outright. See `engine/rules.py::_modulate`.
 - **operational_steps / expected_benefits / expected_harms** — non-empty lists of
   non-empty strings (no free-lunch advice, and a defensible step list).
 - **Document tags** — non-empty; **freshness** (`turn_number`) in range.

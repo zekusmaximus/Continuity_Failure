@@ -1075,6 +1075,77 @@ body {
 .cd-run-system { color: var(--text-dim); }
 .cd-run-input { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
+/* --- Batch 6: call-specific advice space ------------------------------- */
+.cd-caller-weighs { margin: 0.5rem 0 0.75rem; }
+.cd-advice-group-head {
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-bright);
+  margin: 1rem 0 0.5rem;
+}
+.cd-advice-group-head .cd-muted { text-transform: none; letter-spacing: 0; }
+
+.cd-advice-flag {
+  font-family: var(--mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 0.05rem 0.35rem;
+  border-radius: 3px;
+  border: 1px solid var(--border-strong);
+  white-space: nowrap;
+}
+.cd-flag-off { color: var(--info); border-color: var(--info); }
+.cd-flag-redline { color: var(--crit); border-color: var(--crit); }
+
+.cd-advice-off { border-left: 2px solid var(--info); }
+.cd-advice-off.cd-advice-sel { border-left-color: var(--accent); }
+
+.cd-offbrief-note {
+  margin: 0.4rem 0;
+  padding: 0.4rem 0.55rem;
+  font-size: 0.82rem;
+  color: var(--text-dim);
+  background: var(--bg-inset);
+  border-left: 2px solid var(--info);
+  border-radius: 3px;
+}
+.cd-offbrief-redline {
+  color: var(--crit);
+  border-left-color: var(--crit);
+}
+
+.cd-alt-advice {
+  margin-top: 1rem;
+  border-top: 1px dashed var(--border-strong);
+  padding-top: 0.5rem;
+}
+.cd-alt-advice > summary {
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--info);
+}
+.cd-alt-note { margin: 0.35rem 0 0.6rem; }
+
+/* Client-decision "why" panel */
+.cd-decision-why { margin-top: 0.75rem; display: grid; gap: 0.6rem; }
+.cd-why-list { margin: 0.25rem 0 0; padding-left: 1.1rem; display: grid; gap: 0.2rem; }
+.cd-factor-list { list-style: none; margin: 0.25rem 0 0; padding: 0; display: grid; gap: 0.3rem; }
+.cd-factor { display: flex; gap: 0.5rem; align-items: baseline; }
+.cd-factor-mark { font-size: 0.7rem; width: 1rem; text-align: center; }
+.cd-factor-increase .cd-factor-mark { color: var(--good); }
+.cd-factor-decrease .cd-factor-mark { color: var(--crit); }
+.cd-factor-neutral .cd-factor-mark { color: var(--text-dim); }
+.cd-factor-body { display: flex; flex-direction: column; gap: 0.05rem; }
+.cd-factor-k { font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.03em; color: var(--text-bright); text-transform: uppercase; }
+.cd-factor-v { font-size: 0.85rem; color: var(--text-dim); }
+.cd-onbrief-line { margin: 0.1rem 0 0; font-size: 0.8rem; }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;

@@ -285,7 +285,8 @@ def _validate_advice(
 def _validate_call(
     c: _Collector, file: str, path: str, call: Dict[str, Any],
     faction_ids: Set[str], document_ids: Set[str], crisis_id: Optional[str],
-    max_turns: Optional[int],
+    max_turns: Optional[int], global_advice_ids: Set[str],
+    per_turn_advice_ids: Dict[int, Set[str]], advice_tags_by_id: Dict[str, Set[str]],
 ) -> None:
     c.check_fields(file, path, call, schema.FIELD_SPECS["call"], "client call")
     if "id" in call:
@@ -323,6 +324,97 @@ def _validate_call(
         if isinstance(doc_id, str) and doc_id not in document_ids:
             c.add(file, f"{path}.attached_document_ids[{i}]",
                   f"references unknown document '{doc_id}'")
+
+    # --- Call-specific decision space (Batch 6) ---
+    # Advice available on this call's turn = global options + that turn's options.
+    available = set(global_advice_ids)
+    if isinstance(turn, int) and not isinstance(turn, bool):
+        available |= per_turn_advice_ids.get(turn, set())
+
+    # The caller's red-line tags gate the on-brief invariant below.
+    red_line_tags: Set[str] = set()
+    profile = call.get("decision_profile")
+    if isinstance(profile, dict):
+        rlt = profile.get("red_line_tags")
+        if isinstance(rlt, list):
+            red_line_tags = {t for t in rlt if isinstance(t, str)}
+
+    _validate_primary_advice(
+        c, file, path, call, turn, available, advice_tags_by_id, red_line_tags
+    )
+    _validate_decision_profile(c, file, path, profile)
+
+
+def _validate_primary_advice(
+    c: _Collector, file: str, path: str, call: Dict[str, Any], turn: Any,
+    available: Set[str], advice_tags_by_id: Dict[str, Set[str]],
+    red_line_tags: Set[str],
+) -> None:
+    primary = call.get("primary_advice_ids")
+    if primary is None or (isinstance(primary, list) and not primary):
+        c.add(file, f"{path}.primary_advice_ids",
+              "client call must declare primary_advice_ids (the 3-4 on-brief options)")
+        return
+    if not c.is_list(file, f"{path}.primary_advice_ids", primary, "primary_advice_ids"):
+        return
+    lo, hi = schema.MIN_PRIMARY_ADVICE_OPTIONS, schema.MAX_PRIMARY_ADVICE_OPTIONS
+    if not (lo <= len(primary) <= hi):
+        c.add(file, f"{path}.primary_advice_ids",
+              f"a call should present {lo}-{hi} primary advice options, got {len(primary)}")
+    seen: Set[str] = set()
+    for i, aid in enumerate(primary):
+        if not isinstance(aid, str) or not aid.strip():
+            c.add(file, f"{path}.primary_advice_ids[{i}]",
+                  "primary advice entries must be non-empty advice-id strings")
+            continue
+        if aid in seen:
+            c.add(file, f"{path}.primary_advice_ids[{i}]",
+                  f"duplicate primary advice id '{aid}'")
+        seen.add(aid)
+        if aid not in available:
+            c.add(file, f"{path}.primary_advice_ids[{i}]",
+                  f"primary advice '{aid}' is not an option available on turn {turn}")
+            continue
+        crossed = advice_tags_by_id.get(aid, set()) & red_line_tags
+        if crossed:
+            c.add(file, f"{path}.primary_advice_ids[{i}]",
+                  f"primary advice '{aid}' carries a red-line tag "
+                  f"({', '.join(sorted(crossed))}); a red-line option cannot be on-brief")
+
+
+def _validate_decision_profile(
+    c: _Collector, file: str, path: str, profile: Any
+) -> None:
+    if profile is None:
+        c.add(file, path, "client call must include a decision_profile (caller incentives)")
+        return
+    p = f"{path}.decision_profile"
+    if not c.is_mapping(file, p, profile, "decision_profile"):
+        return
+    c.check_fields(file, p, profile,
+                   schema.FIELD_SPECS["call_decision_profile"], "decision profile")
+    if "mandate" in profile:
+        c.check_nonempty_str(file, f"{p}.mandate", profile["mandate"], "mandate")
+    if "off_brief_tolerance" in profile:
+        c.check_int_range(file, f"{p}.off_brief_tolerance",
+                          profile["off_brief_tolerance"], 0, 100)
+    prio = profile.get("priorities")
+    if prio is not None:
+        c.check_str_list(file, f"{p}.priorities", prio, "priorities", require_nonempty=False)
+        if isinstance(prio, list):
+            for j, var in enumerate(prio):
+                if isinstance(var, str) and var not in schema.KNOWN_VARIABLES:
+                    c.add(file, f"{p}.priorities[{j}]",
+                          f"unknown WorldState variable '{var}' in decision priorities")
+    rlt = profile.get("red_line_tags")
+    if rlt is not None:
+        c.check_str_list(file, f"{p}.red_line_tags", rlt, "red_line_tags", require_nonempty=False)
+        if isinstance(rlt, list):
+            for j, tag in enumerate(rlt):
+                if isinstance(tag, str) and tag not in schema.KNOWN_DECISION_TAGS:
+                    c.add(file, f"{p}.red_line_tags[{j}]",
+                          f"unknown decision tag '{tag}' in red_line_tags "
+                          f"(allowed: {', '.join(sorted(schema.KNOWN_DECISION_TAGS))})")
 
 
 def _validate_document(
@@ -403,18 +495,28 @@ def validate_bundle(bundle) -> None:
 
     # --- advice (global) + per-turn advice share one id namespace ---
     advice_ids: Set[str] = set()
+    global_advice_ids: Set[str] = set()
+    per_turn_advice_ids: Dict[int, Set[str]] = {}
+    advice_tags_by_id: Dict[str, Set[str]] = {}
 
-    def register_advice_id(file: str, path: str, advice: Any) -> None:
+    def register_advice_id(
+        file: str, path: str, advice: Any, bucket: Optional[Set[str]] = None
+    ) -> None:
         if isinstance(advice, dict) and isinstance(advice.get("id"), str):
             aid = advice["id"]
             if aid in advice_ids:
                 c.add(file, f"{path}.id", f"duplicate advice id '{aid}'")
             advice_ids.add(aid)
+            if bucket is not None:
+                bucket.add(aid)
+            tags = advice.get("tags")
+            if isinstance(tags, list):
+                advice_tags_by_id[aid] = {t for t in tags if isinstance(t, str)}
 
     if c.is_list(f["advice"], "", bundle.advice, "advice"):
         for i, advice in enumerate(bundle.advice):
             if c.is_mapping(f["advice"], f"[{i}]", advice, "advice option"):
-                register_advice_id(f["advice"], f"[{i}]", advice)
+                register_advice_id(f["advice"], f"[{i}]", advice, global_advice_ids)
                 _validate_advice(c, f["advice"], f"[{i}]", advice, faction_ids)
 
     if c.is_mapping(f["per_turn_advice"], "", bundle.per_turn_advice, "per_turn_advice"):
@@ -430,10 +532,11 @@ def validate_bundle(bundle) -> None:
                       f"per-turn advice key {turn_no} is outside 1..{max_turns}")
             if not c.is_list(f["per_turn_advice"], turn_key, options, "per-turn advice list"):
                 continue
+            bucket = per_turn_advice_ids.setdefault(turn_no, set())
             for i, advice in enumerate(options):
                 path = f"{turn_key}[{i}]"
                 if c.is_mapping(f["per_turn_advice"], path, advice, "advice option"):
-                    register_advice_id(f["per_turn_advice"], path, advice)
+                    register_advice_id(f["per_turn_advice"], path, advice, bucket)
                     _validate_advice(c, f["per_turn_advice"], path, advice, faction_ids)
 
     # --- calls (coverage + references) ---
@@ -444,7 +547,8 @@ def validate_bundle(bundle) -> None:
             if not c.is_mapping(f["calls"], f"[{i}]", call, "client call"):
                 continue
             _validate_call(c, f["calls"], f"[{i}]", call, faction_ids,
-                           document_ids, crisis_id, max_turns)
+                           document_ids, crisis_id, max_turns,
+                           global_advice_ids, per_turn_advice_ids, advice_tags_by_id)
             turn = call.get("turn")
             if isinstance(turn, int) and not isinstance(turn, bool):
                 if turn in turns_seen:
