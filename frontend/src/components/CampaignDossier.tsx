@@ -67,13 +67,13 @@ export default function CampaignDossier({ campaignId, embedded }: Props) {
   return (
     <div className={embedded ? "cd-dossier-embed" : "cd-stage-panel cd-dossier"}>
       {!embedded && (
-        <div className="cd-eyebrow">
+        <h1 className="cd-eyebrow">
           <span className="cd-eyebrow-dot" aria-hidden />
           Campaign dossier {dossier ? `· ${dossier.status}` : ""}
-        </div>
+        </h1>
       )}
 
-      {error && <div className="cd-alert cd-alert-error">System alert: {error}</div>}
+      {error && <div className="cd-alert cd-alert-error" role="alert">System alert: {error}</div>}
 
       <div className="cd-dossier-actions">
         <button className="cd-btn cd-btn-ghost cd-btn-sm" onClick={copy} disabled={loading || !dossier}>
@@ -85,7 +85,7 @@ export default function CampaignDossier({ campaignId, embedded }: Props) {
       </div>
 
       {loading ? (
-        <p className="cd-muted">Compiling case file…</p>
+        <p className="cd-muted" role="status">Compiling case file…</p>
       ) : dossier ? (
         <pre className="cd-dossier-md">{dossier.markdown}</pre>
       ) : (

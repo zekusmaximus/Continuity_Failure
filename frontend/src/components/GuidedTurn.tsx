@@ -1,5 +1,7 @@
+import { useEffect, useRef } from "react";
 import type { CurrentTurn, TurnHistory, TurnResult, MemoDraft } from "../api/client";
 import type { Phase } from "../domain";
+import { TURN_STEPS } from "../domain";
 import CallPhase from "./CallPhase";
 import BriefPhase from "./BriefPhase";
 import EvidencePhase from "./EvidencePhase";
@@ -61,6 +63,12 @@ export default function GuidedTurn(props: Props) {
   } = props;
 
   const call = current?.client_call ?? null;
+  const mainRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    if (document.activeElement?.getAttribute("role") === "tab") return;
+    mainRef.current?.focus();
+  }, [phase]);
 
   let panel: React.ReactNode = null;
   let action: React.ReactNode = null;
@@ -124,6 +132,7 @@ export default function GuidedTurn(props: Props) {
           memoLoading={memoLoading}
           memoError={memoError}
           onDraftMemo={onDraftMemo}
+          readOnly={lastResult !== null}
         />
       ) : null;
       action = (
@@ -131,7 +140,7 @@ export default function GuidedTurn(props: Props) {
           label="Send Advice"
           hint={
             selected
-              ? "Transmit your recommendation. The client decides what to do with it."
+              ? "Sending resolves this turn. The client decides what to do with your recommendation."
               : "Select a recommendation to send."
           }
           onClick={onSendAdvice}
@@ -145,8 +154,8 @@ export default function GuidedTurn(props: Props) {
       panel = lastResult ? <ClientDecisionPhase result={lastResult} /> : null;
       action = (
         <PrimaryAction
-          label="Resolve Consequences"
-          hint="See what your advice — and the client's decision — set in motion."
+          label="Review Consequences"
+          hint="The turn is already resolved. Review what the recorded decision set in motion."
           onClick={() => onGoto("CONSEQUENCES")}
         />
       );
@@ -175,7 +184,7 @@ export default function GuidedTurn(props: Props) {
       ) : (
         <PrimaryAction
           label="Next Call"
-          hint="Take the next incoming call."
+          hint="Load the next authoritative call. This does not resolve another turn."
           onClick={onNextCall}
           busy={submitting}
         />
@@ -198,9 +207,26 @@ export default function GuidedTurn(props: Props) {
       panel = null;
   }
 
+  if (lastResult && TURN_STEPS.indexOf(phase) < TURN_STEPS.indexOf("CLIENT_DECISION")) {
+    action = (
+      <PrimaryAction
+        label="Return to Client Decision"
+        hint="This turn is already resolved; the earlier record is read-only."
+        onClick={() => onGoto("CLIENT_DECISION")}
+      />
+    );
+  }
+
   return (
     <>
-      <main className="cd-stage">
+      <main
+        ref={mainRef}
+        id="main-content"
+        className="cd-stage"
+        role={TURN_STEPS.includes(phase) ? "tabpanel" : undefined}
+        aria-labelledby={TURN_STEPS.includes(phase) ? `cd-phase-tab-${phase.toLowerCase()}` : undefined}
+        tabIndex={0}
+      >
         <div className="cd-stage-inner">{panel}</div>
       </main>
       {action}

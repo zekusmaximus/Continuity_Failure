@@ -9,10 +9,12 @@ import type {
   RecentCampaign,
 } from "./api/client";
 import type { Phase } from "./domain";
+import { PHASE_LABEL, TURN_STEPS } from "./domain";
 import IntroScreen from "./components/IntroScreen";
 import ContinuityHeader from "./components/ContinuityHeader";
 import GuidedTurn from "./components/GuidedTurn";
 import CaseFile from "./components/CaseFile";
+import DeskGuide, { ONBOARDING_STORAGE_KEY } from "./components/DeskGuide";
 
 const CAMPAIGN_STORAGE_KEY = "continuity-failure.campaign-id";
 
@@ -48,6 +50,14 @@ function clearSavedCampaignId() {
   window.history.replaceState({}, "", url);
 }
 
+function hasCompletedDeskGuide(): boolean {
+  try {
+    return window.localStorage.getItem(ONBOARDING_STORAGE_KEY) === "acknowledged";
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Continuity Desk — Guided Intake.
  *
@@ -62,6 +72,7 @@ function clearSavedCampaignId() {
  */
 export default function App() {
   const [phase, setPhase] = useState<Phase>("INTRO");
+  const [maxReachedIndex, setMaxReachedIndex] = useState(0);
   const [campaignId, setCampaignId] = useState<string | null>(null);
   const [summary, setSummary] = useState<CampaignSummary | null>(null);
   const [current, setCurrent] = useState<CurrentTurn | null>(null);
@@ -69,11 +80,14 @@ export default function App() {
   const [history, setHistory] = useState<TurnHistory | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [caseFileOpen, setCaseFileOpen] = useState(false);
+  const [guideOpen, setGuideOpen] = useState(false);
+  const [guideFirstRun, setGuideFirstRun] = useState(false);
   const [recentCampaigns, setRecentCampaigns] = useState<RecentCampaign[]>([]);
 
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [liveMessage, setLiveMessage] = useState("");
 
   // Advisory memo draft for the selected advice option. AI-assist is off by
   // default, so this returns a deterministic fallback unless a live provider is
@@ -81,6 +95,34 @@ export default function App() {
   const [memo, setMemo] = useState<MemoDraft | null>(null);
   const [memoLoading, setMemoLoading] = useState(false);
   const [memoError, setMemoError] = useState<string | null>(null);
+
+  const gotoPhase = useCallback((next: Phase, announcement?: string) => {
+    setPhase(next);
+    const index = TURN_STEPS.indexOf(next);
+    if (index >= 0) setMaxReachedIndex((currentMax) => Math.max(currentMax, index));
+    setLiveMessage(announcement ?? `${PHASE_LABEL[next]} phase.`);
+  }, []);
+
+  const showFirstTurnGuide = useCallback((turnNumber: number) => {
+    if (turnNumber !== 1 || hasCompletedDeskGuide()) return;
+    setGuideFirstRun(true);
+    setGuideOpen(true);
+  }, []);
+
+  const closeGuide = useCallback(() => {
+    try {
+      window.localStorage.setItem(ONBOARDING_STORAGE_KEY, "acknowledged");
+    } catch {
+      // The guide may repeat, but campaign authority never depends on storage.
+    }
+    setGuideOpen(false);
+    setGuideFirstRun(false);
+  }, []);
+
+  const openGuide = useCallback(() => {
+    setGuideFirstRun(false);
+    setGuideOpen(true);
+  }, []);
 
   const refreshCurrent = useCallback(async (id: string) => {
     const cur = await api.getCurrent(id);
@@ -106,9 +148,16 @@ export default function App() {
     setSelected(null);
     setMemo(null);
     setMemoError(null);
-    setPhase(cur.summary.status === "ACTIVE" ? "CALL" : "DOSSIER");
+    if (cur.summary.status === "ACTIVE") {
+      setMaxReachedIndex(0);
+      gotoPhase("CALL", `Turn ${cur.summary.turn_number} incoming call loaded.`);
+      showFirstTurnGuide(cur.summary.turn_number);
+    } else {
+      setMaxReachedIndex(TURN_STEPS.length - 1);
+      gotoPhase("DOSSIER", "Campaign dossier loaded.");
+    }
     saveCampaignId(id);
-  }, []);
+  }, [gotoPhase, showFirstTurnGuide]);
 
   useEffect(() => {
     const savedId = readSavedCampaignId();
@@ -181,14 +230,16 @@ export default function App() {
       setSelected(null);
       setMemo(null);
       setMemoError(null);
-      await Promise.all([refreshCurrent(created.id), refreshHistory(created.id)]);
-      setPhase("CALL");
+      const [cur] = await Promise.all([refreshCurrent(created.id), refreshHistory(created.id)]);
+      setMaxReachedIndex(0);
+      gotoPhase("CALL", "Turn 1 incoming call loaded.");
+      showFirstTurnGuide(cur.summary.turn_number);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setLoading(false);
     }
-  }, [refreshCurrent, refreshHistory]);
+  }, [gotoPhase, refreshCurrent, refreshHistory, showFirstTurnGuide]);
 
   const handleSendAdvice = useCallback(async () => {
     if (!campaignId || !selected || !current || submitting) return;
@@ -210,7 +261,10 @@ export default function App() {
       // state before the player closes this turn. History may safely refresh:
       // it contains the new decision/canon record but no next-turn package.
       await refreshHistory(campaignId);
-      setPhase("CLIENT_DECISION");
+      gotoPhase(
+        "CLIENT_DECISION",
+        `Turn ${result.turn_number} resolved. Client decision available.`,
+      );
     } catch (e) {
       if (e instanceof ApiError && (e.code === "stale_turn" || e.code === "campaign_terminal")) {
         // The backend holds newer state than this desk. Resync rather than let
@@ -227,25 +281,26 @@ export default function App() {
     } finally {
       setSubmitting(false);
     }
-  }, [campaignId, selected, current, submitting, refreshCurrent, refreshHistory]);
+  }, [campaignId, selected, current, submitting, refreshCurrent, refreshHistory, gotoPhase]);
 
   const handleNextCall = useCallback(async () => {
     if (!campaignId) return;
     setLoading(true);
     setError(null);
     try {
-      await refreshCurrent(campaignId);
+      const cur = await refreshCurrent(campaignId);
       setSelected(null);
       setLastResult(null);
       setMemo(null);
       setMemoError(null);
-      setPhase("CALL");
+      setMaxReachedIndex(0);
+      gotoPhase("CALL", `Turn ${cur.summary.turn_number} incoming call loaded.`);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setLoading(false);
     }
-  }, [campaignId, refreshCurrent]);
+  }, [campaignId, refreshCurrent, gotoPhase]);
 
   const handleOpenDossier = useCallback(async () => {
     if (!campaignId) return;
@@ -254,13 +309,13 @@ export default function App() {
     try {
       await Promise.all([refreshCurrent(campaignId), refreshHistory(campaignId)]);
       setLastResult(null);
-      setPhase("DOSSIER");
+      gotoPhase("DOSSIER", "Campaign dossier loaded.");
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setLoading(false);
     }
-  }, [campaignId, refreshCurrent, refreshHistory]);
+  }, [campaignId, refreshCurrent, refreshHistory, gotoPhase]);
 
   const handleRestart = useCallback(() => {
     if (
@@ -315,6 +370,7 @@ export default function App() {
   if (phase === "INTRO") {
     return (
       <div className="cd-app cd-app-intro">
+        <a className="cd-skip-link" href="#main-content">Skip to main content</a>
         <IntroScreen
           onBegin={startCampaign}
           onResume={handleResume}
@@ -322,27 +378,34 @@ export default function App() {
           loading={loading}
         />
         {error && (
-          <div className="cd-banner-alert cd-alert cd-alert-error">
+          <div className="cd-banner-alert cd-alert cd-alert-error" role="alert">
             <strong>System alert:</strong> {error}
           </div>
         )}
+        <div className="cd-sr-only" role="status" aria-live="polite" aria-atomic="true">
+          {loading ? "Opening continuity desk." : ""}
+        </div>
       </div>
     );
   }
 
   return (
     <div className="cd-app">
+      <a className="cd-skip-link" href="#main-content">Skip to main content</a>
       <ContinuityHeader
         summary={headerSummary}
         worldState={current?.world_state ?? null}
         phase={phase}
+        maxReachedIndex={maxReachedIndex}
+        onGoto={gotoPhase}
         onOpenCaseFile={() => setCaseFileOpen(true)}
+        onOpenGuide={openGuide}
         onRestart={handleRestart}
         busy={busy}
       />
 
       {error && (
-        <div className="cd-banner-alert cd-alert cd-alert-error">
+        <div className="cd-banner-alert cd-alert cd-alert-error" role="alert">
           <strong>System alert:</strong> {error}
         </div>
       )}
@@ -352,6 +415,7 @@ export default function App() {
           className={`cd-banner-alert cd-alert ${
             resolvedStatus === "COMPLETED" ? "cd-alert-ok" : "cd-alert-crit"
           }`}
+          role="status"
         >
           <strong>Engagement {resolvedStatus?.toLowerCase()}.</strong>{" "}
           {terminalReason
@@ -370,7 +434,7 @@ export default function App() {
         selected={selected}
         submitting={busy}
         onSelect={handleSelectAdvice}
-        onGoto={setPhase}
+        onGoto={gotoPhase}
         onSendAdvice={handleSendAdvice}
         onNextCall={handleNextCall}
         onOpenDossier={handleOpenDossier}
@@ -389,6 +453,16 @@ export default function App() {
         current={current}
         history={history}
       />
+
+      <DeskGuide open={guideOpen} firstRun={guideFirstRun} onClose={closeGuide} />
+
+      <div className="cd-sr-only" role="status" aria-live="polite" aria-atomic="true">
+        {loading
+          ? "Desk request in progress."
+          : submitting
+            ? "Resolving turn."
+            : liveMessage}
+      </div>
     </div>
   );
 }

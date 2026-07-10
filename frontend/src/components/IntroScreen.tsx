@@ -18,7 +18,7 @@ export default function IntroScreen({
   loading,
 }: Props) {
   return (
-    <div className="cd-intro">
+    <main id="main-content" className="cd-intro" tabIndex={-1}>
       <div className="cd-intro-card">
         <div className="cd-intro-mark" aria-hidden>◆</div>
         <h1 className="cd-intro-title">CONTINUITY DESK</h1>
@@ -79,6 +79,6 @@ export default function IntroScreen({
           Deterministic engine · Optional AI assist is validation-gated and off by default
         </p>
       </div>
-    </div>
+    </main>
   );
 }

@@ -20,10 +20,10 @@ export default function ClientDecisionPhase({ result }: { result: TurnResult }) 
   const d = result.decision;
   return (
     <section className="cd-stage-panel cd-decision">
-      <div className="cd-eyebrow">
+      <h1 className="cd-eyebrow">
         <span className="cd-eyebrow-dot" aria-hidden />
         Client decision · Turn {result.turn_number}
-      </div>
+      </h1>
 
       <div className="cd-decision-head">
         <span className={`cd-decision-badge ${DECISION_BADGE[d.decision_type] ?? ""}`}>
@@ -32,6 +32,11 @@ export default function ClientDecisionPhase({ result }: { result: TurnResult }) 
         <span className="cd-decider">{d.decider}</span>
         <span className="cd-adherence">adherence {Math.round(d.adherence * 100)}%</span>
       </div>
+
+      <p className="cd-context-note">
+        Adherence shows how much of your recommendation the client carried into
+        the resolved turn; deviation records what they changed or withheld.
+      </p>
 
       <Row k="You advised" v={result.advice_label} />
       <Row k="The client did" v={d.rationale || titleCase(d.decision_type)} />

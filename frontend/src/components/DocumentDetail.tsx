@@ -1,6 +1,6 @@
-import { useEffect } from "react";
 import type { DocumentRecord } from "../api/client";
 import StatusTag from "./StatusTag";
+import AccessibleDialog from "./AccessibleDialog";
 import {
   RELIABILITY_LABEL,
   RELIABILITY_CLASS,
@@ -16,36 +16,26 @@ interface Props {
 
 /** Readable detail overlay for a single document. */
 export default function DocumentDetail({ doc, onClose }: Props) {
-  useEffect(() => {
-    if (!doc) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [doc, onClose]);
-
-  if (!doc) return null;
-
   return (
-    <div
-      className="cd-modal-overlay"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="cd-doc-detail-title"
-      onClick={onClose}
+    <AccessibleDialog
+      open={doc !== null}
+      onClose={onClose}
+      titleId="cd-doc-detail-title"
+      overlayClassName="cd-modal-overlay"
+      className="cd-modal cd-modal-doc"
     >
-      <div className="cd-modal cd-modal-doc" onClick={(e) => e.stopPropagation()}>
-        <header className="cd-modal-head">
+      {doc && (
+        <>
+        <div className="cd-modal-head">
           <div>
             <span className="cd-doc-type">{titleCase(doc.type)}</span>
             <h2 id="cd-doc-detail-title">{doc.title}</h2>
             <span className="cd-verified">— {doc.source}</span>
           </div>
-          <button className="cd-btn cd-btn-ghost cd-modal-close" onClick={onClose} aria-label="Close">
+          <button className="cd-btn cd-btn-ghost cd-modal-close" onClick={onClose} aria-label="Close document">
             ✕
           </button>
-        </header>
+        </div>
 
         <div className="cd-modal-body">
           <div className="cd-tagrow">
@@ -80,7 +70,8 @@ export default function DocumentDetail({ doc, onClose }: Props) {
             </div>
           )}
         </div>
-      </div>
-    </div>
+        </>
+      )}
+    </AccessibleDialog>
   );
 }

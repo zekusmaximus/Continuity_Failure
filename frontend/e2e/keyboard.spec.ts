@@ -35,6 +35,9 @@ test.describe("keyboard operation", () => {
     await page.goto("/");
 
     await pressButton(page, "Begin Intake");
+    const guide = page.getByRole("dialog", { name: "Desk operating brief" });
+    await expect(guide).toBeVisible();
+    await pressButton(page, "Acknowledge briefing");
     await expect(page.getByText(/Incoming call · Turn 1/)).toBeVisible();
 
     await pressButton(page, "Accept Call");
@@ -54,7 +57,7 @@ test.describe("keyboard operation", () => {
     await pressButton(page, "Send Advice");
     await expect(page.getByText(/Client decision · Turn 1/)).toBeVisible();
 
-    await pressButton(page, "Resolve Consequences");
+    await pressButton(page, "Review Consequences");
     await pressButton(page, "Close Turn");
     await expect(page.getByText(/Turn archive · Turn 1 filed/)).toBeVisible();
 
@@ -68,20 +71,25 @@ test.describe("keyboard operation", () => {
   }) => {
     await page.goto("/");
     await pressButton(page, "Begin Intake");
+    await pressButton(page, "Acknowledge briefing");
     await expect(page.getByText(/Incoming call · Turn 1/)).toBeVisible();
 
+    const opener = page.getByRole("button", { name: "Case File" });
     await pressButton(page, "Case File");
     const drawer = page.getByRole("dialog", { name: "Case File" });
     await expect(drawer).toBeVisible();
 
     // Tabs inside the drawer are reachable and operable.
-    const factions = drawer.getByRole("button", { name: "Factions", exact: true });
-    await tabTo(page, factions, 'The drawer\'s "Factions" tab');
-    await page.keyboard.press("Enter");
+    const evidence = drawer.getByRole("tab", { name: /Evidence/ });
+    const factions = drawer.getByRole("tab", { name: /Factions/ });
+    await tabTo(page, evidence, 'The drawer\'s "Evidence" tab');
+    await page.keyboard.press("ArrowRight");
+    await expect(factions).toHaveAttribute("aria-selected", "true");
     await expect(drawer.getByRole("heading", { name: "Factions" })).toBeVisible();
 
     await page.keyboard.press("Escape");
     await expect(drawer).toBeHidden();
+    await expect(opener).toBeFocused();
   });
 
   test("the document overlay opens from the keyboard and closes with Escape", async ({
@@ -89,6 +97,7 @@ test.describe("keyboard operation", () => {
   }) => {
     await page.goto("/");
     await pressButton(page, "Begin Intake");
+    await pressButton(page, "Acknowledge briefing");
     await pressButton(page, "Accept Call");
     await pressButton(page, "Review Evidence");
     await expect(page.getByText(/Evidence review · 3 on file/)).toBeVisible();
@@ -106,5 +115,32 @@ test.describe("keyboard operation", () => {
 
     await page.keyboard.press("Escape");
     await expect(overlay).toBeHidden();
+    await expect(doc).toBeFocused();
+  });
+
+  test("phase tabs expose current and unavailable state and use arrow keys", async ({ page }) => {
+    await page.goto("/");
+    await pressButton(page, "Begin Intake");
+    await pressButton(page, "Acknowledge briefing");
+
+    const phases = page.getByRole("tablist", { name: "Turn phases" });
+    const call = phases.getByRole("tab", { name: /Call/ });
+    const brief = phases.getByRole("tab", { name: /Brief/ });
+    const decision = phases.getByRole("tab", { name: /Decision/ });
+    await expect(call).toHaveAttribute("aria-selected", "true");
+    await expect(call).toHaveAttribute("aria-current", "step");
+    await expect(brief).toBeDisabled();
+    await expect(decision).toBeDisabled();
+
+    await pressButton(page, "Accept Call");
+    await expect(brief).toHaveAttribute("aria-selected", "true");
+    await tabTo(page, brief, "Current Brief phase tab");
+    await page.keyboard.press("ArrowLeft");
+    await expect(call).toHaveAttribute("aria-selected", "true");
+    await expect(page.getByText(/Incoming call · Turn 1/)).toBeVisible();
+    await page.keyboard.press("ArrowRight");
+    await expect(brief).toHaveAttribute("aria-selected", "true");
+    await expect(page.getByText(/Situation brief · Turn 1/)).toBeVisible();
+    await expect(decision).toBeDisabled();
   });
 });

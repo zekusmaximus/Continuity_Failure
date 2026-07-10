@@ -16,14 +16,14 @@ interface Props {
 export default function MemoDraftPanel({ memo, loading, error }: Props) {
   if (loading) {
     return (
-      <div className="cd-memo-panel cd-muted">
+      <div className="cd-memo-panel cd-muted" role="status">
         Drafting memo…
       </div>
     );
   }
   if (error) {
     return (
-      <div className="cd-memo-panel cd-alert cd-alert-error">
+      <div className="cd-memo-panel cd-alert cd-alert-error" role="alert">
         Memo draft failed: {error}
       </div>
     );

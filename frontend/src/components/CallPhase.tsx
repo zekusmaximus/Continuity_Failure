@@ -15,6 +15,7 @@ export default function CallPhase({ call }: { call: ClientCall | null }) {
   if (!call) {
     return (
       <section className="cd-stage-panel">
+        <h1 className="cd-eyebrow">Engagement closed</h1>
         <p className="cd-lead">No active call. The engagement has closed.</p>
         <p className="cd-muted">Review the campaign dossier for the final record.</p>
       </section>
@@ -23,10 +24,10 @@ export default function CallPhase({ call }: { call: ClientCall | null }) {
 
   return (
     <section className="cd-stage-panel cd-call">
-      <div className="cd-eyebrow">
+      <h1 className="cd-eyebrow">
         <span className="cd-eyebrow-dot" aria-hidden />
         Incoming call · Turn {call.turn}
-      </div>
+      </h1>
 
       <div className="cd-call-caller">
         <div className="cd-call-name">{call.caller}</div>

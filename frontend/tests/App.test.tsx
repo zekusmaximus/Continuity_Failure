@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 import App from "../src/App";
+import { ONBOARDING_STORAGE_KEY } from "../src/components/DeskGuide";
 import { createFakeBackend, type FakeBackend } from "./support/fakeBackend";
 
 let backend: FakeBackend;
@@ -23,6 +24,7 @@ afterEach(() => {
 /** Start a campaign and walk CALL → ADVICE. */
 async function startAndReachAdvice(user: ReturnType<typeof userEvent.setup>) {
   await user.click(await screen.findByRole("button", { name: "Begin Intake" }));
+  await user.click(await screen.findByRole("button", { name: "Acknowledge briefing" }));
   await screen.findByText(/Incoming call · Turn 1/);
   await user.click(screen.getByRole("button", { name: "Accept Call" }));
   await user.click(await screen.findByRole("button", { name: "Skip to Advice" }));
@@ -31,6 +33,35 @@ async function startAndReachAdvice(user: ReturnType<typeof userEvent.setup>) {
 
 const header = () => screen.getByRole("banner");
 const turnText = () => within(header()).getByText(/^TURN \d+ \/ \d+$/).textContent;
+
+describe("first-turn desk guide", () => {
+  test("appears once, persists acknowledgement, and remains reopenable", async () => {
+    const user = userEvent.setup();
+    const { unmount } = render(<App />);
+
+    await user.click(await screen.findByRole("button", { name: "Begin Intake" }));
+    const guide = await screen.findByRole("dialog", { name: "Desk operating brief" });
+    expect(guide).toHaveTextContent("You advise from inside the machinery");
+    expect(guide).toHaveTextContent("Higher is not always better");
+    expect(guide).toHaveTextContent("Next Call performs no new decision");
+    expect(window.localStorage.getItem(ONBOARDING_STORAGE_KEY)).toBeNull();
+
+    await user.click(within(guide).getByRole("button", { name: "Acknowledge briefing" }));
+    expect(screen.queryByRole("dialog", { name: "Desk operating brief" })).not.toBeInTheDocument();
+    expect(window.localStorage.getItem(ONBOARDING_STORAGE_KEY)).toBe("acknowledged");
+
+    const reopen = within(header()).getByRole("button", { name: "Desk Guide" });
+    await user.click(reopen);
+    await screen.findByRole("dialog", { name: "Desk operating brief" });
+    await user.keyboard("{Escape}");
+    expect(reopen).toHaveFocus();
+
+    unmount();
+    render(<App />);
+    await screen.findByText(/Incoming call · Turn 1/);
+    expect(screen.queryByRole("dialog", { name: "Desk operating brief" })).not.toBeInTheDocument();
+  });
+});
 
 describe("temporal snapshot", () => {
   /**
@@ -74,7 +105,7 @@ describe("temporal snapshot", () => {
       screen.getByRole("radio", { name: /Full disclosure and emergency conservation order/ }),
     );
     await user.click(screen.getByRole("button", { name: "Send Advice" }));
-    await user.click(await screen.findByRole("button", { name: "Resolve Consequences" }));
+    await user.click(await screen.findByRole("button", { name: "Review Consequences" }));
     await user.click(await screen.findByRole("button", { name: "Close Turn" }));
     await screen.findByText(/Turn archive · Turn 1 filed/);
 
@@ -93,6 +124,7 @@ describe("restart confirmation", () => {
     render(<App />);
 
     await user.click(await screen.findByRole("button", { name: "Begin Intake" }));
+    await user.click(await screen.findByRole("button", { name: "Acknowledge briefing" }));
     await screen.findByText(/Incoming call · Turn 1/);
     expect(backend.campaignsCreated).toBe(1);
 

@@ -37,6 +37,7 @@ export default function BriefPhase({ call, state }: Props) {
   if (!call) {
     return (
       <section className="cd-stage-panel">
+        <h1 className="cd-eyebrow">Situation brief unavailable</h1>
         <p className="cd-lead">No active brief for this turn.</p>
       </section>
     );
@@ -44,10 +45,10 @@ export default function BriefPhase({ call, state }: Props) {
 
   return (
     <section className="cd-stage-panel cd-brief">
-      <div className="cd-eyebrow">
+      <h1 className="cd-eyebrow">
         <span className="cd-eyebrow-dot" aria-hidden />
         Situation brief · Turn {call.turn}
-      </div>
+      </h1>
 
       {crisis && (
         <div className="cd-crisis-banner">

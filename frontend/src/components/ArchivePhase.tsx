@@ -22,10 +22,10 @@ export default function ArchivePhase({ result, history }: Props) {
 
   return (
     <section className="cd-stage-panel cd-archive">
-      <div className="cd-eyebrow">
+      <h1 className="cd-eyebrow">
         <span className="cd-eyebrow-dot" aria-hidden />
         Turn archive · Turn {result.turn_number} filed
-      </div>
+      </h1>
 
       <div className="cd-field">
         <div className="cd-field-k">Advice issued</div>

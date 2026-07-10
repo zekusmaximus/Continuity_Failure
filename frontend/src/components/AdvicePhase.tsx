@@ -11,6 +11,7 @@ interface Props {
   memoLoading: boolean;
   memoError: string | null;
   onDraftMemo: () => void;
+  readOnly?: boolean;
 }
 
 function RiskBar({ label, value }: { label: string; value: number }) {
@@ -46,11 +47,13 @@ function AdviceCard({
   selected,
   onSelect,
   factions,
+  readOnly = false,
 }: {
   option: AdviceOption;
   selected: boolean;
   onSelect: (id: string) => void;
   factions: Faction[];
+  readOnly?: boolean;
 }) {
   const factionName = (id: string) => factions.find((f) => f.id === id)?.name ?? id;
   const bestFor = option.expected_benefits[0];
@@ -65,6 +68,7 @@ function AdviceCard({
           value={option.id}
           checked={selected}
           onChange={() => onSelect(option.id)}
+          disabled={readOnly}
         />
         <div className="cd-advice-body">
           <div className="cd-advice-top">
@@ -157,17 +161,26 @@ export default function AdvicePhase({
   memoLoading,
   memoError,
   onDraftMemo,
+  readOnly,
 }: Props) {
   return (
     <section className="cd-stage-panel cd-advisory">
-      <div className="cd-eyebrow">
+      <h1 className="cd-eyebrow">
         <span className="cd-eyebrow-dot" aria-hidden />
         Advisory · choose one recommendation
-      </div>
+      </h1>
       <p className="cd-muted cd-advice-note">
         You advise; the client decides. No option is risk-free — every path
         creates a record.
       </p>
+      <details className="cd-context-help">
+        <summary>How client decisions mediate advice</summary>
+        <p>
+          The client may follow, modify, delay, or reject your recommendation.
+          Adherence determines how much of its stated effects enter resolution;
+          any client modification is recorded as a separate change.
+        </p>
+      </details>
       <ul className="cd-advice-list-outer">
         {options.map((opt) => (
           <AdviceCard
@@ -176,6 +189,7 @@ export default function AdvicePhase({
             selected={selected === opt.id}
             onSelect={onSelect}
             factions={factions}
+            readOnly={readOnly}
           />
         ))}
       </ul>

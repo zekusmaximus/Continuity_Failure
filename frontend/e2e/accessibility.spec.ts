@@ -36,11 +36,22 @@ test.describe("accessibility smoke", () => {
     await scan(page, "intake");
   });
 
-  test("the call and advice phases have no serious violations", async ({ page }) => {
+  test("the first-turn operating brief has no serious violations", async ({ page }) => {
+    await page.goto("/");
+    await page.getByRole("button", { name: "Begin Intake" }).click();
+    await expect(page.getByRole("dialog", { name: "Desk operating brief" })).toBeVisible();
+    await scan(page, "first-turn operating brief");
+  });
+
+  test("the pre-resolution phases have no serious violations", async ({ page }) => {
     await beginIntake(page);
     await scan(page, "incoming call");
 
-    await walkToAdvice(page);
+    await primaryAction(page, "Accept Call").click();
+    await scan(page, "situation brief");
+    await primaryAction(page, "Review Evidence").click();
+    await scan(page, "evidence review");
+    await primaryAction(page, "Continue to Advice").click();
     await scan(page, "advice");
   });
 
@@ -50,7 +61,7 @@ test.describe("accessibility smoke", () => {
     await scan(page, "case file drawer");
   });
 
-  test("the archived turn has no serious violations", async ({ page }) => {
+  test("the resolved-turn phases have no serious violations", async ({ page }) => {
     await beginIntake(page);
     await walkToAdvice(page);
     await page
@@ -59,5 +70,9 @@ test.describe("accessibility smoke", () => {
     await primaryAction(page, "Send Advice").click();
     await expect(page.getByText(/Client decision · Turn 1/)).toBeVisible();
     await scan(page, "client decision");
+    await primaryAction(page, "Review Consequences").click();
+    await scan(page, "consequences");
+    await primaryAction(page, "Close Turn").click();
+    await scan(page, "turn archive");
   });
 });

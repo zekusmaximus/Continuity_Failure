@@ -82,6 +82,11 @@ for (const viewport of VIEWPORTS) {
       await beginIntake(page);
       await expectNoHorizontalOverflow(page, `${where} / call`);
       await expectPrimaryActionUsable(page, "Accept Call", `${where} / call`);
+      for (const name of ["Case File", "Desk Guide", "New Engagement"]) {
+        const control = page.getByRole("button", { name });
+        await expect(control, `${where}: header control ${name}`).toBeVisible();
+        await expect(control, `${where}: header control ${name}`).toBeInViewport();
+      }
 
       await walkToAdvice(page);
       await expectNoHorizontalOverflow(page, `${where} / advice`);
@@ -92,7 +97,7 @@ for (const viewport of VIEWPORTS) {
       await expectNoHorizontalOverflow(page, `${where} / client decision`);
       await expectPrimaryActionUsable(
         page,
-        "Resolve Consequences",
+        "Review Consequences",
         `${where} / client decision`,
       );
 
@@ -101,7 +106,7 @@ for (const viewport of VIEWPORTS) {
       const drawer = await openCaseFile(page);
       await expect(drawer).toBeInViewport();
       await expectNoHorizontalOverflow(page, `${where} / case file`);
-      await drawer.getByRole("button", { name: "Full State" }).click();
+      await drawer.getByRole("tab", { name: "Full State" }).click();
       await expectNoHorizontalOverflow(page, `${where} / case file · full state`);
       await page.keyboard.press("Escape");
     });

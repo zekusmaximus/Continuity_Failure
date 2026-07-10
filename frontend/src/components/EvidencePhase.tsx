@@ -53,10 +53,19 @@ export default function EvidencePhase({ documents, call, onOpenCaseFile }: Props
 
   return (
     <section className="cd-stage-panel cd-evidence">
-      <div className="cd-eyebrow">
+      <h1 className="cd-eyebrow">
         <span className="cd-eyebrow-dot" aria-hidden />
         Evidence review · {documents.length} on file
-      </div>
+      </h1>
+
+      <details className="cd-context-help">
+        <summary>How to read this evidence</summary>
+        <p>
+          Turn is the freshness marker. Source and reliability tell you how much
+          weight the record can bear; public status tells you who may already know it.
+          Priority reflects relevance to this call, not certainty.
+        </p>
+      </details>
 
       {documents.length === 0 ? (
         <p className="cd-muted">No documents available yet.</p>
@@ -67,7 +76,7 @@ export default function EvidencePhase({ documents, call, onOpenCaseFile }: Props
           return (
             <div key={tier} className="cd-ev-group">
               <div className="cd-ev-group-head">
-                <span className={`cd-ev-tier cd-ev-tier-${tier.toLowerCase()}`}>{tier}</span>
+                <h2 className={`cd-ev-tier cd-ev-tier-${tier.toLowerCase()}`}>{tier}</h2>
                 <span className="cd-ev-group-hint">{EVIDENCE_TIER_HINT[tier]}</span>
               </div>
               <ul className="cd-ev-list">
@@ -89,6 +98,7 @@ export default function EvidencePhase({ documents, call, onOpenCaseFile }: Props
                           label={PUBLIC_STATUS_LABEL[doc.public_status] ?? doc.public_status}
                           className={PUBLIC_STATUS_CLASS[doc.public_status] ?? "tag-private"}
                         />
+                        <StatusTag label={`Turn ${doc.turn_number}`} className="tag-turn" />
                       </div>
                     </button>
                   </li>

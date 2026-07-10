@@ -44,7 +44,15 @@ export default function StateReadout({ state }: { state: WorldState }) {
                         {meta.risk ? "↑ worse" : "↑ better"}
                       </span>
                     </span>
-                    <span className="cd-var-bar">
+                    <span
+                      className="cd-var-bar"
+                      role="progressbar"
+                      aria-label={meta.label}
+                      aria-valuemin={0}
+                      aria-valuemax={100}
+                      aria-valuenow={value}
+                      aria-valuetext={`${value} of 100. ${meta.risk ? "Higher is worse" : "Higher is better"}.`}
+                    >
                       <span className={`cd-var-fill ${levelClass(level)}`} style={{ width: `${value}%` }} />
                     </span>
                     <span className={`cd-var-value ${levelClass(level)}`}>{value}</span>

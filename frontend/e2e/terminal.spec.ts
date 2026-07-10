@@ -22,7 +22,7 @@ test.describe("terminal campaign", () => {
     await page.goto(`/?campaign=${campaignId}`);
 
     // The desk opens straight into the dossier, not into a call.
-    await expect(page.getByText(/Campaign dossier/)).toBeVisible();
+    await expect(page.getByRole("heading", { name: /Campaign dossier/ })).toBeVisible();
     await expect(page.getByText(/Compiling case file/)).toBeHidden();
 
     // No affordance advances the engagement.
@@ -37,7 +37,7 @@ test.describe("terminal campaign", () => {
 
     // The Case File remains available for the whole record.
     const drawer = await openCaseFile(page);
-    await drawer.getByRole("button", { name: "Timeline" }).click();
+    await drawer.getByRole("tab", { name: "Timeline" }).click();
     await expect(drawer).toBeVisible();
     await page.keyboard.press("Escape");
 

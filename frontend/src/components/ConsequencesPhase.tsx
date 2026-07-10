@@ -15,7 +15,7 @@ function StackSection({
   if (items.length === 0) return null;
   return (
     <div className={`cd-stack-sec cd-stack-${tone}`}>
-      <div className="cd-subhead">{title}</div>
+      <h2 className="cd-subhead">{title}</h2>
       <ul className="cd-stack-list">
         {items.map((s, i) => (
           <li key={i}>{s}</li>
@@ -37,10 +37,10 @@ export default function ConsequencesPhase({ result }: { result: TurnResult }) {
 
   return (
     <section className="cd-stage-panel cd-consequences">
-      <div className="cd-eyebrow">
+      <h1 className="cd-eyebrow">
         <span className="cd-eyebrow-dot" aria-hidden />
         Consequences · Turn {result.turn_number}
-      </div>
+      </h1>
 
       <p className="cd-lead">{result.aftermath_summary}</p>
 
@@ -59,7 +59,11 @@ export default function ConsequencesPhase({ result }: { result: TurnResult }) {
       </div>
 
       <div className="cd-changes">
-        <div className="cd-subhead">State changes</div>
+        <h2 className="cd-subhead">State changes</h2>
+        <p className="cd-context-note">
+          Reasons distinguish advice, client modification, and ambient Drift—the
+          crisis pressure applied independently each turn.
+        </p>
         {changes.length === 0 ? (
           <p className="cd-muted cd-small">No tracked variable moved this turn.</p>
         ) : (

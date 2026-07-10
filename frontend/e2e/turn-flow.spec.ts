@@ -55,7 +55,7 @@ test.describe("turn presentation", () => {
       ).toBe(3);
       await page.keyboard.press("Escape");
 
-      if (step === "Client decision") await primaryAction(page, "Resolve Consequences").click();
+      if (step === "Client decision") await primaryAction(page, "Review Consequences").click();
       if (step === "Consequences") await primaryAction(page, "Close Turn").click();
     }
 
