@@ -199,13 +199,27 @@ The Vite dev server runs at `http://localhost:5173` and proxies `/api` and
 
 ### Tests
 
-From the repository root (with the venv active):
+Backend and engine tests, from the repository root (with the venv active):
 
 ```bash
 pytest
 ```
 
 The engine tests exercise only the `engine` package and require no web server.
+
+Frontend tests live under `frontend/` in two layers — fast component/integration
+tests (Vitest) and real-browser end-to-end tests (Playwright) that drive the
+production build against an isolated backend and SQLite database:
+
+```bash
+cd frontend
+npm install
+npx playwright install chromium   # once per machine
+npm run test:ci                    # typecheck + component tests + e2e
+```
+
+See [`frontend/TESTING.md`](frontend/TESTING.md) for the individual commands, the
+isolated test-database behavior, and common local failures.
 
 ## MVP Scope (this slice)
 

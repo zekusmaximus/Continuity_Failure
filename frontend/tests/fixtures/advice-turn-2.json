@@ -1,0 +1,207 @@
+{
+  "advice_id": "full_disclosure",
+  "advice_label": "Full disclosure and emergency conservation order",
+  "aftermath_summary": "The Northbridge Public Schools adopted part of your advice (PARTIALLY_FOLLOWED). Notable shifts: Information Integrity 70→78; Legal Exposure 28→20; Media Pressure 39→47.",
+  "canon_entry": {
+    "body": "The Northbridge Public Schools adopted part of your advice (PARTIALLY_FOLLOWED). Notable shifts: Information Integrity 70→78; Legal Exposure 28→20; Media Pressure 39→47.",
+    "category": "decision",
+    "classification": "canon",
+    "id": "canon_turn_2",
+    "involved_factions": [
+      "Northbridge Public Schools"
+    ],
+    "public_status": "public",
+    "source": "Northbridge Public Schools",
+    "tags": [
+      "disclosure",
+      "partially_followed"
+    ],
+    "title": "Turn 2: PARTIALLY_FOLLOWED on Full disclosure and emergency conservation order",
+    "turn_number": 2
+  },
+  "consequence_stack": {
+    "canonized_events": [
+      "Turn 2: PARTIALLY_FOLLOWED on Full disclosure and emergency conservation order"
+    ],
+    "faction_reactions": [
+      {
+        "faction_id": "council_opposition",
+        "faction_name": "Town Council Opposition",
+        "reaction": "Circumspect; unable to find a clean line of attack yet."
+      },
+      {
+        "faction_id": "media_rumor_network",
+        "faction_name": "Local Media / Rumor Network",
+        "reaction": "Circulating the official line; no strong seam to pull yet."
+      },
+      {
+        "faction_id": "state_liaison",
+        "faction_name": "State Emergency Management Liaison",
+        "reaction": "Advisory posture; resources on offer if the record is kept clean."
+      },
+      {
+        "faction_id": "hospital",
+        "faction_name": "Northbridge Hospital",
+        "reaction": "Watchful; priority mitigation is holding for now."
+      },
+      {
+        "faction_id": "utility_contractor",
+        "faction_name": "Utility Contractor",
+        "reaction": "Cooperative within current terms."
+      }
+    ],
+    "immediate": [
+      "Turn 2 · opening phase: acting on Northbridge Public Schools's call — The superintendent demands a written, defensible closure threshold for three south-zone schools as parent pressure builds.",
+      "A controlled statement landed, but with the public-facing scope narrowed.",
+      "Mitigation for hospital and schools was pre-positioned before the statement.",
+      "Largest advice/client move: Information Integrity 70→78 (+8, advice)."
+    ],
+    "legal_fallout": [
+      "Legal posture: no new cause of action crystallized this turn."
+    ],
+    "media_framing": [
+      "Headline frame: 'water worries mount' -- reactive, not yet dominant."
+    ],
+    "opened_threads": [],
+    "second_order": [
+      "No single variable is at a breaking point, but several are trending the wrong way."
+    ]
+  },
+  "decision": {
+    "adherence": 0.75,
+    "advice_id": "full_disclosure",
+    "decider": "Northbridge Public Schools",
+    "decision_type": "PARTIALLY_FOLLOWED",
+    "deviation": "Adopted the spirit of the disclosure but narrowed its public scope.",
+    "modifications": {},
+    "private_motive": "Wanted the credit for openness without the cost of full exposure.",
+    "public_explanation": "A controlled statement has been issued with mitigation pre-positioned.",
+    "rationale": "The Northbridge Public Schools adopted the spirit of Full disclosure and emergency conservation order but trimmed the public-facing scope. Media pressure 39, public trust 60.",
+    "resulting_risk": "Controlled framing is brittle if the rumor feed moves first."
+  },
+  "diffs": [
+    {
+      "delta": -2,
+      "new_value": 34,
+      "old_value": 36,
+      "reason": "Advice — Full disclosure and emergency conservation order",
+      "source_type": "advice",
+      "variable": "budget_capacity"
+    },
+    {
+      "delta": 8,
+      "new_value": 78,
+      "old_value": 70,
+      "reason": "Advice — Full disclosure and emergency conservation order",
+      "source_type": "advice",
+      "variable": "information_integrity"
+    },
+    {
+      "delta": -8,
+      "new_value": 20,
+      "old_value": 28,
+      "reason": "Advice — Full disclosure and emergency conservation order",
+      "source_type": "advice",
+      "variable": "legal_exposure"
+    },
+    {
+      "delta": 8,
+      "new_value": 47,
+      "old_value": 39,
+      "reason": "Advice — Full disclosure and emergency conservation order",
+      "source_type": "advice",
+      "variable": "media_pressure"
+    },
+    {
+      "delta": 2,
+      "new_value": 54,
+      "old_value": 52,
+      "reason": "Advice — Full disclosure and emergency conservation order",
+      "source_type": "advice",
+      "variable": "player_reputation"
+    },
+    {
+      "delta": -6,
+      "new_value": 54,
+      "old_value": 60,
+      "reason": "Advice — Full disclosure and emergency conservation order",
+      "source_type": "advice",
+      "variable": "public_order"
+    },
+    {
+      "delta": 4,
+      "new_value": 64,
+      "old_value": 60,
+      "reason": "Advice — Full disclosure and emergency conservation order",
+      "source_type": "advice",
+      "variable": "public_trust"
+    },
+    {
+      "delta": -2,
+      "new_value": 42,
+      "old_value": 44,
+      "reason": "Ambient crisis pressure",
+      "source_type": "ambient",
+      "variable": "water_security"
+    },
+    {
+      "delta": -1,
+      "new_value": 54,
+      "old_value": 55,
+      "reason": "Ambient crisis pressure",
+      "source_type": "ambient",
+      "variable": "hospital_stability"
+    },
+    {
+      "delta": -2,
+      "new_value": 32,
+      "old_value": 34,
+      "reason": "Ambient crisis pressure",
+      "source_type": "ambient",
+      "variable": "budget_capacity"
+    },
+    {
+      "delta": 3,
+      "new_value": 50,
+      "old_value": 47,
+      "reason": "Ambient crisis pressure",
+      "source_type": "ambient",
+      "variable": "media_pressure"
+    },
+    {
+      "delta": 1,
+      "new_value": 54,
+      "old_value": 53,
+      "reason": "Ambient crisis pressure",
+      "source_type": "ambient",
+      "variable": "contractor_dependency"
+    },
+    {
+      "delta": 2,
+      "new_value": 22,
+      "old_value": 20,
+      "reason": "Ambient crisis pressure",
+      "source_type": "ambient",
+      "variable": "legal_exposure"
+    },
+    {
+      "delta": 2,
+      "new_value": 42,
+      "old_value": 40,
+      "reason": "Ambient crisis pressure",
+      "source_type": "ambient",
+      "variable": "school_disruption"
+    },
+    {
+      "delta": -1,
+      "new_value": 48,
+      "old_value": 49,
+      "reason": "Ambient crisis pressure",
+      "source_type": "ambient",
+      "variable": "staff_capacity"
+    }
+  ],
+  "failure_reason": null,
+  "status_after": "ACTIVE",
+  "turn_number": 2
+}

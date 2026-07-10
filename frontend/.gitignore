@@ -8,3 +8,12 @@ dist-ssr
 *.tsbuildinfo
 vite.config.d.ts
 vite.config.js
+
+# Test artifacts
+.e2e/
+playwright-report/
+test-results/
+vitest.config.d.ts
+vitest.config.js
+playwright.config.d.ts
+playwright.config.js

@@ -1,0 +1,266 @@
+{
+  "canon": [
+    {
+      "body": "The Town Manager's Office adopted part of your advice (PARTIALLY_FOLLOWED). Notable shifts: Information Integrity 62→70; Legal Exposure 34→26; Media Pressure 28→36.",
+      "category": "decision",
+      "classification": "canon",
+      "id": "canon_turn_1",
+      "involved_factions": [
+        "Town Manager's Office"
+      ],
+      "public_status": "public",
+      "source": "Town Manager's Office",
+      "tags": [
+        "disclosure",
+        "partially_followed"
+      ],
+      "title": "Turn 1: PARTIALLY_FOLLOWED on Full disclosure and emergency conservation order",
+      "turn_number": 1
+    }
+  ],
+  "open_threads": [
+    {
+      "id": "thread_disclosure_clock",
+      "status": "open",
+      "summary": "A preliminary sample sits above the advisory threshold; the confirmatory result is pending. Every turn of delay adds legal and narrative risk.",
+      "tags": [
+        "disclosure",
+        "legal",
+        "narrative"
+      ],
+      "title": "Disclosure clock on a preliminary, contested lab result",
+      "turn_opened": 1
+    },
+    {
+      "id": "thread_contractor_leverage",
+      "status": "open",
+      "summary": "Only Marquotte Utilities is certified for the failing valves. Indemnity demands and premium change orders compound dependency.",
+      "tags": [
+        "contractor",
+        "procurement",
+        "dependency"
+      ],
+      "title": "Sole-source contractor leverage over the repair",
+      "turn_opened": 1
+    }
+  ],
+  "summary": {
+    "created_at": "2026-07-10T15:43:03.282955+00:00",
+    "failure_reason": null,
+    "id": "test-campaign",
+    "max_turns": 10,
+    "name": "Northbridge Water Failure",
+    "scenario_id": "northbridge_water_failure",
+    "status": "ACTIVE",
+    "turn_number": 2
+  },
+  "turns": [
+    {
+      "advice_id": "full_disclosure",
+      "advice_label": "Full disclosure and emergency conservation order",
+      "aftermath_summary": "The Town Manager's Office adopted part of your advice (PARTIALLY_FOLLOWED). Notable shifts: Information Integrity 62→70; Legal Exposure 34→26; Media Pressure 28→36.",
+      "canon_entry": {
+        "body": "The Town Manager's Office adopted part of your advice (PARTIALLY_FOLLOWED). Notable shifts: Information Integrity 62→70; Legal Exposure 34→26; Media Pressure 28→36.",
+        "category": "decision",
+        "classification": "canon",
+        "id": "canon_turn_1",
+        "involved_factions": [
+          "Town Manager's Office"
+        ],
+        "public_status": "public",
+        "source": "Town Manager's Office",
+        "tags": [
+          "disclosure",
+          "partially_followed"
+        ],
+        "title": "Turn 1: PARTIALLY_FOLLOWED on Full disclosure and emergency conservation order",
+        "turn_number": 1
+      },
+      "consequence_stack": {
+        "canonized_events": [
+          "Turn 1: PARTIALLY_FOLLOWED on Full disclosure and emergency conservation order"
+        ],
+        "faction_reactions": [
+          {
+            "faction_id": "council_opposition",
+            "faction_name": "Town Council Opposition",
+            "reaction": "Circumspect; unable to find a clean line of attack yet."
+          },
+          {
+            "faction_id": "media_rumor_network",
+            "faction_name": "Local Media / Rumor Network",
+            "reaction": "Circulating the official line; no strong seam to pull yet."
+          },
+          {
+            "faction_id": "state_liaison",
+            "faction_name": "State Emergency Management Liaison",
+            "reaction": "Advisory posture; resources on offer if the record is kept clean."
+          },
+          {
+            "faction_id": "hospital",
+            "faction_name": "Northbridge Hospital",
+            "reaction": "Watchful; priority mitigation is holding for now."
+          },
+          {
+            "faction_id": "utility_contractor",
+            "faction_name": "Utility Contractor",
+            "reaction": "Cooperative within current terms."
+          }
+        ],
+        "immediate": [
+          "Turn 1 · opening phase: acting on Town Manager's Office's call — Ambiguous preliminary contamination sample and a 12% overnight pressure drop, hours before an emergency council session.",
+          "A controlled statement landed, but with the public-facing scope narrowed.",
+          "Mitigation for hospital and schools was pre-positioned before the statement.",
+          "Largest advice/client move: Information Integrity 62→70 (+8, advice)."
+        ],
+        "legal_fallout": [
+          "Legal posture: no new cause of action crystallized this turn."
+        ],
+        "media_framing": [
+          "Headline frame: 'town responds' -- coverage follows the official line for now."
+        ],
+        "opened_threads": [],
+        "second_order": [
+          "No single variable is at a breaking point, but several are trending the wrong way."
+        ]
+      },
+      "decision": {
+        "adherence": 0.75,
+        "advice_id": "full_disclosure",
+        "decider": "Town Manager's Office",
+        "decision_type": "PARTIALLY_FOLLOWED",
+        "deviation": "Adopted the spirit of the disclosure but narrowed its public scope.",
+        "modifications": {},
+        "private_motive": "Wanted the credit for openness without the cost of full exposure.",
+        "public_explanation": "A controlled statement has been issued with mitigation pre-positioned.",
+        "rationale": "The Town Manager's Office adopted the spirit of Full disclosure and emergency conservation order but trimmed the public-facing scope. Media pressure 28, public trust 56.",
+        "resulting_risk": "Controlled framing is brittle if the rumor feed moves first."
+      },
+      "diffs": [
+        {
+          "delta": -2,
+          "new_value": 38,
+          "old_value": 40,
+          "reason": "Advice — Full disclosure and emergency conservation order",
+          "source_type": "advice",
+          "variable": "budget_capacity"
+        },
+        {
+          "delta": 8,
+          "new_value": 70,
+          "old_value": 62,
+          "reason": "Advice — Full disclosure and emergency conservation order",
+          "source_type": "advice",
+          "variable": "information_integrity"
+        },
+        {
+          "delta": -8,
+          "new_value": 26,
+          "old_value": 34,
+          "reason": "Advice — Full disclosure and emergency conservation order",
+          "source_type": "advice",
+          "variable": "legal_exposure"
+        },
+        {
+          "delta": 8,
+          "new_value": 36,
+          "old_value": 28,
+          "reason": "Advice — Full disclosure and emergency conservation order",
+          "source_type": "advice",
+          "variable": "media_pressure"
+        },
+        {
+          "delta": 2,
+          "new_value": 52,
+          "old_value": 50,
+          "reason": "Advice — Full disclosure and emergency conservation order",
+          "source_type": "advice",
+          "variable": "player_reputation"
+        },
+        {
+          "delta": -6,
+          "new_value": 60,
+          "old_value": 66,
+          "reason": "Advice — Full disclosure and emergency conservation order",
+          "source_type": "advice",
+          "variable": "public_order"
+        },
+        {
+          "delta": 4,
+          "new_value": 60,
+          "old_value": 56,
+          "reason": "Advice — Full disclosure and emergency conservation order",
+          "source_type": "advice",
+          "variable": "public_trust"
+        },
+        {
+          "delta": -2,
+          "new_value": 44,
+          "old_value": 46,
+          "reason": "Ambient crisis pressure",
+          "source_type": "ambient",
+          "variable": "water_security"
+        },
+        {
+          "delta": -1,
+          "new_value": 55,
+          "old_value": 56,
+          "reason": "Ambient crisis pressure",
+          "source_type": "ambient",
+          "variable": "hospital_stability"
+        },
+        {
+          "delta": -2,
+          "new_value": 36,
+          "old_value": 38,
+          "reason": "Ambient crisis pressure",
+          "source_type": "ambient",
+          "variable": "budget_capacity"
+        },
+        {
+          "delta": 3,
+          "new_value": 39,
+          "old_value": 36,
+          "reason": "Ambient crisis pressure",
+          "source_type": "ambient",
+          "variable": "media_pressure"
+        },
+        {
+          "delta": 1,
+          "new_value": 53,
+          "old_value": 52,
+          "reason": "Ambient crisis pressure",
+          "source_type": "ambient",
+          "variable": "contractor_dependency"
+        },
+        {
+          "delta": 2,
+          "new_value": 28,
+          "old_value": 26,
+          "reason": "Ambient crisis pressure",
+          "source_type": "ambient",
+          "variable": "legal_exposure"
+        },
+        {
+          "delta": 2,
+          "new_value": 40,
+          "old_value": 38,
+          "reason": "Ambient crisis pressure",
+          "source_type": "ambient",
+          "variable": "school_disruption"
+        },
+        {
+          "delta": -1,
+          "new_value": 49,
+          "old_value": 50,
+          "reason": "Ambient crisis pressure",
+          "source_type": "ambient",
+          "variable": "staff_capacity"
+        }
+      ],
+      "failure_reason": null,
+      "status_after": "ACTIVE",
+      "turn_number": 1
+    }
+  ]
+}

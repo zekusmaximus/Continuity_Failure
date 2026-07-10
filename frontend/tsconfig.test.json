@@ -1,0 +1,20 @@
+{
+  // The production build (`tsc -b`) deliberately compiles only `src`. This
+  // project type-checks the test code and its configs without letting either
+  // leak into the shipped bundle's type graph.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "composite": false,
+    "types": ["vitest/globals", "@testing-library/jest-dom", "node"]
+  },
+  "include": [
+    "src",
+    "tests",
+    "e2e",
+    "vite.config.ts",
+    "vitest.config.ts",
+    "playwright.config.ts"
+  ],
+  "references": []
+}

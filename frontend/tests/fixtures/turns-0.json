@@ -1,0 +1,40 @@
+{
+  "canon": [],
+  "open_threads": [
+    {
+      "id": "thread_disclosure_clock",
+      "status": "open",
+      "summary": "A preliminary sample sits above the advisory threshold; the confirmatory result is pending. Every turn of delay adds legal and narrative risk.",
+      "tags": [
+        "disclosure",
+        "legal",
+        "narrative"
+      ],
+      "title": "Disclosure clock on a preliminary, contested lab result",
+      "turn_opened": 1
+    },
+    {
+      "id": "thread_contractor_leverage",
+      "status": "open",
+      "summary": "Only Marquotte Utilities is certified for the failing valves. Indemnity demands and premium change orders compound dependency.",
+      "tags": [
+        "contractor",
+        "procurement",
+        "dependency"
+      ],
+      "title": "Sole-source contractor leverage over the repair",
+      "turn_opened": 1
+    }
+  ],
+  "summary": {
+    "created_at": "2026-07-10T15:43:03.282955+00:00",
+    "failure_reason": null,
+    "id": "test-campaign",
+    "max_turns": 10,
+    "name": "Northbridge Water Failure",
+    "scenario_id": "northbridge_water_failure",
+    "status": "ACTIVE",
+    "turn_number": 1
+  },
+  "turns": []
+}

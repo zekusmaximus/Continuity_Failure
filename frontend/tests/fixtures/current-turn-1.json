@@ -1,0 +1,628 @@
+{
+  "advice_options": [
+    {
+      "affected_factions": [
+        "town_managers_office",
+        "media_rumor_network",
+        "parent_resident_coalition",
+        "business_alliance"
+      ],
+      "effects": {
+        "budget_capacity": -3,
+        "information_integrity": 10,
+        "legal_exposure": -10,
+        "media_pressure": 10,
+        "player_reputation": 3,
+        "public_order": -8,
+        "public_trust": 5
+      },
+      "expected_benefits": [
+        "Lowest legal exposure; the disclosure-timing liability is discharged.",
+        "Information integrity holds; the record is clean."
+      ],
+      "expected_harms": [
+        "Short-term public-order shock and media amplification.",
+        "Business and school disruption spike before mitigation lands."
+      ],
+      "id": "full_disclosure",
+      "label": "Full disclosure and emergency conservation order",
+      "legal_risk": 15,
+      "operational_risk": 45,
+      "operational_steps": [
+        "Transmit the preliminary result and response timeline to the state liaison in writing.",
+        "Issue the conservation order with separate hospital and school operating instructions.",
+        "Publish the source report, known uncertainties, and the next verification deadline together."
+      ],
+      "political_risk": 70,
+      "rationale": "Minimizes legal exposure and protects information integrity.",
+      "recommendation": "Release the preliminary result with a conservation order, notify the state agency in writing, and publish the response timeline.",
+      "summary": "Publish the findings, issue a conservation order, and open the record.",
+      "tags": [
+        "disclosure"
+      ],
+      "title": "",
+      "type": "FULL_DISCLOSURE"
+    },
+    {
+      "affected_factions": [
+        "town_managers_office",
+        "hospital",
+        "parent_resident_coalition",
+        "media_rumor_network"
+      ],
+      "effects": {
+        "budget_capacity": -3,
+        "hospital_stability": 3,
+        "information_integrity": 6,
+        "media_pressure": 5,
+        "public_order": -4,
+        "public_trust": 2,
+        "school_disruption": -4
+      },
+      "expected_benefits": [
+        "Trust and information integrity both improve modestly.",
+        "Hospital and schools are buffered before the public learns."
+      ],
+      "expected_harms": [
+        "Vulnerable to a leak narrative if the rumor feed moves first.",
+        "Spends budget and staff on mitigation that may look precautionary."
+      ],
+      "id": "controlled_disclosure",
+      "label": "Controlled disclosure with hospital and school mitigation",
+      "legal_risk": 35,
+      "operational_risk": 35,
+      "operational_steps": [
+        "Brief the state liaison, hospital, and superintendent before the public statement.",
+        "Pre-position clinical water and school sanitation contingencies before release.",
+        "Publish a measured statement that names the uncertainty and the next verification deadline."
+      ],
+      "political_risk": 45,
+      "rationale": "Balanced: protects trust without triggering panic.",
+      "recommendation": "Issue a measured public statement, pre-position hospital and school mitigation, and brief the state liaison before press runs the story.",
+      "summary": "Release a measured statement while pre-positioning mitigation.",
+      "tags": [
+        "disclosure"
+      ],
+      "title": "",
+      "type": "CONTROLLED_DISCLOSURE"
+    },
+    {
+      "affected_factions": [
+        "council_opposition",
+        "media_rumor_network",
+        "parent_resident_coalition"
+      ],
+      "effects": {
+        "information_integrity": -10,
+        "legal_exposure": 8,
+        "media_pressure": 5,
+        "public_order": 4,
+        "public_trust": -8
+      },
+      "expected_benefits": [
+        "Short-term public order is preserved.",
+        "Buys time for contractor repair sequencing."
+      ],
+      "expected_harms": [
+        "Disclosure-timing liability builds sharply.",
+        "A leak converts the delay into a concealment narrative."
+      ],
+      "id": "delay_disclosure",
+      "label": "Delay public disclosure pending confirmatory testing",
+      "legal_risk": 85,
+      "operational_risk": 25,
+      "operational_steps": [
+        "Document the basis and expiration time for withholding the preliminary result.",
+        "Continue quiet hospital, school, and pressure-zone mitigation during the wait.",
+        "Prepare a release package that can be issued immediately if the result leaks or confirms."
+      ],
+      "political_risk": 60,
+      "rationale": "Preserves short-term order and contractor bandwidth.",
+      "recommendation": "Wait for the confirmatory second-lab result before any public statement; continue quiet mitigation in the meantime.",
+      "summary": "Hold the public line while awaiting second-lab confirmation.",
+      "tags": [
+        "delay"
+      ],
+      "title": "",
+      "type": "DELAY"
+    },
+    {
+      "affected_factions": [
+        "state_liaison",
+        "council_majority",
+        "town_managers_office"
+      ],
+      "effects": {
+        "budget_capacity": 3,
+        "player_shadow_authority": 3,
+        "public_trust": -3,
+        "state_oversight_risk": 12,
+        "water_security": 12
+      },
+      "expected_benefits": [
+        "Fastest material improvement to water security.",
+        "Budget pressure eases as state resources arrive."
+      ],
+      "expected_harms": [
+        "Raises the odds of a formal oversight designation.",
+        "Politically costly; the majority bloc resists outside control."
+      ],
+      "id": "state_support",
+      "label": "Request state emergency support immediately",
+      "legal_risk": 30,
+      "operational_risk": 20,
+      "operational_steps": [
+        "Send a written request identifying tanker, operator, and logistics requirements.",
+        "Record why local capacity cannot meet the current operational need.",
+        "Negotiate a time-bounded reporting and authority framework before accepting resources."
+      ],
+      "political_risk": 65,
+      "rationale": "Fastest path to water security, at a political cost.",
+      "recommendation": "Formally request state emergency assistance for water, logistics, and operators; document the operational necessity.",
+      "summary": "Invoke state emergency assistance for water and logistics.",
+      "tags": [
+        "state_support"
+      ],
+      "title": "",
+      "type": "STATE_AID_REQUEST"
+    },
+    {
+      "affected_factions": [
+        "utility_contractor",
+        "water_authority",
+        "council_majority"
+      ],
+      "effects": {
+        "budget_capacity": 4,
+        "contractor_dependency": 10,
+        "legal_exposure": 2,
+        "public_trust": -2,
+        "water_security": 8
+      },
+      "expected_benefits": [
+        "Water security improves without public escalation.",
+        "Budget terms improve if the town credibly threatens alternatives."
+      ],
+      "expected_harms": [
+        "Deepens structural dependency on a sole-source firm.",
+        "Little leverage if the contractor calls the bluff."
+      ],
+      "id": "contractor_pressure",
+      "label": "Pressure the contractor privately while preparing a statement",
+      "legal_risk": 40,
+      "operational_risk": 55,
+      "operational_steps": [
+        "Set a written repair milestone and crew-staging deadline for the contractor.",
+        "Document the town's alternatives, indemnity limits, and walk-away conditions.",
+        "Prepare a public procurement statement for release if the revised timeline is refused."
+      ],
+      "political_risk": 35,
+      "rationale": "Protects budget and water but deepens dependency.",
+      "recommendation": "Negotiate a faster emergency timeline privately, with a contingency statement ready if the squeeze fails.",
+      "summary": "Force a faster repair timeline without public confrontation.",
+      "tags": [
+        "contractor"
+      ],
+      "title": "",
+      "type": "CONTRACTOR_PRESSURE"
+    },
+    {
+      "affected_factions": [
+        "hospital",
+        "water_authority",
+        "state_liaison",
+        "council_majority"
+      ],
+      "effects": {
+        "budget_capacity": -5,
+        "hospital_stability": 6,
+        "public_trust": 2,
+        "state_oversight_risk": 3,
+        "water_security": 6
+      },
+      "expected_benefits": [
+        "Hospital and water resilience both improve cooperatively.",
+        "Public trust benefits from visible regional coordination."
+      ],
+      "expected_harms": [
+        "Costs budget and political capital.",
+        "Slightly raises state awareness of the failure."
+      ],
+      "id": "mutual_aid",
+      "label": "Convene regional mutual aid before public escalation",
+      "legal_risk": 25,
+      "operational_risk": 40,
+      "operational_steps": [
+        "Activate the regional compact with named water, staffing, and hospital requests.",
+        "Assign one municipal coordinator to reconcile incoming aid with local operations.",
+        "Publish the scope and duration of mutual aid without overstating system stability."
+      ],
+      "political_risk": 40,
+      "rationale": "Strengthens hospital and water resilience collaboratively.",
+      "recommendation": "Activate the regional mutual-aid compact for neighboring utilities and hospital resupply before the crisis goes fully public.",
+      "summary": "Pull neighboring utilities and regional hospitals into the response.",
+      "tags": [
+        "mutual_aid"
+      ],
+      "title": "",
+      "type": "MUTUAL_AID"
+    }
+  ],
+  "client_call": {
+    "ask": "How should we handle disclosure and conservation before the second lab returns?",
+    "attached_document_ids": [
+      "doc_preliminary_lab_report",
+      "doc_town_manager_transcript",
+      "doc_council_session_excerpt"
+    ],
+    "caller": "Town Manager's Office",
+    "caller_faction_id": "town_managers_office",
+    "caller_role": "Mara Velez, Town Manager",
+    "crisis_id": null,
+    "id": "call_01",
+    "immediate_risks": [
+      "Disclosure-timing liability accrues from the moment of awareness.",
+      "A leak before any statement locks in a concealment frame."
+    ],
+    "known_facts": [
+      "Preliminary sample sits ~1.3x the advisory threshold; flagged inconclusive.",
+      "South-zone pressure dropped 12% overnight.",
+      "Confirmatory second-lab result is pending."
+    ],
+    "private_pressure": "Council majority wants a 'maintenance acceleration' frame, not a contamination event, until confirmation.",
+    "public_exposure": "private",
+    "summary": "Ambiguous preliminary contamination sample and a 12% overnight pressure drop, hours before an emergency council session.",
+    "time_horizon": "72 hours",
+    "turn": 1,
+    "unknown_facts": [
+      "Whether the indicator elevation is transient (heat-stressed source water) or real.",
+      "Whether the pressure drop is a main failure or a distribution anomaly."
+    ],
+    "urgency": "critical"
+  },
+  "documents": [
+    {
+      "content": "SAMPLE: NB-WS-SZ-0141 (south pressure zone intake).\nRESULT: Indicator parameter 1.3x advisory threshold (preliminary).\nFLAG: Single-draw, field-chain custody; recommend confirmatory second-lab draw before any regulatory notice.\nNOTE: Result is suggestive, not confirmatory. Heat-stressed source water may produce transient indicator elevations.",
+      "id": "doc_preliminary_lab_report",
+      "public_status": "private",
+      "reliability": "contested",
+      "source": "State-certified contract laboratory",
+      "summary": "A single preliminary sample flags a possible contaminant just above the advisory threshold; the lab flags the result as preliminary and inconclusive pending confirmation.",
+      "tags": [
+        "contamination",
+        "preliminary",
+        "unverified"
+      ],
+      "title": "Preliminary Water Quality Lab Report",
+      "turn_number": 1,
+      "type": "LAB_REPORT"
+    },
+    {
+      "content": "M. VELEZ (Town Manager): \"Pressure dropped twelve percent overnight in the south zone. The lab flagged a preliminary result. I have an emergency council session in the morning. I need to know what I can say and what I must say before the second lab comes back.\"\n[Consultant retained on a 30-day emergency stabilization engagement.]",
+      "id": "doc_town_manager_transcript",
+      "public_status": "private",
+      "reliability": "high",
+      "source": "Town Manager's Office",
+      "summary": "Verbatim opening call from the Town Manager retaining the engagement ahead of an emergency council session.",
+      "tags": [
+        "retainer",
+        "disclosure_decision"
+      ],
+      "title": "Town Manager Call Transcript",
+      "turn_number": 1,
+      "type": "CALL_TRANSCRIPT"
+    },
+    {
+      "content": "[Executive session, sealed pending vote.]\nMAJORITY COUNSEL: \"Frame this as accelerating deferred maintenance, not a contamination event, until the second lab returns.\"\nOPPOSITION (on record): \"Note for the record: we disagree with framing before confirmation either way.\"\nACTION: Manager authorized to pre-position mitigation; disclosure posture deferred to consultant advice.",
+      "id": "doc_council_session_excerpt",
+      "public_status": "sealed",
+      "reliability": "high",
+      "source": "Northbridge Town Council (executive session)",
+      "summary": "Closed executive-session excerpt: the majority wants the issue framed as a maintenance acceleration, not a contamination event.",
+      "tags": [
+        "sealed",
+        "framing",
+        "political"
+      ],
+      "title": "Council Executive Session Excerpt",
+      "turn_number": 1,
+      "type": "MEETING_MINUTES"
+    }
+  ],
+  "last_turn": null,
+  "open_threads": [
+    {
+      "id": "thread_disclosure_clock",
+      "status": "open",
+      "summary": "A preliminary sample sits above the advisory threshold; the confirmatory result is pending. Every turn of delay adds legal and narrative risk.",
+      "tags": [
+        "disclosure",
+        "legal",
+        "narrative"
+      ],
+      "title": "Disclosure clock on a preliminary, contested lab result",
+      "turn_opened": 1
+    },
+    {
+      "id": "thread_contractor_leverage",
+      "status": "open",
+      "summary": "Only Marquotte Utilities is certified for the failing valves. Indemnity demands and premium change orders compound dependency.",
+      "tags": [
+        "contractor",
+        "procurement",
+        "dependency"
+      ],
+      "title": "Sole-source contractor leverage over the repair",
+      "turn_opened": 1
+    }
+  ],
+  "summary": {
+    "created_at": "2026-07-10T15:43:03.282955+00:00",
+    "failure_reason": null,
+    "id": "test-campaign",
+    "max_turns": 10,
+    "name": "Northbridge Water Failure",
+    "scenario_id": "northbridge_water_failure",
+    "status": "ACTIVE",
+    "turn_number": 1
+  },
+  "system_status": {
+    "ai_available": false,
+    "comms": 72,
+    "data_freshness": 56,
+    "model_status": "AI assist present — off by default (returns system drafts)",
+    "power": 72,
+    "staff_capacity": 50
+  },
+  "world_state": {
+    "active_crisis": {
+      "active": true,
+      "description": "Heat stress and deferred maintenance have destabilized the municipal water system. A preliminary contamination sample is ambiguous, system pressure is falling in the south zone, hospital and school operations depend on stable supply, and the only qualified repair contractor holds outsized leverage over the town. Each decision narrows the next.",
+      "id": "northbridge_water_crisis",
+      "name": "Northbridge Water System Failure",
+      "severity": 54,
+      "type": "WATER_FAILURE"
+    },
+    "factions": [
+      {
+        "alignment": "authority",
+        "current_pressure": 62,
+        "description": "Appointed executive running day-to-day municipal operations.",
+        "id": "town_managers_office",
+        "influence": 78,
+        "name": "Town Manager's Office",
+        "posture": "decisive",
+        "private_incentive": "Keep a stabilization record that survives a council vote and a state review.",
+        "public_position": "Treat the situation as an acceleration of deferred maintenance.",
+        "red_lines": [
+          "A state receivership or oversight designation.",
+          "Any documented public falsehood traceable to the Manager's office."
+        ],
+        "risk_tolerance": 45,
+        "tags": [
+          "decision_authority",
+          "engagement_holder"
+        ],
+        "trust_in_player": 58,
+        "type": "EXECUTIVE"
+      },
+      {
+        "alignment": "authority",
+        "current_pressure": 55,
+        "description": "Governing bloc controlling appropriations and emergency authorities.",
+        "id": "council_majority",
+        "influence": 70,
+        "name": "Town Council Majority",
+        "posture": "confident",
+        "private_incentive": "Authorize enough to look decisive without owning the political risk.",
+        "public_position": "Support the Manager while protecting the majority bloc's record.",
+        "red_lines": [
+          "Emergency appropriations without a recorded vote.",
+          "Public blame settling on the majority bloc."
+        ],
+        "risk_tolerance": 35,
+        "tags": [
+          "appropriations",
+          "vote"
+        ],
+        "trust_in_player": 50,
+        "type": "LEGISLATIVE"
+      },
+      {
+        "alignment": "opposition",
+        "current_pressure": 58,
+        "description": "Minority bloc poised to capitalize on any misstep.",
+        "id": "council_opposition",
+        "influence": 45,
+        "name": "Town Council Opposition",
+        "posture": "circumspect",
+        "private_incentive": "Build a record that frames the majority as evasive.",
+        "public_position": "Demand transparency and a full public record.",
+        "red_lines": [
+          "Closed-session approvals they cannot scrutinize.",
+          "Being the last to see internal memos."
+        ],
+        "risk_tolerance": 60,
+        "tags": [
+          "oversight",
+          "hearing_threat"
+        ],
+        "trust_in_player": 38,
+        "type": "LEGISLATIVE"
+      },
+      {
+        "alignment": "service",
+        "current_pressure": 64,
+        "description": "Operators of the treatment plant, mains, and pressure system.",
+        "id": "water_authority",
+        "influence": 60,
+        "name": "Public Works / Water Authority",
+        "posture": "stretched",
+        "private_incentive": "Avoid being named as the cause of the failure.",
+        "public_position": "We can hold pressure if we get staff and contractor support.",
+        "red_lines": [
+          "Liability for contamination they did not introduce.",
+          "Operating beyond certified staffing."
+        ],
+        "risk_tolerance": 40,
+        "tags": [
+          "operator",
+          "staff_constrained"
+        ],
+        "trust_in_player": 55,
+        "type": "UTILITY"
+      },
+      {
+        "alignment": "service",
+        "current_pressure": 50,
+        "description": "Regional acute-care facility dependent on municipal water.",
+        "id": "hospital",
+        "influence": 55,
+        "name": "Northbridge Hospital",
+        "posture": "watchful",
+        "private_incentive": "Secure priority allocation without becoming the public face of the crisis.",
+        "public_position": "Protect clinical operations, especially dialysis and sterilization.",
+        "red_lines": [
+          "An unplanned loss of water for dialysis or sterilization.",
+          "Being blamed for an elective-cancellation cascade."
+        ],
+        "risk_tolerance": 30,
+        "tags": [
+          "critical_facility",
+          "priority_water"
+        ],
+        "trust_in_player": 60,
+        "type": "HOSPITAL"
+      },
+      {
+        "alignment": "neutral",
+        "current_pressure": 66,
+        "description": "Organized residents tracking school and household risk.",
+        "id": "parent_resident_coalition",
+        "influence": 48,
+        "name": "Parent and Resident Coalition",
+        "posture": "alarmed",
+        "private_incentive": "Force visible, on-the-record action before pressure drops further.",
+        "public_position": "Close or protect the schools; tell us the truth about the water.",
+        "red_lines": [
+          "Schools staying open under unsafe pressure.",
+          "Residents being the last to learn."
+        ],
+        "risk_tolerance": 55,
+        "tags": [
+          "school_pressure",
+          "social_amplification"
+        ],
+        "trust_in_player": 44,
+        "type": "RESIDENT_GROUP"
+      },
+      {
+        "alignment": "neutral",
+        "current_pressure": 44,
+        "description": "Employers and retailers sensitive to disruption and reputation.",
+        "id": "business_alliance",
+        "influence": 42,
+        "name": "Local Business Alliance",
+        "posture": "steady",
+        "private_incentive": "Avoid a contaminated-town reputation that lingers past the crisis.",
+        "public_position": "Keep the town open for business; compensate mandatory closures.",
+        "red_lines": [
+          "Uncompensated mandatory closures.",
+          "A public 'contamination' label they cannot contest."
+        ],
+        "risk_tolerance": 50,
+        "tags": [
+          "economic",
+          "reputation_sensitive"
+        ],
+        "trust_in_player": 46,
+        "type": "BUSINESS"
+      },
+      {
+        "alignment": "authority",
+        "current_pressure": 48,
+        "description": "State agency observer with authority to trigger oversight.",
+        "id": "state_liaison",
+        "influence": 50,
+        "name": "State Emergency Management Liaison",
+        "posture": "advisory",
+        "private_incentive": "Avoid a visible local failure on the agency's watch.",
+        "public_position": "Offer resources; expect timely notification and documentation.",
+        "red_lines": [
+          "Being notified after the press.",
+          "Quiet local deals that foreclose state response options."
+        ],
+        "risk_tolerance": 42,
+        "tags": [
+          "state_oversight",
+          "intervention_trigger"
+        ],
+        "trust_in_player": 52,
+        "type": "STATE_ACTOR"
+      },
+      {
+        "alignment": "service",
+        "current_pressure": 60,
+        "description": "Sole qualified firm able to repair the failing system.",
+        "id": "utility_contractor",
+        "influence": 58,
+        "name": "Utility Contractor",
+        "posture": "cooperative",
+        "private_incentive": "Lock in premium rates and indemnity while leverage is high.",
+        "public_position": "We can deliver if the town underwrites the emergency scope.",
+        "red_lines": [
+          "Indemnification gaps on emergency change orders.",
+          "A competitive procurement that sidelines the firm."
+        ],
+        "risk_tolerance": 65,
+        "tags": [
+          "sole_source",
+          "leverage"
+        ],
+        "trust_in_player": 40,
+        "type": "CONTRACTOR"
+      },
+      {
+        "alignment": "neutral",
+        "current_pressure": 52,
+        "description": "Patchwork of outlets and social channels amplifying uncertainty.",
+        "id": "media_rumor_network",
+        "influence": 40,
+        "name": "Local Media / Rumor Network",
+        "posture": "circulating",
+        "private_incentive": "A leak or contradiction is the most valuable story available.",
+        "public_position": "Report what we can verify; chase what we can't.",
+        "red_lines": [
+          "A clean, well-managed story with no seams to pull."
+        ],
+        "risk_tolerance": 70,
+        "tags": [
+          "narrative",
+          "amplification"
+        ],
+        "trust_in_player": 30,
+        "type": "MEDIA"
+      }
+    ],
+    "last_verified": "Turn 1 · Operational snapshot (deterministic)",
+    "turn_number": 1,
+    "variables": {
+      "budget_capacity": 40,
+      "contractor_dependency": 52,
+      "hospital_stability": 56,
+      "information_integrity": 62,
+      "legal_exposure": 34,
+      "media_pressure": 28,
+      "player_perceived_neutrality": 60,
+      "player_reputation": 50,
+      "player_shadow_authority": 18,
+      "power_stability": 72,
+      "public_order": 66,
+      "public_trust": 56,
+      "school_disruption": 38,
+      "staff_capacity": 50,
+      "state_oversight_risk": 26,
+      "water_security": 46
+    }
+  }
+}

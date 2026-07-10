@@ -38,10 +38,16 @@ export default function CaseFile({ open, onClose, campaignId, current, history }
   if (!open) return null;
 
   return (
-    <div className="cd-drawer-overlay" role="dialog" aria-modal="true" onClick={onClose}>
+    <div
+      className="cd-drawer-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="cd-case-file-title"
+      onClick={onClose}
+    >
       <aside className="cd-drawer" onClick={(e) => e.stopPropagation()}>
         <header className="cd-drawer-head">
-          <h2>Case File</h2>
+          <h2 id="cd-case-file-title">Case File</h2>
           <button className="cd-btn cd-btn-ghost cd-modal-close" onClick={onClose} aria-label="Close">
             ✕
           </button>

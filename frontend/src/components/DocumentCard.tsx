@@ -17,11 +17,13 @@ interface Props {
 
 export default function DocumentCard({ doc, expanded, onToggle, highlighted }: Props) {
   return (
-    <li
-      className={`cd-doc ${highlighted ? "cd-doc-hl" : ""}`}
-      aria-expanded={expanded}
-    >
-      <button className="cd-doc-head" onClick={() => onToggle(doc.id)}>
+    <li className={`cd-doc ${highlighted ? "cd-doc-hl" : ""}`}>
+      {/* aria-expanded belongs on the control that toggles, not on the listitem. */}
+      <button
+        className="cd-doc-head"
+        aria-expanded={expanded}
+        onClick={() => onToggle(doc.id)}
+      >
         <div className="cd-doc-head-main">
           <span className="cd-doc-type">{titleCase(doc.type)}</span>
           <span className="cd-doc-title">{doc.title}</span>

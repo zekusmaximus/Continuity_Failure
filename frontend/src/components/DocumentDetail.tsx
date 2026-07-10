@@ -28,12 +28,18 @@ export default function DocumentDetail({ doc, onClose }: Props) {
   if (!doc) return null;
 
   return (
-    <div className="cd-modal-overlay" role="dialog" aria-modal="true" onClick={onClose}>
+    <div
+      className="cd-modal-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="cd-doc-detail-title"
+      onClick={onClose}
+    >
       <div className="cd-modal cd-modal-doc" onClick={(e) => e.stopPropagation()}>
         <header className="cd-modal-head">
           <div>
             <span className="cd-doc-type">{titleCase(doc.type)}</span>
-            <h2>{doc.title}</h2>
+            <h2 id="cd-doc-detail-title">{doc.title}</h2>
             <span className="cd-verified">— {doc.source}</span>
           </div>
           <button className="cd-btn cd-btn-ghost cd-modal-close" onClick={onClose} aria-label="Close">
