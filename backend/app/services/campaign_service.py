@@ -17,11 +17,21 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import asdict
+from datetime import datetime, timezone
 from typing import Optional
+import uuid
 
 from engine import dossier as dossier_engine
 from engine import seed_data, turn as turn_engine
-from engine.models import Campaign
+from engine.models import (
+    AdviceMemo,
+    Campaign,
+    FactClassification,
+    MemoProvenance,
+    MemoRevision,
+    MemoStatus,
+    SentMemoSnapshot,
+)
 from app.ai import fallbacks
 from app.ai.logging import get_run_store
 from app.ai.provider import get_provider
@@ -172,18 +182,113 @@ def get_current(campaign_id: str) -> Optional[schemas.CurrentTurnModel]:
     )
 
 
-def request_fingerprint(advice_id: str, expected_turn: int) -> str:
+def request_fingerprint(
+    advice_id: str,
+    expected_turn: int,
+    memo_id: Optional[str] = None,
+    memo_revision: Optional[int] = None,
+) -> str:
     """Stable digest of everything a submission asks the engine to do.
 
     Reusing an idempotency key with a different fingerprint is a client bug, so
     it must be a conflict rather than a silent replay of the wrong turn.
     """
     canonical = json.dumps(
-        {"advice_id": advice_id, "expected_turn": expected_turn},
+        {
+            "advice_id": advice_id,
+            "expected_turn": expected_turn,
+            "memo_id": memo_id,
+            "memo_revision": memo_revision,
+        },
         sort_keys=True,
         separators=(",", ":"),
     )
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def _utc_now() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _content_digest(content: str) -> str:
+    return hashlib.sha256(content.encode("utf-8")).hexdigest()
+
+
+def _memo_content_text(draft: MemoDraft) -> str:
+    """Render validated structured output into the editable plain-text record."""
+    sections = [
+        ("Recommendation", [draft.recommendation]),
+        ("Rationale", [draft.rationale]),
+        ("Operational steps", draft.operational_steps),
+        ("Communications", [draft.communications]),
+        ("Likely opposition", draft.likely_opposition),
+        ("Second-order risks", draft.second_order_risks),
+        ("Fallback plan", [draft.fallback_plan]),
+    ]
+    lines: list[str] = []
+    for heading, items in sections:
+        lines.append(heading.upper())
+        lines.extend(
+            item if len(items) == 1 else f"- {item}"
+            for item in items
+        )
+        lines.append("")
+    return "\n".join(lines).strip()
+
+
+def _memo_model(memo: AdviceMemo) -> schemas.AdviceMemoModel:
+    return schemas.AdviceMemoModel.model_validate(asdict(memo))
+
+
+def _find_memo(campaign: Campaign, memo_id: str) -> AdviceMemo:
+    memo = next((item for item in campaign.advice_memos if item.id == memo_id), None)
+    if memo is None or memo.campaign_id != campaign.id:
+        raise errors.MemoNotFound(memo_id)
+    return memo
+
+
+def _new_memo(
+    campaign: Campaign,
+    *,
+    name: str,
+    content: str,
+    advice_id: str,
+    author: str,
+    source: str,
+    provenance: MemoProvenance,
+) -> AdviceMemo:
+    now = _utc_now()
+    digest = _content_digest(content)
+    memo = AdviceMemo(
+        id=f"memo_{uuid.uuid4().hex}",
+        campaign_id=campaign.id,
+        status=MemoStatus.DRAFT,
+        name=name,
+        content=content,
+        revision=1,
+        created_at=now,
+        updated_at=now,
+        author=author,
+        source=source,
+        classification=FactClassification.PROPOSED,
+        provenance=provenance,
+        turn_number=campaign.turn_number,
+        call_id=campaign.current_call().id if campaign.current_call() else None,
+        advice_id=advice_id,
+        revisions=[
+            MemoRevision(
+                revision=1,
+                name=name,
+                content=content,
+                author=author,
+                source=source,
+                created_at=now,
+                content_digest=digest,
+            )
+        ],
+    )
+    campaign.advice_memos.append(memo)
+    return memo
 
 
 class ResolvedTurn:
@@ -202,6 +307,8 @@ def submit_advice(
     *,
     expected_turn: int,
     idempotency_key: str,
+    memo_id: Optional[str] = None,
+    memo_revision: Optional[int] = None,
 ) -> ResolvedTurn:
     """Resolve one turn atomically, at most once per (campaign, key).
 
@@ -210,7 +317,9 @@ def submit_advice(
     instead of tripping the now-stale revision check. Only a key that has never
     resolved reaches the terminal and revision guards.
     """
-    fingerprint = request_fingerprint(advice_id, expected_turn)
+    fingerprint = request_fingerprint(
+        advice_id, expected_turn, memo_id, memo_revision
+    )
 
     with get_repository().transaction() as active:
         campaign = active.get_campaign(campaign_id)
@@ -240,11 +349,84 @@ def submit_advice(
             bind_log_fields(idempotency=IdempotencyOutcome.STALE_TURN)
             raise errors.StaleTurn(expected_turn, campaign.turn_number)
 
+        option = next(
+            (item for item in campaign.available_advice() if item.id == advice_id),
+            None,
+        )
+        if option is None:
+            bind_log_fields(idempotency=IdempotencyOutcome.REJECTED)
+            raise errors.UnknownAdvice(advice_id)
+
+        # Public API callers always attach an explicit memo. The optional
+        # branch preserves direct service compatibility by materializing the
+        # same deterministic system memo; every resolved turn still has an
+        # exact sent artifact.
+        if memo_id is None:
+            payload = fallbacks.build_memo_input(
+                option, campaign.current_call(), campaign.world_state.factions
+            )
+            generated = fallbacks.memo_fallback(payload)
+            memo = _new_memo(
+                campaign,
+                name=f"Advice of record — {option.title or option.label}",
+                content=_memo_content_text(generated),
+                advice_id=advice_id,
+                author="Continuity Desk",
+                source="system",
+                provenance=MemoProvenance(
+                    workflow="deterministic_fallback",
+                    model_name="disabled",
+                    provider="disabled",
+                    validation_status="fallback",
+                    fallback_used=True,
+                ),
+            )
+        else:
+            memo = _find_memo(campaign, memo_id)
+            if memo.status != MemoStatus.DRAFT:
+                raise errors.ImmutableMemo(memo.id)
+            if memo_revision != memo.revision:
+                raise errors.StaleMemoRevision(memo_revision or 0, memo.revision)
+            if memo.advice_id is not None and memo.advice_id != advice_id:
+                raise errors.MemoAdviceMismatch()
+
+        sent_at = _utc_now()
+        sent_snapshot = SentMemoSnapshot(
+            memo_id=memo.id,
+            revision=memo.revision,
+            name=memo.name,
+            content=memo.content,
+            content_digest=_content_digest(memo.content),
+            sent_at=sent_at,
+            author=memo.author,
+            source=memo.source,
+            classification=memo.classification,
+            provenance=memo.provenance,
+        )
+
         try:
             result = turn_engine.advance_turn(campaign, advice_id)
         except turn_engine.UnknownAdviceOption as exc:
             bind_log_fields(idempotency=IdempotencyOutcome.REJECTED)
             raise errors.UnknownAdvice(advice_id) from exc
+
+        # Attach audit references only after deterministic resolution. Memo
+        # prose is never visible to rules, diffs, decision type, or canon text.
+        result.sent_memo = sent_snapshot
+        result.decision.memo_id = memo.id
+        result.decision.memo_revision = memo.revision
+        result.canon_entry.memo_id = memo.id
+
+        memo.status = MemoStatus.SENT
+        memo.turn_number = result.turn_number
+        memo.call_id = memo.call_id or (
+            campaign.client_calls.get(result.turn_number).id
+            if campaign.client_calls.get(result.turn_number)
+            else None
+        )
+        memo.advice_id = advice_id
+        memo.updated_at = sent_at
+        memo.sent_snapshot = sent_snapshot
 
         response = schemas.TurnResultModel.model_validate(asdict(result))
         active.save_campaign(campaign, snapshot_turn=result.turn_number)
@@ -295,6 +477,125 @@ def get_dossier(campaign_id: str) -> Optional[schemas.DossierModel]:
     )
 
 
+def list_memos(campaign_id: str) -> Optional[list[schemas.AdviceMemoModel]]:
+    campaign = _require_campaign_or_none(campaign_id)
+    if campaign is None:
+        return None
+    return [_memo_model(memo) for memo in campaign.advice_memos]
+
+
+def create_memo(
+    campaign_id: str,
+    *,
+    creation_mode: str,
+    advice_id: str,
+    name: str,
+    content: Optional[str] = None,
+) -> schemas.AdviceMemoModel:
+    """Create a persistent proposed memo without touching WorldState."""
+    artifact = None
+    if creation_mode == "ai":
+        campaign = _require_campaign(campaign_id)
+        option = next(
+            (item for item in campaign.available_advice() if item.id == advice_id),
+            None,
+        )
+        if option is None:
+            raise errors.UnknownAdvice(advice_id)
+        payload = fallbacks.build_memo_input(
+            option, campaign.current_call(), campaign.world_state.factions
+        )
+        artifact = run_artifact(
+            prompt_name="memo_drafter",
+            prompt_version="v1",
+            input_payload=payload,
+            schema=MemoDraft,
+            fallback=fallbacks.memo_fallback,
+            input_summary=f"turn {campaign.turn_number}: {option.label}",
+            campaign_id=campaign.id,
+            turn_number=campaign.turn_number,
+        )
+        content = _memo_content_text(artifact.content)
+
+    with get_repository().transaction() as active:
+        campaign = active.get_campaign(campaign_id)
+        if campaign is None:
+            raise errors.CampaignNotFound(campaign_id)
+        if not any(item.id == advice_id for item in campaign.available_advice()):
+            raise errors.UnknownAdvice(advice_id)
+
+        if artifact is None:
+            provenance = MemoProvenance(workflow="manual", fallback_used=False)
+            source = "player"
+            author = "Player consultant"
+        else:
+            provenance = MemoProvenance(
+                workflow=(
+                    "ai_assisted" if artifact.from_model else "deterministic_fallback"
+                ),
+                model_run_id=artifact.run.id,
+                prompt_version=artifact.run.prompt_version,
+                model_name=artifact.run.model_name,
+                provider=artifact.run.provider,
+                validation_status=artifact.run.validation_status,
+                fallback_used=not artifact.from_model,
+            )
+            source = "ai" if artifact.from_model else "system"
+            author = "AI drafting assistant" if artifact.from_model else "Continuity Desk"
+
+        memo = _new_memo(
+            campaign,
+            name=name,
+            content=content or "",
+            advice_id=advice_id,
+            author=author,
+            source=source,
+            provenance=provenance,
+        )
+        active.save_campaign(campaign)
+    return _memo_model(memo)
+
+
+def update_memo(
+    campaign_id: str,
+    memo_id: str,
+    *,
+    expected_revision: int,
+    name: str,
+    content: str,
+) -> schemas.AdviceMemoModel:
+    """Append a player-authored revision to an editable draft."""
+    with get_repository().transaction() as active:
+        campaign = active.get_campaign(campaign_id)
+        if campaign is None:
+            raise errors.CampaignNotFound(campaign_id)
+        memo = _find_memo(campaign, memo_id)
+        if memo.status != MemoStatus.DRAFT:
+            raise errors.ImmutableMemo(memo.id)
+        if memo.revision != expected_revision:
+            raise errors.StaleMemoRevision(expected_revision, memo.revision)
+        now = _utc_now()
+        memo.revision += 1
+        memo.name = name
+        memo.content = content
+        memo.updated_at = now
+        memo.author = "Player consultant"
+        memo.source = "player"
+        memo.revisions.append(
+            MemoRevision(
+                revision=memo.revision,
+                name=name,
+                content=content,
+                author=memo.author,
+                source=memo.source,
+                created_at=now,
+                content_digest=_content_digest(content),
+            )
+        )
+        active.save_campaign(campaign)
+    return _memo_model(memo)
+
+
 def draft_memo(
     campaign_id: str, advice_id: str
 ) -> Optional[schemas.MemoDraftModel]:
@@ -334,6 +635,12 @@ def draft_memo(
         status=artifact.status,
         source="ai" if artifact.from_model else "system",
         draft=schemas.MemoContentModel(**artifact.content.model_dump()),
+        model_run_id=artifact.run.id,
+        prompt_version=artifact.run.prompt_version,
+        model_name=artifact.run.model_name,
+        provider=artifact.run.provider,
+        validation_status=artifact.run.validation_status,
+        fallback_used=not artifact.from_model,
     )
 
 
@@ -344,6 +651,7 @@ def get_model_runs(campaign_id: str) -> Optional[list[schemas.ModelRunModel]]:
         return None
     return [
         schemas.ModelRunModel(
+            id=r.id,
             prompt_name=r.prompt_name,
             prompt_version=r.prompt_version,
             model_name=r.model_name,
@@ -352,6 +660,7 @@ def get_model_runs(campaign_id: str) -> Optional[list[schemas.ModelRunModel]]:
             retry_count=r.retry_count,
             latency_ms=r.latency_ms,
             turn_number=r.turn_number,
+            provider=r.provider,
         )
         for r in get_run_store().for_campaign(campaign_id)
     ]

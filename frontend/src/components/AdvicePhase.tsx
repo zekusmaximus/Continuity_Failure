@@ -1,4 +1,4 @@
-import type { AdviceOption, ClientCall, Faction, MemoDraft } from "../api/client";
+import type { AdviceMemo, AdviceOption, ClientCall, Faction } from "../api/client";
 import { levelClass, titleCase, VARIABLE_META } from "../domain";
 import MemoDraftPanel from "./MemoDraftPanel";
 
@@ -8,10 +8,13 @@ interface Props {
   factions: Faction[];
   selected: string | null;
   onSelect: (id: string) => void;
-  memo: MemoDraft | null;
+  memo: AdviceMemo | null;
   memoLoading: boolean;
+  memoSaving: boolean;
   memoError: string | null;
   onDraftMemo: () => void;
+  onCreateManualMemo: () => void;
+  onSaveMemo: (name: string, content: string) => void;
   readOnly?: boolean;
 }
 
@@ -198,8 +201,11 @@ export default function AdvicePhase({
   onSelect,
   memo,
   memoLoading,
+  memoSaving,
   memoError,
   onDraftMemo,
+  onCreateManualMemo,
+  onSaveMemo,
   readOnly,
 }: Props) {
   const callerName = call?.caller ?? "client";
@@ -292,17 +298,29 @@ export default function AdvicePhase({
         <div className="cd-advice-memo">
           <button
             className="cd-btn cd-btn-ghost"
-            onClick={onDraftMemo}
-            disabled={memoLoading}
+            onClick={onCreateManualMemo}
+            disabled={memoLoading || !!memo}
           >
-            {memoLoading ? "Drafting…" : "Draft memo"}
+            Create manual memo
+          </button>
+          <button
+            className="cd-btn cd-btn-ghost"
+            onClick={onDraftMemo}
+            disabled={memoLoading || !!memo}
+          >
+            {memoLoading ? "Drafting…" : "Request assisted draft"}
           </button>
           <span className="cd-muted cd-advice-memo-hint">
-            Advisory only — drafts a memo for the selected option without
-            sending advice or changing state. Falls back to a system draft when
-            AI is off.
+            Draft and edit are advisory only and never change state. One saved
+            memo revision must be attached before the recommendation can be sent.
           </span>
-          <MemoDraftPanel memo={memo} loading={memoLoading} error={memoError} />
+          <MemoDraftPanel
+            memo={memo}
+            loading={memoLoading}
+            saving={memoSaving}
+            error={memoError}
+            onSave={onSaveMemo}
+          />
         </div>
       )}
     </section>

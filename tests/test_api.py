@@ -43,6 +43,7 @@ SURVIVAL_SEQUENCE = [
     "controlled_disclosure",
     "mutual_aid",
 ]
+_MEMOS_BY_KEY = {}
 
 
 def _submit(client, campaign_id, advice_id, *, expected_turn=None, key=None):
@@ -58,12 +59,31 @@ def _submit(client, campaign_id, advice_id, *, expected_turn=None, key=None):
             if current.status_code == 200
             else 1
         )
+    submission_key = key or uuid.uuid4().hex
+    memo = _MEMOS_BY_KEY.get((campaign_id, submission_key))
+    if memo is None:
+        created = client.post(
+            f"/api/campaigns/{campaign_id}/memos",
+            json={
+                "creation_mode": "manual",
+                "advice_id": advice_id,
+                "name": "API advice of record",
+                "content": "Exact advisory content for the API test.",
+            },
+        )
+        if created.status_code == 201:
+            memo = created.json()
+            _MEMOS_BY_KEY[(campaign_id, submission_key)] = memo
+        else:
+            memo = {"id": "memo_" + "0" * 32, "revision": 1}
     return client.post(
         f"/api/campaigns/{campaign_id}/advice",
         json={
             "advice_id": advice_id,
             "expected_turn": expected_turn,
-            "idempotency_key": key or uuid.uuid4().hex,
+            "idempotency_key": submission_key,
+            "memo_id": memo["id"],
+            "memo_revision": memo["revision"],
         },
     )
 
@@ -73,6 +93,7 @@ def _isolated_database(tmp_path, monkeypatch):
     """Every API test gets a fresh SQLite file, never the developer database."""
     monkeypatch.setenv("CF_DATABASE_PATH", str(tmp_path / "api.sqlite3"))
     campaign_service.configure_repository()
+    _MEMOS_BY_KEY.clear()
     yield
     campaign_service.configure_repository()
 

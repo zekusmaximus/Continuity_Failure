@@ -30,6 +30,8 @@ test.describe("at-most-once turn resolution", () => {
     const campaignId = await beginIntake(page);
     await walkToAdvice(page);
     await adviceOption(page, FULL_DISCLOSURE).check();
+    await primaryAction(page, "Create manual memo").click();
+    await expect(page.getByText(/Memo attached for send/)).toBeVisible();
 
     const submittedKeys: string[] = [];
     let dropped = false;

@@ -5,7 +5,7 @@ import type {
   CurrentTurn,
   TurnHistory,
   TurnResult,
-  MemoDraft,
+  AdviceMemo,
   RecentCampaign,
 } from "./api/client";
 import type { Phase } from "./domain";
@@ -92,8 +92,10 @@ export default function App() {
   // Advisory memo draft for the selected advice option. AI-assist is off by
   // default, so this returns a deterministic fallback unless a live provider is
   // configured. Drafting never advances the turn or changes state.
-  const [memo, setMemo] = useState<MemoDraft | null>(null);
+  const [memo, setMemo] = useState<AdviceMemo | null>(null);
+  const [memos, setMemos] = useState<AdviceMemo[]>([]);
   const [memoLoading, setMemoLoading] = useState(false);
+  const [memoSaving, setMemoSaving] = useState(false);
   const [memoError, setMemoError] = useState<string | null>(null);
 
   const gotoPhase = useCallback((next: Phase, announcement?: string) => {
@@ -135,15 +137,23 @@ export default function App() {
     setHistory(await api.getTurns(id));
   }, []);
 
+  const refreshMemos = useCallback(async (id: string) => {
+    const records = await api.getMemos(id);
+    setMemos(records);
+    return records;
+  }, []);
+
   const reopenCampaign = useCallback(async (id: string) => {
-    const [cur, turns] = await Promise.all([
+    const [cur, turns, memoRecords] = await Promise.all([
       api.getCurrent(id),
       api.getTurns(id),
+      api.getMemos(id),
     ]);
     setCampaignId(id);
     setCurrent(cur);
     setSummary(cur.summary);
     setHistory(turns);
+    setMemos(memoRecords);
     setLastResult(null);
     setSelected(null);
     setMemo(null);
@@ -231,6 +241,7 @@ export default function App() {
       setMemo(null);
       setMemoError(null);
       const [cur] = await Promise.all([refreshCurrent(created.id), refreshHistory(created.id)]);
+      setMemos([]);
       setMaxReachedIndex(0);
       gotoPhase("CALL", "Turn 1 incoming call loaded.");
       showFirstTurnGuide(cur.summary.turn_number);
@@ -242,7 +253,7 @@ export default function App() {
   }, [gotoPhase, refreshCurrent, refreshHistory, showFirstTurnGuide]);
 
   const handleSendAdvice = useCallback(async () => {
-    if (!campaignId || !selected || !current || submitting) return;
+    if (!campaignId || !selected || !current || !memo || submitting) return;
     setSubmitting(true);
     setError(null);
     try {
@@ -254,8 +265,11 @@ export default function App() {
         selected,
         current.summary.turn_number,
         newIdempotencyKey(),
+        memo.id,
+        memo.revision,
       );
       setLastResult(result);
+      setMemo((record) => record ? { ...record, status: "sent", sent_snapshot: result.sent_memo } : record);
       // Keep `current` frozen on the turn that was just resolved. That prevents
       // the header and Case File from exposing the next call, documents, or
       // state before the player closes this turn. History may safely refresh:
@@ -281,7 +295,7 @@ export default function App() {
     } finally {
       setSubmitting(false);
     }
-  }, [campaignId, selected, current, submitting, refreshCurrent, refreshHistory, gotoPhase]);
+  }, [campaignId, selected, current, submitting, memo, refreshCurrent, refreshHistory, gotoPhase]);
 
   const handleNextCall = useCallback(async () => {
     if (!campaignId) return;
@@ -293,6 +307,7 @@ export default function App() {
       setLastResult(null);
       setMemo(null);
       setMemoError(null);
+      await refreshMemos(campaignId);
       setMaxReachedIndex(0);
       gotoPhase("CALL", `Turn ${cur.summary.turn_number} incoming call loaded.`);
     } catch (e) {
@@ -300,7 +315,7 @@ export default function App() {
     } finally {
       setLoading(false);
     }
-  }, [campaignId, refreshCurrent, gotoPhase]);
+  }, [campaignId, refreshCurrent, refreshMemos, gotoPhase]);
 
   const handleOpenDossier = useCallback(async () => {
     if (!campaignId) return;
@@ -334,24 +349,77 @@ export default function App() {
     setMemoLoading(true);
     setMemoError(null);
     try {
-      const draft = await api.draftMemo(campaignId, selected);
+      const option = current?.advice_options.find((item) => item.id === selected);
+      const draft = await api.createMemo(campaignId, {
+        creation_mode: "ai",
+        advice_id: selected,
+        name: `Advice of record — ${option?.title || option?.label || selected}`,
+      });
       setMemo(draft);
+      setMemos((records) => [...records, draft]);
     } catch (e) {
       setMemo(null);
       setMemoError(e instanceof Error ? e.message : String(e));
     } finally {
       setMemoLoading(false);
     }
-  }, [campaignId, selected]);
+  }, [campaignId, selected, current]);
+
+  const handleCreateManualMemo = useCallback(async () => {
+    if (!campaignId || !selected || !current) return;
+    const option = current.advice_options.find((item) => item.id === selected);
+    if (!option) return;
+    const steps = option.operational_steps.map((step) => `- ${step}`).join("\n");
+    setMemoLoading(true);
+    setMemoError(null);
+    try {
+      const created = await api.createMemo(campaignId, {
+        creation_mode: "manual",
+        advice_id: selected,
+        name: `Advice of record — ${option.title || option.label}`,
+        content: `RECOMMENDATION\n${option.recommendation || option.summary}\n\nRATIONALE\n${option.rationale}\n\nOPERATIONAL STEPS\n${steps}`,
+      });
+      setMemo(created);
+      setMemos((records) => [...records, created]);
+    } catch (e) {
+      setMemoError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setMemoLoading(false);
+    }
+  }, [campaignId, selected, current]);
+
+  const handleSaveMemo = useCallback(async (name: string, content: string) => {
+    if (!campaignId || !memo) return;
+    setMemoSaving(true);
+    setMemoError(null);
+    try {
+      const updated = await api.updateMemo(campaignId, memo.id, {
+        expected_revision: memo.revision,
+        name,
+        content,
+      });
+      setMemo(updated);
+      setMemos((records) => records.map((item) => item.id === updated.id ? updated : item));
+    } catch (e) {
+      setMemoError(e instanceof Error ? e.message : String(e));
+      if (e instanceof ApiError && e.code === "stale_memo_revision") {
+        await refreshMemos(campaignId).catch(() => undefined);
+      }
+    } finally {
+      setMemoSaving(false);
+    }
+  }, [campaignId, memo, refreshMemos]);
 
   const handleSelectAdvice = useCallback(
     (id: string) => {
       // Switching options invalidates any prior memo draft.
       setSelected(id);
-      setMemo(null);
+      setMemo(
+        memos.find((item) => item.status === "draft" && item.advice_id === id) ?? null,
+      );
       setMemoError(null);
     },
-    [],
+    [memos],
   );
 
   const resolvedStatus = lastResult?.status_after ?? summary?.status;
@@ -442,8 +510,11 @@ export default function App() {
         onOpenCaseFile={() => setCaseFileOpen(true)}
         memo={memo}
         memoLoading={memoLoading}
+        memoSaving={memoSaving}
         memoError={memoError}
         onDraftMemo={handleDraftMemo}
+        onCreateManualMemo={handleCreateManualMemo}
+        onSaveMemo={handleSaveMemo}
       />
 
       <CaseFile

@@ -75,6 +75,7 @@ export function createFakeBackend(options: Options = {}): FakeBackend {
   const requests: RecordedRequest[] = [];
   const adviceKeys: string[] = [];
   const injections: { fragment: string; injection: Injection }[] = [];
+  let memos: Record<string, unknown>[] = [];
 
   function takeInjection(path: string): Injection | null {
     const index = injections.findIndex((i) => path.includes(i.fragment));
@@ -99,6 +100,7 @@ export function createFakeBackend(options: Options = {}): FakeBackend {
       turnNumber = 1;
       resolved = 0;
       idempotency.clear();
+      memos = [];
       const summary = CURRENT_BY_TURN[0].summary;
       return json({
         id: CAMPAIGN_ID,
@@ -133,6 +135,45 @@ export function createFakeBackend(options: Options = {}): FakeBackend {
       return json([]);
     }
 
+    if (method === "GET" && path.endsWith("/memos")) {
+      return json(memos);
+    }
+
+    if (method === "POST" && path.endsWith("/memos")) {
+      const now = "2026-07-10T00:00:00+00:00";
+      const source = body?.creation_mode === "ai" ? "system" : "player";
+      const content = String(body?.content ?? "Deterministic assisted memo content.");
+      const memo = {
+        id: `memo_${String(memos.length + 1).padStart(32, "0")}`,
+        campaign_id: CAMPAIGN_ID,
+        status: "draft",
+        name: String(body?.name ?? "Advice memo"),
+        content,
+        revision: 1,
+        created_at: now,
+        updated_at: now,
+        author: source === "player" ? "Player consultant" : "Continuity Desk",
+        source,
+        classification: "proposed",
+        provenance: {
+          workflow: source === "player" ? "manual" : "deterministic_fallback",
+          model_run_id: null,
+          prompt_version: source === "player" ? null : "v1",
+          model_name: source === "player" ? null : "disabled",
+          provider: source === "player" ? null : "disabled",
+          validation_status: source === "player" ? null : "fallback",
+          fallback_used: source !== "player",
+        },
+        turn_number: turnNumber,
+        call_id: `call_${turnNumber}`,
+        advice_id: body?.advice_id,
+        revisions: [],
+        sent_snapshot: null,
+      };
+      memos = [...memos, memo];
+      return json(memo, { status: 201 });
+    }
+
     if (method === "POST" && path.endsWith("/memo")) {
       return json({
         status: "fallback",
@@ -152,7 +193,7 @@ export function createFakeBackend(options: Options = {}): FakeBackend {
     if (method === "POST" && path.endsWith("/advice")) {
       const key = String(body?.idempotency_key ?? "");
       const expected = Number(body?.expected_turn);
-      const fingerprint = `${body?.advice_id}:${expected}`;
+      const fingerprint = `${body?.advice_id}:${expected}:${body?.memo_id}:${body?.memo_revision}`;
       adviceKeys.push(key);
 
       // Replay first, exactly as campaign_service.submit_advice orders it: an

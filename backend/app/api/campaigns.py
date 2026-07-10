@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Query, Response, status
+from fastapi import APIRouter, HTTPException, Path, Query, Response, status
 
 from engine.turn import UnknownAdviceOption
 
@@ -133,6 +133,8 @@ def submit_advice(
             payload.advice_id,
             expected_turn=payload.expected_turn,
             idempotency_key=payload.idempotency_key,
+            memo_id=payload.memo_id,
+            memo_revision=payload.memo_revision,
         )
     except errors.TurnResolutionError as exc:
         raise _turn_error(campaign_id, exc) from None
@@ -150,6 +152,63 @@ def get_turns(campaign_id: str):
     if result is None:
         _not_found(campaign_id)
     return result
+
+
+@router.get(
+    "/{campaign_id}/memos",
+    response_model=list[schemas.AdviceMemoModel],
+    summary="List persistent advice memos for a campaign",
+)
+def list_memos(campaign_id: str):
+    result = campaign_service.list_memos(campaign_id)
+    if result is None:
+        _not_found(campaign_id)
+    return result
+
+
+@router.post(
+    "/{campaign_id}/memos",
+    response_model=schemas.AdviceMemoModel,
+    status_code=status.HTTP_201_CREATED,
+    responses={400: {"model": schemas.ApiErrorModel}, 404: {"model": schemas.ApiErrorModel}},
+    summary="Create a manual or AI-assisted memo draft",
+)
+def create_memo(campaign_id: str, payload: schemas.CreateMemoRequest):
+    bind_log_fields(campaign_id=campaign_id)
+    try:
+        return campaign_service.create_memo(
+            campaign_id,
+            creation_mode=payload.creation_mode,
+            advice_id=payload.advice_id,
+            name=payload.name,
+            content=payload.content,
+        )
+    except errors.TurnResolutionError as exc:
+        raise _turn_error(campaign_id, exc) from None
+
+
+@router.patch(
+    "/{campaign_id}/memos/{memo_id}",
+    response_model=schemas.AdviceMemoModel,
+    responses={404: {"model": schemas.ApiErrorModel}, 409: {"model": schemas.ApiErrorModel}},
+    summary="Save a new player-authored memo revision",
+)
+def update_memo(
+    campaign_id: str,
+    payload: schemas.UpdateMemoRequest,
+    memo_id: str = Path(pattern=schemas.MEMO_ID_PATTERN),
+):
+    bind_log_fields(campaign_id=campaign_id)
+    try:
+        return campaign_service.update_memo(
+            campaign_id,
+            memo_id,
+            expected_revision=payload.expected_revision,
+            name=payload.name,
+            content=payload.content,
+        )
+    except errors.TurnResolutionError as exc:
+        raise _turn_error(campaign_id, exc) from None
 
 
 @router.get(

@@ -155,6 +155,8 @@ export interface NpcDecision {
   off_brief_adjustments: Record<string, number>;
   cost_reason: string;
   explanation: DecisionExplanation | null;
+  memo_id: string | null;
+  memo_revision: number | null;
 }
 
 export interface AppliedDiff {
@@ -177,6 +179,60 @@ export interface CanonEntry {
   public_status: string;
   involved_factions: string[];
   tags: string[];
+  memo_id: string | null;
+}
+
+export interface MemoProvenance {
+  workflow: "manual" | "ai_assisted" | "deterministic_fallback";
+  model_run_id: string | null;
+  prompt_version: string | null;
+  model_name: string | null;
+  provider: string | null;
+  validation_status: string | null;
+  fallback_used: boolean;
+}
+
+export interface MemoRevision {
+  revision: number;
+  name: string;
+  content: string;
+  author: string;
+  source: "player" | "ai" | "system";
+  created_at: string;
+  content_digest: string;
+}
+
+export interface SentMemoSnapshot {
+  memo_id: string;
+  revision: number;
+  name: string;
+  content: string;
+  content_digest: string;
+  sent_at: string;
+  author: string;
+  source: "player" | "ai" | "system";
+  classification: string;
+  provenance: MemoProvenance;
+}
+
+export interface AdviceMemo {
+  id: string;
+  campaign_id: string;
+  status: "draft" | "sent";
+  name: string;
+  content: string;
+  revision: number;
+  created_at: string;
+  updated_at: string;
+  author: string;
+  source: "player" | "ai" | "system";
+  classification: string;
+  provenance: MemoProvenance;
+  turn_number: number | null;
+  call_id: string | null;
+  advice_id: string | null;
+  revisions: MemoRevision[];
+  sent_snapshot: SentMemoSnapshot | null;
 }
 
 export interface FactionReaction {
@@ -206,6 +262,7 @@ export interface TurnResult {
   status_after: "ACTIVE" | "COMPLETED" | "FAILED";
   consequence_stack: ConsequenceStack;
   failure_reason: string | null;
+  sent_memo: SentMemoSnapshot | null;
 }
 
 export interface SystemStatus {
@@ -275,9 +332,16 @@ export interface MemoDraft {
   status: "ok" | "fallback";
   source: "ai" | "system";
   draft: MemoContent;
+  model_run_id: string | null;
+  prompt_version: string;
+  model_name: string | null;
+  provider: string | null;
+  validation_status: string | null;
+  fallback_used: boolean;
 }
 
 export interface ModelRun {
+  id: string;
   prompt_name: string;
   prompt_version: string;
   model_name: string;
@@ -286,6 +350,7 @@ export interface ModelRun {
   retry_count: number;
   latency_ms: number | null;
   turn_number: number | null;
+  provider: string | null;
 }
 
 // --- Errors -----------------------------------------------------------------
@@ -299,6 +364,10 @@ export type ApiErrorCode =
   | "stale_turn"
   | "idempotency_key_conflict"
   | "unknown_advice_option"
+  | "memo_not_found"
+  | "stale_memo_revision"
+  | "memo_immutable"
+  | "memo_advice_mismatch"
   | "corrupt_record"
   | "network_error"
   | "unexpected_error";
@@ -456,6 +525,8 @@ export const api = {
     adviceId: string,
     expectedTurn: number,
     idempotencyKey: string,
+    memoId: string,
+    memoRevision: number,
   ) =>
     requestWithRetry<TurnResult>(`/api/campaigns/${id}/advice`, {
       method: "POST",
@@ -463,12 +534,38 @@ export const api = {
         advice_id: adviceId,
         expected_turn: expectedTurn,
         idempotency_key: idempotencyKey,
+        memo_id: memoId,
+        memo_revision: memoRevision,
       }),
     }),
   getTurns: (id: string) =>
     request<TurnHistory>(`/api/campaigns/${id}/turns`),
   getDossier: (id: string) =>
     request<Dossier>(`/api/campaigns/${id}/dossier`),
+  getMemos: (id: string) =>
+    request<AdviceMemo[]>(`/api/campaigns/${id}/memos`),
+  createMemo: (
+    id: string,
+    payload: {
+      creation_mode: "manual" | "ai";
+      advice_id: string;
+      name: string;
+      content?: string;
+    },
+  ) =>
+    request<AdviceMemo>(`/api/campaigns/${id}/memos`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  updateMemo: (
+    id: string,
+    memoId: string,
+    payload: { expected_revision: number; name: string; content: string },
+  ) =>
+    request<AdviceMemo>(`/api/campaigns/${id}/memos/${memoId}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }),
   // Advisory only: drafts a memo without advancing the turn or changing state.
   // With AI off (the default) this returns a deterministic fallback memo.
   draftMemo: (id: string, adviceId: string) =>

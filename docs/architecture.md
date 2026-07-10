@@ -30,7 +30,7 @@ frontend/   React 18 + TypeScript + Vite  (no UI framework, plain CSS)
    |        Vite dev server proxies /api and /health to the backend
    ↓ HTTP (JSON)
 backend/    FastAPI + Pydantic v2
-   |        app/api/campaigns.py        routes (incl. /memo, /model-runs)
+   |        app/api/campaigns.py        routes (incl. /memos, /memo, /model-runs)
    |        app/services/campaign_service.py  engine <-> memory <-> ai <-> schemas
    |        app/schemas/api.py          Pydantic request/response models
    |        app/repository.py           neutral SQLite repository provider
@@ -45,7 +45,7 @@ backend/    FastAPI + Pydantic v2
 engine/     framework-free deterministic engine (dataclasses, no web deps)
    |        models.py state.py diffs.py rules.py turn.py seed_data.py
    ↓ used by
-memory/     versioned SQLite repository (campaigns, immutable snapshots, model runs)
+memory/     versioned SQLite repository (campaigns/memos, immutable snapshots, model runs)
 ```
 
 **Implemented now**
@@ -63,8 +63,9 @@ memory/     versioned SQLite repository (campaigns, immutable snapshots, model r
   `GET /api/campaigns` (recent resume metadata),
   `GET /api/campaigns/{id}`, `GET /api/campaigns/{id}/current`,
   `POST /api/campaigns/{id}/advice`, `GET /api/campaigns/{id}/turns`,
-  `GET /api/campaigns/{id}/dossier`, `POST /api/campaigns/{id}/memo`
-  (advisory memo draft), `GET /api/campaigns/{id}/model-runs` (read-only AI
+  `GET /api/campaigns/{id}/dossier`, persistent `GET/POST /memos` and
+  `PATCH /memos/{memo_id}`, legacy `POST /memo` (advisory preview), and
+  `GET /api/campaigns/{id}/model-runs` (read-only AI
   run log).
 * **Durable SQLite boundary** (`memory/persistence.py`): complete versioned
   campaign JSON reconstructs typed engine dataclasses exactly; separate
@@ -84,6 +85,12 @@ memory/     versioned SQLite repository (campaigns, immutable snapshots, model r
   turn; the loser sees `stale_turn`. `(campaign_id, idempotency_key)` is a
   primary key, so an exact retry replays the stored response
   (`Idempotent-Replay: true`) and never resolves a second turn.
+* **Persistent advice of record**: manual and validation-gated assisted drafts
+  are `AdviceMemo` aggregates with append-only revisions and explicit
+  provenance. A submission identifies one memo revision; resolution seals an
+  exact-content SHA-256 snapshot and links it to `NpcDecision`, `TurnResult`,
+  canon, and dossier inside the existing transaction. Memo prose is attached
+  only after deterministic resolution and never enters rules or effects.
 * **Request identity and structured logs** (`backend/app/observability.py`): a
   pure-ASGI middleware adopts a valid inbound `X-Request-ID` or generates one,
   echoes it, and emits one JSON line per request with `request_id`, `method`,
@@ -110,8 +117,9 @@ memory/     versioned SQLite repository (campaigns, immutable snapshots, model r
   header. Dense material (full 16-variable state, all factions, canon, full
   timeline, raw applied diffs, Markdown dossier) is moved into an on-demand
   **Case File** drawer rather than being rendered all at once. The Advice phase
-  exposes an optional **Draft memo** affordance (calls `/memo`, renders the
-  draft with honest "AI draft" / "System draft (fallback)" provenance), and the
+  exposes a memo workbench for manual/assisted creation, revision editing, and
+  exact sent-content confirmation (calls `/memos` and renders honest source,
+  validation, and fallback provenance), and the
   Case File has a **Model Runs** tab. The frontend reveals the backend's single
   post-advice `TurnResult` across the separate client-decision / consequences /
   archive phases; no backend shape change was required.

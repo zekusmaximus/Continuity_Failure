@@ -7,9 +7,9 @@ service layer, so field names here must match the engine models exactly.
 
 from __future__ import annotations
 
-from typing import Dict, List, Optional
+from typing import Dict, List, Literal, Optional
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 MAX_TURN_NUMBER = 1000
@@ -20,6 +20,7 @@ CAMPAIGN_STATUS_PATTERN = r"^(ACTIVE|COMPLETED|FAILED)$"
 DECISION_TYPE_PATTERN = r"^(FOLLOWED|PARTIALLY_FOLLOWED|MODIFIED|DELAYED|REJECTED)$"
 SOURCE_TYPE_PATTERN = r"^(advice|npc_modification|ambient|decision)$"
 FACT_CLASSIFICATION_PATTERN = r"^(canon|proposed|rejected|rumor|unverified|contradicted)$"
+MEMO_ID_PATTERN = r"^memo_[a-f0-9]{32}$"
 
 
 class StrictRequestModel(BaseModel):
@@ -203,6 +204,8 @@ class AdviceSubmissionRequest(StrictRequestModel):
         max_length=64,
         pattern=r"^[A-Za-z0-9_-]+$",
     )
+    memo_id: str = Field(pattern=MEMO_ID_PATTERN)
+    memo_revision: int = Field(ge=1, le=1000, strict=True)
 
 
 class ApiErrorDetail(BaseModel):
@@ -271,6 +274,8 @@ class NpcDecisionModel(BaseModel):
     off_brief_adjustments: Dict[str, int] = Field(default_factory=dict)
     cost_reason: str = ""
     explanation: Optional[DecisionExplanationModel] = None
+    memo_id: Optional[str] = Field(default=None, pattern=MEMO_ID_PATTERN)
+    memo_revision: Optional[int] = Field(default=None, ge=1)
 
     @field_validator("modifications", "off_brief_adjustments")
     @classmethod
@@ -302,6 +307,95 @@ class CanonEntryModel(BaseModel):
     public_status: str = Field(default="public", pattern=PUBLIC_STATUS_PATTERN)
     involved_factions: List[str] = Field(default_factory=list)
     tags: List[str] = Field(default_factory=list)
+    memo_id: Optional[str] = Field(default=None, pattern=MEMO_ID_PATTERN)
+
+
+class MemoProvenanceModel(BaseModel):
+    workflow: str = Field(pattern=r"^(manual|ai_assisted|deterministic_fallback)$")
+    model_run_id: Optional[str] = None
+    prompt_version: Optional[str] = None
+    model_name: Optional[str] = None
+    provider: Optional[str] = None
+    validation_status: Optional[str] = Field(
+        default=None, pattern=r"^(ok|invalid|fallback|error)$"
+    )
+    fallback_used: bool = False
+
+
+class MemoRevisionModel(BaseModel):
+    revision: int = Field(ge=1)
+    name: str
+    content: str
+    author: str
+    source: str = Field(pattern=r"^(player|ai|system)$")
+    created_at: str
+    content_digest: str = Field(pattern=r"^[a-f0-9]{64}$")
+
+
+class SentMemoSnapshotModel(BaseModel):
+    memo_id: str = Field(pattern=MEMO_ID_PATTERN)
+    revision: int = Field(ge=1)
+    name: str
+    content: str
+    content_digest: str = Field(pattern=r"^[a-f0-9]{64}$")
+    sent_at: str
+    author: str
+    source: str = Field(pattern=r"^(player|ai|system)$")
+    classification: str = Field(pattern=FACT_CLASSIFICATION_PATTERN)
+    provenance: MemoProvenanceModel
+
+
+class AdviceMemoModel(BaseModel):
+    id: str = Field(pattern=MEMO_ID_PATTERN)
+    campaign_id: str
+    status: str = Field(pattern=r"^(draft|sent)$")
+    name: str
+    content: str
+    revision: int = Field(ge=1)
+    created_at: str
+    updated_at: str
+    author: str
+    source: str = Field(pattern=r"^(player|ai|system)$")
+    classification: str = Field(pattern=FACT_CLASSIFICATION_PATTERN)
+    provenance: MemoProvenanceModel
+    turn_number: Optional[int] = Field(default=None, ge=1)
+    call_id: Optional[str] = None
+    advice_id: Optional[str] = None
+    revisions: List[MemoRevisionModel] = Field(default_factory=list)
+    sent_snapshot: Optional[SentMemoSnapshotModel] = None
+
+
+class CreateMemoRequest(StrictRequestModel):
+    creation_mode: Literal["manual", "ai"]
+    advice_id: str = Field(min_length=1, max_length=64, pattern=r"^[a-z0-9_]+$")
+    name: str = Field(min_length=1, max_length=120, pattern=r"^.*\S.*$")
+    content: Optional[str] = Field(default=None, min_length=1, max_length=12000)
+
+    @field_validator("name")
+    @classmethod
+    def normalize_memo_name(cls, value: str) -> str:
+        return value.strip()
+
+    @model_validator(mode="after")
+    def validate_creation_mode(self):
+        if self.creation_mode == "manual" and not (self.content and self.content.strip()):
+            raise ValueError("manual memos require non-blank content")
+        if self.creation_mode == "ai" and self.content is not None:
+            raise ValueError("AI-assisted memos do not accept supplied content")
+        if self.content is not None:
+            self.content = self.content.strip()
+        return self
+
+
+class UpdateMemoRequest(StrictRequestModel):
+    expected_revision: int = Field(ge=1, le=1000, strict=True)
+    name: str = Field(min_length=1, max_length=120, pattern=r"^.*\S.*$")
+    content: str = Field(min_length=1, max_length=12000, pattern=r"(?s)^.*\S.*$")
+
+    @field_validator("name", "content")
+    @classmethod
+    def normalize_memo_text(cls, value: str) -> str:
+        return value.strip()
 
 
 class FactionReactionModel(BaseModel):
@@ -331,6 +425,7 @@ class TurnResultModel(BaseModel):
     status_after: str = Field(pattern=CAMPAIGN_STATUS_PATTERN)
     consequence_stack: ConsequenceStackModel = Field(default_factory=ConsequenceStackModel)
     failure_reason: Optional[str] = None
+    sent_memo: Optional[SentMemoSnapshotModel] = None
 
 
 class SystemStatusModel(BaseModel):
@@ -411,11 +506,18 @@ class MemoDraftModel(BaseModel):
     status: str = Field(pattern=r"^(ok|fallback)$")
     source: str = Field(pattern=r"^(ai|system)$")
     draft: MemoContentModel
+    model_run_id: Optional[str] = None
+    prompt_version: str = "v1"
+    model_name: Optional[str] = None
+    provider: Optional[str] = None
+    validation_status: Optional[str] = None
+    fallback_used: bool = False
 
 
 class ModelRunModel(BaseModel):
     """Read-only projection of a logged ModelRun for the inspector endpoint."""
 
+    id: str
     prompt_name: str
     prompt_version: str
     model_name: str
@@ -424,3 +526,4 @@ class ModelRunModel(BaseModel):
     retry_count: int = Field(ge=0)
     latency_ms: Optional[int] = Field(default=None, ge=0)
     turn_number: Optional[int] = Field(default=None, ge=1)
+    provider: Optional[str] = None

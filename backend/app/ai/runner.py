@@ -125,6 +125,7 @@ def run_artifact(
             latency_ms=0,
             campaign_id=campaign_id,
             turn_number=turn_number,
+            provider="disabled",
         )
         return _log_and_return(ArtifactStatus.FALLBACK, content, run)
 
@@ -183,6 +184,7 @@ def run_artifact(
             token_usage=tokens,
             campaign_id=campaign_id,
             turn_number=turn_number,
+            provider=getattr(provider, "name", None),
         )
         return _log_and_return(ArtifactStatus.OK, parsed, run)
 
@@ -203,5 +205,6 @@ def run_artifact(
         token_usage=tokens,
         campaign_id=campaign_id,
         turn_number=turn_number,
+        provider=getattr(provider, "name", None),
     )
     return _log_and_return(ArtifactStatus.FALLBACK, content, run)

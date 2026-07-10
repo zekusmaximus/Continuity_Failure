@@ -1060,6 +1060,21 @@ body {
 .cd-memo-list { margin: 4px 0 0 18px; padding: 0; display: flex; flex-direction: column; gap: 3px; }
 .cd-memo-list li { font-size: 13px; }
 .cd-memo-list.cd-bad-list li { color: var(--crit); }
+.cd-memo-panel input,
+.cd-memo-panel textarea {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--border-strong);
+  background: rgba(5, 12, 16, 0.72);
+  color: var(--text);
+  padding: 9px 10px;
+  font: inherit;
+}
+.cd-memo-panel textarea { resize: vertical; line-height: 1.5; }
+.cd-memo-panel input:focus-visible,
+.cd-memo-panel textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.cd-memo-panel input:disabled,
+.cd-memo-panel textarea:disabled { opacity: 0.75; cursor: not-allowed; }
 
 /* ============================ Model runs (Case File) ============================ */
 .cd-runs { font-size: 13px; }

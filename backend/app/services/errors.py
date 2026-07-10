@@ -80,3 +80,46 @@ class UnknownAdvice(TurnResolutionError):
     def __init__(self, advice_id: str) -> None:
         super().__init__(f"Unknown advice option: {advice_id}")
         self.advice_id = advice_id
+
+
+class MemoNotFound(TurnResolutionError):
+    code = "memo_not_found"
+    status_code = 404
+
+    def __init__(self, memo_id: str) -> None:
+        super().__init__(f"Advice memo not found: {memo_id}")
+        self.memo_id = memo_id
+
+
+class StaleMemoRevision(TurnResolutionError):
+    code = "stale_memo_revision"
+    status_code = 409
+
+    def __init__(self, expected_revision: int, current_revision: int) -> None:
+        super().__init__(
+            f"This request expected memo revision {expected_revision}, but the "
+            f"draft is revision {current_revision}. Reload the memo before continuing."
+        )
+        self.expected_revision = expected_revision
+        self.current_revision = current_revision
+
+
+class ImmutableMemo(TurnResolutionError):
+    code = "memo_immutable"
+    status_code = 409
+
+    def __init__(self, memo_id: str) -> None:
+        super().__init__(
+            f"Advice memo {memo_id} has been sent and is part of the historical record."
+        )
+
+
+class MemoAdviceMismatch(TurnResolutionError):
+    code = "memo_advice_mismatch"
+    status_code = 409
+
+    def __init__(self) -> None:
+        super().__init__(
+            "The attached memo was drafted for a different advice option. "
+            "Create or select a memo for this recommendation."
+        )

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import threading
 from typing import Dict, List, Optional
+import uuid
 
 from pydantic import BaseModel
 
@@ -26,6 +27,7 @@ class ValidationStatus:
 class ModelRun(BaseModel):
     """One logged model invocation. See ``prompts/README.md`` § Logging."""
 
+    id: str = ""
     prompt_name: str
     prompt_version: str
     model_name: str
@@ -40,6 +42,11 @@ class ModelRun(BaseModel):
     # Optional provenance so runs can be filtered per campaign/turn.
     campaign_id: Optional[str] = None
     turn_number: Optional[int] = None
+    provider: Optional[str] = None
+
+    def model_post_init(self, __context) -> None:
+        if not self.id:
+            self.id = f"run_{uuid.uuid4().hex}"
 
 
 class ModelRunStore:

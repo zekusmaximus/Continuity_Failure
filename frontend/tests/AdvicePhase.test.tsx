@@ -75,8 +75,11 @@ function renderAdvice(selected: string | null = null) {
       onSelect={onSelect}
       memo={null}
       memoLoading={false}
+      memoSaving={false}
       memoError={null}
       onDraftMemo={vi.fn()}
+      onCreateManualMemo={vi.fn()}
+      onSaveMemo={vi.fn()}
     />,
   );
   return { onSelect };
@@ -147,6 +150,8 @@ describe("ClientDecisionPhase explanation payload", () => {
         outcome_reason: "The Hospital rejected the advice because it crossed a red line.",
         on_brief_options: ["Priority water allocation", "Convene mutual aid"],
       },
+      memo_id: null,
+      memo_revision: null,
     },
     diffs: [],
     aftermath_summary: "rejected",
@@ -161,6 +166,7 @@ describe("ClientDecisionPhase explanation payload", () => {
       public_status: "public",
       involved_factions: [],
       tags: [],
+      memo_id: null,
     },
     status_after: "ACTIVE",
     consequence_stack: {
@@ -173,6 +179,7 @@ describe("ClientDecisionPhase explanation payload", () => {
       opened_threads: [],
     },
     failure_reason: null,
+    sent_memo: null,
   };
 
   test("renders human-labeled adherence factors, conflicts, and outcome reason", () => {

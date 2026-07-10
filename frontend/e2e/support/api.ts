@@ -22,6 +22,7 @@ export interface Summary {
  * fails the run on collapsed public order well before the 10-turn window ends.
  */
 export const RELENTLESS_OPTION = "full_disclosure";
+const memosBySubmission = new Map<string, { id: string; revision: number }>();
 
 export async function createCampaign(request: APIRequestContext): Promise<string> {
   const res = await request.post(`${BACKEND_URL}/api/campaigns`, { data: {} });
@@ -53,11 +54,34 @@ export async function submitAdvice(
   campaignId: string,
   opts: { adviceId?: string; expectedTurn: number; idempotencyKey: string },
 ): Promise<{ status: number; body: Record<string, unknown> }> {
+  const adviceId = opts.adviceId ?? RELENTLESS_OPTION;
+  const submission = `${campaignId}:${opts.idempotencyKey}`;
+  let memo = memosBySubmission.get(submission);
+  if (!memo) {
+    const created = await request.post(`${BACKEND_URL}/api/campaigns/${campaignId}/memos`, {
+      data: {
+        creation_mode: "manual",
+        advice_id: adviceId,
+        name: "E2E advice of record",
+        content: "Exact E2E advisory content.",
+      },
+      failOnStatusCode: false,
+    });
+    if (created.ok()) {
+      const body = await created.json();
+      memo = { id: body.id as string, revision: body.revision as number };
+      memosBySubmission.set(submission, memo);
+    } else {
+      memo = { id: `memo_${"0".repeat(32)}`, revision: 1 };
+    }
+  }
   const res = await request.post(`${BACKEND_URL}/api/campaigns/${campaignId}/advice`, {
     data: {
-      advice_id: opts.adviceId ?? RELENTLESS_OPTION,
+      advice_id: adviceId,
       expected_turn: opts.expectedTurn,
       idempotency_key: opts.idempotencyKey,
+      memo_id: memo.id,
+      memo_revision: memo.revision,
     },
     failOnStatusCode: false,
   });

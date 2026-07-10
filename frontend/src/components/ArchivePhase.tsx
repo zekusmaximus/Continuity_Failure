@@ -32,6 +32,18 @@ export default function ArchivePhase({ result, history }: Props) {
         <p className="cd-field-v">{result.advice_label}</p>
       </div>
 
+      {result.sent_memo && (
+        <details className="cd-context-help">
+          <summary>
+            Memo of record · {result.sent_memo.name} · revision {result.sent_memo.revision}
+          </summary>
+          <p className="cd-muted">
+            {result.sent_memo.memo_id} · sent {result.sent_memo.sent_at} · SHA-256 {result.sent_memo.content_digest}
+          </p>
+          <pre className="cd-dossier-md">{result.sent_memo.content}</pre>
+        </details>
+      )}
+
       <div className="cd-field">
         <div className="cd-field-k">Client decision</div>
         <p className="cd-field-v">

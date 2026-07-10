@@ -80,6 +80,8 @@ describe("temporal snapshot", () => {
     await user.click(
       screen.getByRole("radio", { name: /Full disclosure and emergency conservation order/ }),
     );
+    await user.click(screen.getByRole("button", { name: "Create manual memo" }));
+    await screen.findByText(/Memo attached for send/);
     await user.click(screen.getByRole("button", { name: "Send Advice" }));
     await screen.findByText(/Client decision · Turn 1/);
 
@@ -104,6 +106,8 @@ describe("temporal snapshot", () => {
     await user.click(
       screen.getByRole("radio", { name: /Full disclosure and emergency conservation order/ }),
     );
+    await user.click(screen.getByRole("button", { name: "Create manual memo" }));
+    await screen.findByText(/Memo attached for send/);
     await user.click(screen.getByRole("button", { name: "Send Advice" }));
     await user.click(await screen.findByRole("button", { name: "Review Consequences" }));
     await user.click(await screen.findByRole("button", { name: "Close Turn" }));

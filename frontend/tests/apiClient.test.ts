@@ -47,7 +47,7 @@ describe("submitAdvice retry semantics", () => {
     ]);
 
     const key = "fixed-key";
-    const promise = api.submitAdvice("c1", "full_disclosure", 1, key);
+    const promise = api.submitAdvice("c1", "full_disclosure", 1, key, `memo_${"1".repeat(32)}`, 2);
     await vi.runAllTimersAsync();
     const result = await promise;
 
@@ -64,12 +64,14 @@ describe("submitAdvice retry semantics", () => {
     const second = bodyOf(1);
     expect(first).toEqual(second);
     expect(second.idempotency_key).toBe(key);
+    expect(second.memo_id).toBe(`memo_${"1".repeat(32)}`);
+    expect(second.memo_revision).toBe(2);
   });
 
   test("never retries a 4xx verdict", async () => {
     const fetchMock = scriptedFetch([() => errorBody(409, "stale_turn")]);
 
-    await expect(api.submitAdvice("c1", "full_disclosure", 1, "k")).rejects.toMatchObject({
+    await expect(api.submitAdvice("c1", "full_disclosure", 1, "k", `memo_${"1".repeat(32)}`, 1)).rejects.toMatchObject({
       code: "stale_turn",
       status: 409,
     });
@@ -81,7 +83,7 @@ describe("submitAdvice retry semantics", () => {
     vi.useFakeTimers();
     const fetchMock = scriptedFetch([() => errorBody(500, "unexpected_error")]);
 
-    const promise = api.submitAdvice("c1", "full_disclosure", 1, "k").catch((e) => e);
+    const promise = api.submitAdvice("c1", "full_disclosure", 1, "k", `memo_${"1".repeat(32)}`, 1).catch((e) => e);
     await vi.runAllTimersAsync();
     const error = await promise;
 

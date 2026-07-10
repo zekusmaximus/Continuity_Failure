@@ -1,7 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 
-import { beginIntake, openCaseFile, primaryAction, walkToAdvice } from "./support/desk";
+import { beginIntake, openCaseFile, primaryAction, sendAdvice, walkToAdvice } from "./support/desk";
 
 /**
  * A smoke check, not a compliance audit, and explicitly not a substitute for
@@ -67,8 +67,7 @@ test.describe("accessibility smoke", () => {
     await page
       .getByRole("radio", { name: /Full disclosure and emergency conservation order/ })
       .check();
-    await primaryAction(page, "Send Advice").click();
-    await expect(page.getByText(/Client decision · Turn 1/)).toBeVisible();
+    await sendAdvice(page);
     await scan(page, "client decision");
     await primaryAction(page, "Review Consequences").click();
     await scan(page, "consequences");

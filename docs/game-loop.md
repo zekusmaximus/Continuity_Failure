@@ -20,12 +20,13 @@
 >   client-decision, consequences, and archive phases. Dense views (full state,
 >   factions, canon, timeline, raw diffs, model runs, dossier) live in an
 >   on-demand Case File.
-> - **AI assist (as built):** the Advice phase exposes an optional **Draft
->   memo** affordance (`POST /api/campaigns/{id}/memo`) that drafts an advisory
->   memo for the selected option. It is validation-gated and off by default
->   (returns a deterministic system draft, logs a `fallback` `ModelRun`); it
->   never sends advice or changes state. Model runs are inspectable in the Case
->   File. This is advisory drafting, not the full AI-use phase below.
+> - **Memo workflow (as built):** the Advice phase exposes a persistent
+>   workbench (`GET/POST /api/campaigns/{id}/memos`, `PATCH /memos/{id}`) for
+>   manual or validation-gated assisted drafts and player-authored revisions.
+>   AI is off by default (returns a deterministic system draft and logs a
+>   fallback `ModelRun`). Drafting and editing never change state. Sending
+>   attaches one exact memo revision to the deterministic NPC decision, turn
+>   snapshot, canon reference, and dossier; sent records are immutable.
 > - **Planned next:** the optional AI-use phase (a validation-gated, read-only
 >   Research Console that only proposes classified facts), which would sit
 >   between BRIEF/EVIDENCE and ADVICE, plus the remaining read-only tools

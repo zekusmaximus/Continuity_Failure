@@ -73,9 +73,48 @@ def render_dossier_markdown(campaign: Campaign) -> str:
             lines.append(f"- **Status after:** {t.status_after}")
             lines.append(f"- **Client:** {t.decision.decider}")
             lines.append(f"- **Aftermath:** {t.aftermath_summary}")
+            if t.sent_memo is not None:
+                lines.append(
+                    f"- **Memo of record:** `{t.sent_memo.memo_id}` revision "
+                    f"{t.sent_memo.revision} (`{t.sent_memo.content_digest}`)"
+                )
             if t.consequence_stack.opened_threads:
                 lines.append("- **Threads opened:** "
                              + "; ".join(t.consequence_stack.opened_threads))
+            lines.append("")
+
+    lines.append("## Advice Memos of Record")
+    lines.append("")
+    sent = [t for t in campaign.turn_history if t.sent_memo is not None]
+    if not sent:
+        lines.append("_No advice memos have been sent._")
+        lines.append("")
+    else:
+        for turn in sent:
+            memo = turn.sent_memo
+            assert memo is not None
+            lines.append(f"### Turn {turn.turn_number} — {memo.name}")
+            lines.append("")
+            lines.append(f"- **Memo ID / revision:** `{memo.memo_id}` / {memo.revision}")
+            lines.append(f"- **Sent:** {memo.sent_at}")
+            lines.append(f"- **Authorship/source:** {memo.author} / {memo.source}")
+            lines.append(f"- **Classification:** {memo.classification}")
+            lines.append(f"- **Workflow:** {memo.provenance.workflow}")
+            if memo.provenance.model_run_id:
+                lines.append(f"- **Model run:** `{memo.provenance.model_run_id}`")
+            lines.append(f"- **SHA-256:** `{memo.content_digest}`")
+            lines.append(
+                f"- **Client decision:** {turn.decision.decision_type} by "
+                f"{turn.decision.decider}"
+            )
+            lines.append("")
+            lines.append("**Exact sent content**")
+            lines.append("")
+            lines.append("```text")
+            # Keep the exact sent string contiguous in the export. The digest
+            # above remains the authority if prose itself contains a fence.
+            lines.append(memo.content)
+            lines.append("```")
             lines.append("")
 
     # Canon

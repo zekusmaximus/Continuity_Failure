@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import type { CurrentTurn, TurnHistory, TurnResult, MemoDraft } from "../api/client";
+import type { AdviceMemo, CurrentTurn, TurnHistory, TurnResult } from "../api/client";
 import type { Phase } from "../domain";
 import { TURN_STEPS } from "../domain";
 import CallPhase from "./CallPhase";
@@ -28,10 +28,13 @@ interface Props {
   onOpenDossier: () => void;
   onRestart: () => void;
   onOpenCaseFile: () => void;
-  memo: MemoDraft | null;
+  memo: AdviceMemo | null;
   memoLoading: boolean;
+  memoSaving: boolean;
   memoError: string | null;
   onDraftMemo: () => void;
+  onCreateManualMemo: () => void;
+  onSaveMemo: (name: string, content: string) => void;
 }
 
 /**
@@ -58,8 +61,11 @@ export default function GuidedTurn(props: Props) {
     onOpenCaseFile,
     memo,
     memoLoading,
+    memoSaving,
     memoError,
     onDraftMemo,
+    onCreateManualMemo,
+    onSaveMemo,
   } = props;
 
   const call = current?.client_call ?? null;
@@ -131,8 +137,11 @@ export default function GuidedTurn(props: Props) {
           onSelect={onSelect}
           memo={memo}
           memoLoading={memoLoading}
+          memoSaving={memoSaving}
           memoError={memoError}
           onDraftMemo={onDraftMemo}
+          onCreateManualMemo={onCreateManualMemo}
+          onSaveMemo={onSaveMemo}
           readOnly={lastResult !== null}
         />
       ) : null;
@@ -141,11 +150,13 @@ export default function GuidedTurn(props: Props) {
           label="Send Advice"
           hint={
             selected
-              ? "Sending resolves this turn. The client decides what to do with your recommendation."
+              ? memo
+                ? `Send ${memo.name}, revision ${memo.revision}. The client decides what to do with it.`
+                : "Create and attach a memo before sending this recommendation."
               : "Select a recommendation to send."
           }
           onClick={onSendAdvice}
-          disabled={!selected}
+          disabled={!selected || !memo || memo.status !== "draft"}
           busy={submitting}
         />
       );

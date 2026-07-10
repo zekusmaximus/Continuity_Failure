@@ -67,13 +67,16 @@ The API is served at `http://localhost:8000`. Interactive docs:
 | GET    | `/api/campaigns/{id}` | Campaign summary + current world state |
 | GET    | `/api/campaigns/{id}/current` | Current turn package (state, call, advice, last turn) |
 | POST   | `/api/campaigns/{id}/advice` | Submit advice, resolve NPC decision, advance one turn |
+| GET/POST | `/api/campaigns/{id}/memos` | List or create persistent manual/AI-assisted memo drafts |
+| PATCH  | `/api/campaigns/{id}/memos/{memo_id}` | Save a new player-authored draft revision |
 | GET    | `/api/campaigns/{id}/turns` | Full turn history + canon archive |
 | GET    | `/api/campaigns/{id}/dossier` | Campaign dossier as Markdown |
 | POST   | `/api/campaigns/{id}/memo` | Draft an advisory memo without advancing state |
 | GET    | `/api/campaigns/{id}/model-runs` | Read-only AI/model run log |
 
 `POST /api/campaigns` accepts an optional `{"name": "..."}` body.
-`POST /api/campaigns/{id}/advice` accepts `{"advice_id": "..."}`.
+`POST /api/campaigns/{id}/advice` requires `advice_id`, `expected_turn`, a
+bounded `idempotency_key`, and the attached `memo_id` / `memo_revision`.
 Request bodies reject unknown fields and enforce bounded names and advice IDs.
 
 To enable the optional Anthropic provider, install `backend[ai]` and set both
@@ -83,8 +86,11 @@ remains available through its deterministic fallback.
 
 ## Persistence
 
-Campaigns, immutable end-of-turn snapshots, and complete advisory `ModelRun`
-records are stored in SQLite through `memory/persistence.py`. The default file
+Campaigns (including versioned `AdviceMemo` aggregates), immutable end-of-turn
+snapshots, and complete advisory `ModelRun` records are stored in SQLite through
+`memory/persistence.py`. A sent memo's exact content, digest, provenance, and
+revision are copied into the immutable turn snapshot in the same transaction as
+the NPC decision and AppliedDiff record. The default file
 is `data/continuity_failure.sqlite3` at the repository root. Override it with
 `CF_DATABASE_PATH` (an absolute path is recommended for service deployments):
 

@@ -51,12 +51,14 @@ SURVIVAL_SEQUENCE = [
     "controlled_disclosure",
     "mutual_aid",
 ]
+_MEMOS_BY_KEY = {}
 
 
 @pytest.fixture(autouse=True)
 def _isolated_database(tmp_path, monkeypatch):
     monkeypatch.setenv("CF_DATABASE_PATH", str(tmp_path / "atomic.sqlite3"))
     campaign_service.configure_repository()
+    _MEMOS_BY_KEY.clear()
     yield
     campaign_service.configure_repository()
 
@@ -77,12 +79,30 @@ def _key(label: str = "") -> str:
 
 
 def _post(client, campaign_id, advice_id, expected_turn, key, headers=None):
+    memo = _MEMOS_BY_KEY.get((campaign_id, key))
+    if memo is None:
+        created = client.post(
+            f"/api/campaigns/{campaign_id}/memos",
+            json={
+                "creation_mode": "manual",
+                "advice_id": advice_id,
+                "name": "Atomic advice of record",
+                "content": "Exact advisory content for the atomicity test.",
+            },
+        )
+        if created.status_code == 201:
+            memo = created.json()
+            _MEMOS_BY_KEY[(campaign_id, key)] = memo
+        else:
+            memo = {"id": "memo_" + "0" * 32, "revision": 1}
     return client.post(
         f"/api/campaigns/{campaign_id}/advice",
         json={
             "advice_id": advice_id,
             "expected_turn": expected_turn,
             "idempotency_key": key,
+            "memo_id": memo["id"],
+            "memo_revision": memo["revision"],
         },
         headers=headers or {},
     )

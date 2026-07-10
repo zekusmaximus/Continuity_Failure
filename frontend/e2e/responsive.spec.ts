@@ -91,7 +91,9 @@ for (const viewport of VIEWPORTS) {
       await walkToAdvice(page);
       await expectNoHorizontalOverflow(page, `${where} / advice`);
       await adviceOption(page, /Full disclosure and emergency conservation order/).check();
-      await expectPrimaryActionUsable(page, "Send Advice", `${where} / advice`);
+      const send = primaryAction(page, "Send Advice");
+      await expect(send, `${where} / advice: send control must stay in the viewport`).toBeInViewport();
+      await expect(send, `${where} / advice: send stays guarded until a memo is attached`).toBeDisabled();
 
       await sendAdvice(page);
       await expectNoHorizontalOverflow(page, `${where} / client decision`);

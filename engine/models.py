@@ -46,6 +46,11 @@ class FactClassification:
     CONTRADICTED = "contradicted"
 
 
+class MemoStatus:
+    DRAFT = "draft"
+    SENT = "sent"
+
+
 class PublicStatus:
     """Visibility of a fact, document, or canon entry within the world."""
     PUBLIC = "public"
@@ -279,6 +284,8 @@ class NpcDecision:
     off_brief_adjustments: Dict[str, int] = field(default_factory=dict)  # deterministic cost deltas
     cost_reason: str = ""          # AppliedDiff reason for the off-brief/red-line cost
     explanation: Optional["DecisionExplanation"] = None
+    memo_id: Optional[str] = None
+    memo_revision: Optional[int] = None
 
 
 @dataclass
@@ -294,6 +301,67 @@ class CanonEntry:
     public_status: str = PublicStatus.PUBLIC
     involved_factions: List[str] = field(default_factory=list)
     tags: List[str] = field(default_factory=list)
+    memo_id: Optional[str] = None
+
+
+@dataclass
+class MemoProvenance:
+    """Audit metadata for advisory prose; never an input to engine effects."""
+    workflow: str                 # manual / ai_assisted / deterministic_fallback
+    model_run_id: Optional[str] = None
+    prompt_version: Optional[str] = None
+    model_name: Optional[str] = None
+    provider: Optional[str] = None
+    validation_status: Optional[str] = None
+    fallback_used: bool = False
+
+
+@dataclass
+class MemoRevision:
+    revision: int
+    name: str
+    content: str
+    author: str
+    source: str                  # player / ai / system
+    created_at: str
+    content_digest: str
+
+
+@dataclass
+class SentMemoSnapshot:
+    """Exact advisory artifact attached to one resolved turn."""
+    memo_id: str
+    revision: int
+    name: str
+    content: str
+    content_digest: str
+    sent_at: str
+    author: str
+    source: str
+    classification: str
+    provenance: MemoProvenance
+
+
+@dataclass
+class AdviceMemo:
+    """Persistent advisory artifact. Draft revisions are append-only."""
+    id: str
+    campaign_id: str
+    status: str
+    name: str
+    content: str
+    revision: int
+    created_at: str
+    updated_at: str
+    author: str
+    source: str
+    classification: str
+    provenance: MemoProvenance
+    turn_number: Optional[int] = None
+    call_id: Optional[str] = None
+    advice_id: Optional[str] = None
+    revisions: List[MemoRevision] = field(default_factory=list)
+    sent_snapshot: Optional[SentMemoSnapshot] = None
 
 
 @dataclass
@@ -342,6 +410,7 @@ class TurnResult:
     status_after: str
     consequence_stack: ConsequenceStack = field(default_factory=ConsequenceStack)
     failure_reason: Optional[str] = None
+    sent_memo: Optional[SentMemoSnapshot] = None
 
 
 @dataclass
@@ -365,6 +434,7 @@ class Campaign:
     open_threads: List[OpenThread] = field(default_factory=list)
     failure_reason: Optional[str] = None
     created_at: str = ""
+    advice_memos: List[AdviceMemo] = field(default_factory=list)
 
     def is_terminal(self) -> bool:
         return self.status in (CampaignStatus.COMPLETED, CampaignStatus.FAILED)
