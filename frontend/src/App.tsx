@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { api } from "./api/client";
+import { ApiError, api, newIdempotencyKey } from "./api/client";
 import type {
   CampaignSummary,
   CurrentTurn,
@@ -191,11 +191,19 @@ export default function App() {
   }, [refreshCurrent, refreshHistory]);
 
   const handleSendAdvice = useCallback(async () => {
-    if (!campaignId || !selected) return;
+    if (!campaignId || !selected || !current || submitting) return;
     setSubmitting(true);
     setError(null);
     try {
-      const result = await api.submitAdvice(campaignId, selected);
+      // One key per deliberate submission. `api.submitAdvice` reuses it for its
+      // own transport retries, so a dropped response never resolves a second
+      // turn. `expected_turn` pins the revision this advice was composed for.
+      const result = await api.submitAdvice(
+        campaignId,
+        selected,
+        current.summary.turn_number,
+        newIdempotencyKey(),
+      );
       setLastResult(result);
       // Keep `current` frozen on the turn that was just resolved. That prevents
       // the header and Case File from exposing the next call, documents, or
@@ -204,11 +212,22 @@ export default function App() {
       await refreshHistory(campaignId);
       setPhase("CLIENT_DECISION");
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      if (e instanceof ApiError && (e.code === "stale_turn" || e.code === "campaign_terminal")) {
+        // The backend holds newer state than this desk. Resync rather than let
+        // the player resubmit against a revision that no longer exists.
+        setError(`${e.message} Reloading the engagement record.`);
+        try {
+          await Promise.all([refreshCurrent(campaignId), refreshHistory(campaignId)]);
+        } catch {
+          /* keep the original conflict message */
+        }
+      } else {
+        setError(e instanceof Error ? e.message : String(e));
+      }
     } finally {
       setSubmitting(false);
     }
-  }, [campaignId, selected, refreshHistory]);
+  }, [campaignId, selected, current, submitting, refreshCurrent, refreshHistory]);
 
   const handleNextCall = useCallback(async () => {
     if (!campaignId) return;

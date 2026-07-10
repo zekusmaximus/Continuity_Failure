@@ -12,6 +12,8 @@ from typing import Dict, List, Optional
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
+MAX_TURN_NUMBER = 1000
+
 PUBLIC_STATUS_PATTERN = r"^(public|private|leaked|sealed|disputed|unknown)$"
 RELIABILITY_PATTERN = r"^(high|medium|low|unknown|contested)$"
 CAMPAIGN_STATUS_PATTERN = r"^(ACTIVE|COMPLETED|FAILED)$"
@@ -163,11 +165,54 @@ class RecentCampaignModel(BaseModel):
 
 
 class AdviceRequest(StrictRequestModel):
+    """Advisory, non-mutating requests (memo drafting)."""
+
     advice_id: str = Field(
         min_length=1,
         max_length=64,
         pattern=r"^[a-z0-9_]+$",
     )
+
+
+class AdviceSubmissionRequest(StrictRequestModel):
+    """A turn-resolution request: what to do, to which revision, exactly once.
+
+    ``expected_turn`` is the campaign revision the client believes is current;
+    resolving against any other revision is a conflict rather than an overwrite.
+    ``idempotency_key`` is minted once per deliberate submission and reused for
+    transport retries, so a retried request never resolves a second turn.
+    """
+
+    advice_id: str = Field(
+        min_length=1,
+        max_length=64,
+        pattern=r"^[a-z0-9_]+$",
+    )
+    expected_turn: int = Field(ge=1, le=MAX_TURN_NUMBER)
+    idempotency_key: str = Field(
+        min_length=8,
+        max_length=64,
+        pattern=r"^[A-Za-z0-9_-]+$",
+    )
+
+
+class ApiErrorDetail(BaseModel):
+    """Stable, internals-free error body: ``{"detail": ApiErrorDetail}``.
+
+    ``error`` is a machine-readable code the frontend switches on; ``message``
+    is player-safe prose. No stack traces, SQL, paths, or model output.
+    """
+
+    error: str
+    message: str
+    request_id: Optional[str] = None
+    campaign_id: Optional[str] = None
+    expected_turn: Optional[int] = None
+    current_turn: Optional[int] = None
+
+
+class ApiErrorModel(BaseModel):
+    detail: ApiErrorDetail
 
 
 class CreateCampaignRequest(StrictRequestModel):

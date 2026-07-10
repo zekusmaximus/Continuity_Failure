@@ -11,6 +11,7 @@ from engine import seed_data
 from engine.models import Campaign, CampaignStatus, TurnResult
 from engine.turn import advance_turn
 from memory.persistence import (
+    SCHEMA_VERSION,
     CorruptRecordError,
     ImmutableSnapshotError,
     SQLiteRepository,
@@ -133,4 +134,75 @@ def test_schema_version_is_recorded(tmp_path):
         version = connection.execute(
             "SELECT MAX(version) FROM schema_migrations"
         ).fetchone()[0]
-    assert version == 1
+    assert version == SCHEMA_VERSION == 2
+
+
+def test_idempotency_uniqueness_is_enforced_by_sqlite(tmp_path):
+    """The (campaign, key) guarantee lives in the database, not only in Python."""
+    repository = SQLiteRepository(tmp_path / "unique.sqlite3")
+    campaign = seed_data.create_northbridge_campaign()
+    repository.put(campaign)
+
+    def insert(connection):
+        connection.execute(
+            "INSERT INTO turn_idempotency(campaign_id, idempotency_key, "
+            "request_fingerprint, expected_turn, resulting_turn, created_at, "
+            "response_json) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (campaign.id, "duplicate-key-0001", "fingerprint", 1, 1, "now", "{}"),
+        )
+
+    with sqlite3.connect(repository.path) as connection:
+        insert(connection)
+    with pytest.raises(sqlite3.IntegrityError):
+        with sqlite3.connect(repository.path) as connection:
+            insert(connection)
+
+
+def test_existing_v1_database_upgrades_without_losing_campaigns(tmp_path):
+    """An operator's Batch 1 database gains the idempotency table in place."""
+    database = tmp_path / "upgrade.sqlite3"
+    repository = SQLiteRepository(database)
+    campaign = seed_data.create_northbridge_campaign("Legacy Engagement")
+    repository.put(campaign)
+    _resolve_and_save(repository, campaign, "controlled_disclosure")
+
+    # Rewind the file to the Batch 1 schema.
+    with sqlite3.connect(database) as connection:
+        connection.execute("DROP TABLE turn_idempotency")
+        connection.execute("DELETE FROM schema_migrations WHERE version = 2")
+
+    upgraded = SQLiteRepository(database)
+
+    with sqlite3.connect(database) as connection:
+        assert connection.execute(
+            "SELECT MAX(version) FROM schema_migrations"
+        ).fetchone()[0] == 2
+        assert connection.execute(
+            "SELECT COUNT(*) FROM turn_idempotency"
+        ).fetchone()[0] == 0
+    restored = upgraded.get(campaign.id)
+    assert restored.turn_number == 2
+    assert len(restored.turn_history) == 1
+    assert upgraded.snapshot_json(campaign.id, 1)
+
+
+def test_transaction_rolls_back_every_write_on_failure(tmp_path):
+    """A campaign save and a snapshot append vanish together if the unit fails."""
+    repository = SQLiteRepository(tmp_path / "rollback.sqlite3")
+    campaign = seed_data.create_northbridge_campaign()
+    repository.put(campaign)
+
+    class Injected(RuntimeError):
+        pass
+
+    with pytest.raises(Injected):
+        with repository.transaction() as active:
+            working = active.get_campaign(campaign.id)
+            result = advance_turn(working, "controlled_disclosure")
+            active.save_campaign(working, snapshot_turn=result.turn_number)
+            raise Injected("failure after the writes, before the commit")
+
+    restored = SQLiteRepository(repository.path).get(campaign.id)
+    assert restored.turn_number == 1
+    assert restored.turn_history == []
+    assert repository.snapshot_json(campaign.id, 1) is None

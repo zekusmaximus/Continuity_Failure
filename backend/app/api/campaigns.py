@@ -2,20 +2,60 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, Query, status
+from typing import Optional
+
+from fastapi import APIRouter, HTTPException, Query, Response, status
 
 from engine.turn import UnknownAdviceOption
 
+from app.observability import bind_log_fields, get_request_id
 from app.services import campaign_service
+from app.services import errors
 from app.schemas import api as schemas
 
 router = APIRouter(prefix="/api/campaigns", tags=["campaigns"])
 
 
+def _error_body(
+    code: str,
+    message: str,
+    *,
+    campaign_id: Optional[str] = None,
+    expected_turn: Optional[int] = None,
+    current_turn: Optional[int] = None,
+) -> dict:
+    """Build the one error shape every route returns. Never leaks internals."""
+    return schemas.ApiErrorDetail(
+        error=code,
+        message=message,
+        request_id=get_request_id(),
+        campaign_id=campaign_id,
+        expected_turn=expected_turn,
+        current_turn=current_turn,
+    ).model_dump()
+
+
 def _not_found(campaign_id: str):
     raise HTTPException(
         status_code=status.HTTP_404_NOT_FOUND,
-        detail=f"Campaign not found: {campaign_id}",
+        detail=_error_body(
+            "campaign_not_found",
+            f"Campaign not found: {campaign_id}",
+            campaign_id=campaign_id,
+        ),
+    )
+
+
+def _turn_error(campaign_id: str, exc: errors.TurnResolutionError) -> HTTPException:
+    return HTTPException(
+        status_code=exc.status_code,
+        detail=_error_body(
+            exc.code,
+            exc.message,
+            campaign_id=campaign_id,
+            expected_turn=getattr(exc, "expected_turn", None),
+            current_turn=getattr(exc, "current_turn", None),
+        ),
     )
 
 
@@ -66,26 +106,38 @@ def get_current(campaign_id: str):
 @router.post(
     "/{campaign_id}/advice",
     response_model=schemas.TurnResultModel,
+    responses={
+        400: {"model": schemas.ApiErrorModel},
+        404: {"model": schemas.ApiErrorModel},
+        409: {"model": schemas.ApiErrorModel},
+    },
     summary="Submit advice, resolve the NPC decision, and advance the turn",
 )
-def submit_advice(campaign_id: str, payload: schemas.AdviceRequest):
-    if campaign_service.get_campaign(campaign_id) is None:
-        _not_found(campaign_id)
+def submit_advice(
+    campaign_id: str,
+    payload: schemas.AdviceSubmissionRequest,
+    response: Response,
+):
+    """Resolve exactly one turn, atomically and at most once per key.
+
+    * same key + same payload → the original response, no turn advanced
+      (``Idempotent-Replay: true``);
+    * same key + different payload → 409 ``idempotency_key_conflict``;
+    * ``expected_turn`` behind the campaign → 409 ``stale_turn``;
+    * terminal campaign → 409 ``campaign_terminal``.
+    """
+    bind_log_fields(campaign_id=campaign_id, expected_turn=payload.expected_turn)
     try:
-        result = campaign_service.submit_advice(campaign_id, payload.advice_id)
-    except UnknownAdviceOption as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Unknown advice option: {exc}",
+        resolved = campaign_service.submit_advice(
+            campaign_id,
+            payload.advice_id,
+            expected_turn=payload.expected_turn,
+            idempotency_key=payload.idempotency_key,
         )
-    except RuntimeError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=str(exc),
-        )
-    if result is None:
-        _not_found(campaign_id)
-    return result
+    except errors.TurnResolutionError as exc:
+        raise _turn_error(campaign_id, exc) from None
+    response.headers["Idempotent-Replay"] = "true" if resolved.replayed else "false"
+    return resolved.result
 
 
 @router.get(
@@ -122,6 +174,7 @@ def draft_memo(campaign_id: str, payload: schemas.AdviceRequest):
 
     With AI disabled (the default) this returns a deterministic fallback memo.
     """
+    bind_log_fields(campaign_id=campaign_id)
     if campaign_service.get_campaign(campaign_id) is None:
         _not_found(campaign_id)
     try:
@@ -129,8 +182,12 @@ def draft_memo(campaign_id: str, payload: schemas.AdviceRequest):
     except UnknownAdviceOption as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Unknown advice option: {exc}",
-        )
+            detail=_error_body(
+                "unknown_advice_option",
+                f"Unknown advice option: {exc}",
+                campaign_id=campaign_id,
+            ),
+        ) from None
     if result is None:
         _not_found(campaign_id)
     return result

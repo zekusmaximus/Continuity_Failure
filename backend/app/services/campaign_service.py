@@ -3,10 +3,19 @@
 This is the only place the FastAPI layer touches engine + persistence. It loads
 detached typed campaigns from SQLite, delegates state transitions to the
 engine, then durably saves the result. No game logic lives here.
+
+Turn resolution is the one operation that must be atomic. ``submit_advice``
+opens a single repository transaction and, inside it, checks the idempotency
+record, validates the campaign revision, runs the deterministic engine, saves
+the authoritative campaign, appends the immutable snapshot, and records the
+idempotency result. Any failure rolls the whole thing back, so a partially
+resolved turn is never observable.
 """
 
 from __future__ import annotations
 
+import hashlib
+import json
 from dataclasses import asdict
 from typing import Optional
 
@@ -19,8 +28,10 @@ from app.ai.provider import get_provider
 from app.ai.runner import run_artifact
 from app.ai.schemas import MemoDraft
 from app.config import get_settings
+from app.observability import IdempotencyOutcome, bind_log_fields
 from app.repository import configure_repository, get_repository
 from app.schemas import api as schemas
+from app.services import errors
 
 
 def get_store():
@@ -161,18 +172,96 @@ def get_current(campaign_id: str) -> Optional[schemas.CurrentTurnModel]:
     )
 
 
-def submit_advice(
-    campaign_id: str, advice_id: str
-) -> Optional[schemas.TurnResultModel]:
-    campaign = _require_campaign_or_none(campaign_id)
-    if campaign is None:
-        return None
+def request_fingerprint(advice_id: str, expected_turn: int) -> str:
+    """Stable digest of everything a submission asks the engine to do.
 
-    result = turn_engine.advance_turn(campaign, advice_id)
-    # Save the authoritative document and immutable end-of-turn snapshot in
-    # one SQLite transaction.
-    get_repository().put(campaign, snapshot_turn=result.turn_number)
-    return schemas.TurnResultModel.model_validate(asdict(result))
+    Reusing an idempotency key with a different fingerprint is a client bug, so
+    it must be a conflict rather than a silent replay of the wrong turn.
+    """
+    canonical = json.dumps(
+        {"advice_id": advice_id, "expected_turn": expected_turn},
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+class ResolvedTurn:
+    """A turn-resolution outcome plus whether it replayed a prior submission."""
+
+    __slots__ = ("result", "replayed")
+
+    def __init__(self, result: schemas.TurnResultModel, replayed: bool) -> None:
+        self.result = result
+        self.replayed = replayed
+
+
+def submit_advice(
+    campaign_id: str,
+    advice_id: str,
+    *,
+    expected_turn: int,
+    idempotency_key: str,
+) -> ResolvedTurn:
+    """Resolve one turn atomically, at most once per (campaign, key).
+
+    Ordering is deliberate. The idempotency record is consulted first, so an
+    honest retry of a turn that already committed replays its original response
+    instead of tripping the now-stale revision check. Only a key that has never
+    resolved reaches the terminal and revision guards.
+    """
+    fingerprint = request_fingerprint(advice_id, expected_turn)
+
+    with get_repository().transaction() as active:
+        campaign = active.get_campaign(campaign_id)
+        if campaign is None:
+            bind_log_fields(idempotency=IdempotencyOutcome.REJECTED)
+            raise errors.CampaignNotFound(campaign_id)
+
+        recorded = active.get_idempotency_record(campaign_id, idempotency_key)
+        if recorded is not None:
+            if recorded["request_fingerprint"] != fingerprint:
+                bind_log_fields(idempotency=IdempotencyOutcome.KEY_CONFLICT)
+                raise errors.IdempotencyKeyConflict(idempotency_key)
+            bind_log_fields(
+                idempotency=IdempotencyOutcome.REPLAYED,
+                turn_number=recorded["resulting_turn"],
+            )
+            return ResolvedTurn(
+                schemas.TurnResultModel.model_validate(recorded["response"]),
+                replayed=True,
+            )
+
+        if campaign.is_terminal():
+            bind_log_fields(idempotency=IdempotencyOutcome.TERMINAL)
+            raise errors.CampaignTerminal(campaign.status, campaign.failure_reason)
+
+        if campaign.turn_number != expected_turn:
+            bind_log_fields(idempotency=IdempotencyOutcome.STALE_TURN)
+            raise errors.StaleTurn(expected_turn, campaign.turn_number)
+
+        try:
+            result = turn_engine.advance_turn(campaign, advice_id)
+        except turn_engine.UnknownAdviceOption as exc:
+            bind_log_fields(idempotency=IdempotencyOutcome.REJECTED)
+            raise errors.UnknownAdvice(advice_id) from exc
+
+        response = schemas.TurnResultModel.model_validate(asdict(result))
+        active.save_campaign(campaign, snapshot_turn=result.turn_number)
+        active.save_idempotency_record(
+            campaign_id=campaign_id,
+            idempotency_key=idempotency_key,
+            request_fingerprint=fingerprint,
+            expected_turn=expected_turn,
+            resulting_turn=result.turn_number,
+            response=response.model_dump(mode="json"),
+        )
+        bind_log_fields(
+            idempotency=IdempotencyOutcome.RESOLVED,
+            turn_number=result.turn_number,
+        )
+
+    return ResolvedTurn(response, replayed=False)
 
 
 def get_turns(campaign_id: str) -> Optional[schemas.TurnHistoryModel]:

@@ -16,6 +16,7 @@ from __future__ import annotations
 import os
 import sqlite3
 import sys
+import uuid
 
 import pytest
 
@@ -42,6 +43,29 @@ SURVIVAL_SEQUENCE = [
     "controlled_disclosure",
     "mutual_aid",
 ]
+
+
+def _submit(client, campaign_id, advice_id, *, expected_turn=None, key=None):
+    """Submit advice against the live revision with a fresh idempotency key.
+
+    Mirrors an honest client: one new key per deliberate submission, and the
+    turn number the client currently believes is authoritative.
+    """
+    if expected_turn is None:
+        current = client.get(f"/api/campaigns/{campaign_id}/current")
+        expected_turn = (
+            current.json()["summary"]["turn_number"]
+            if current.status_code == 200
+            else 1
+        )
+    return client.post(
+        f"/api/campaigns/{campaign_id}/advice",
+        json={
+            "advice_id": advice_id,
+            "expected_turn": expected_turn,
+            "idempotency_key": key or uuid.uuid4().hex,
+        },
+    )
 
 
 @pytest.fixture(autouse=True)
@@ -124,7 +148,8 @@ def test_get_campaign(client, campaign):
 def test_get_campaign_unknown_returns_404(client):
     res = client.get("/api/campaigns/does-not-exist")
     assert res.status_code == 404
-    assert "not found" in res.json()["detail"].lower()
+    assert res.json()["detail"]["error"] == "campaign_not_found"
+    assert "not found" in res.json()["detail"]["message"].lower()
 
 
 def test_recent_campaigns_expose_resume_metadata_only(client):
@@ -148,10 +173,7 @@ def test_recent_campaigns_expose_resume_metadata_only(client):
 
 
 def test_campaign_resumes_after_service_repository_reconstruction(client, campaign):
-    client.post(
-        f"/api/campaigns/{campaign}/advice",
-        json={"advice_id": "controlled_disclosure"},
-    )
+    _submit(client, campaign, "controlled_disclosure")
     before = client.get(f"/api/campaigns/{campaign}/turns").json()
     campaign_service.configure_repository()
     after = client.get(f"/api/campaigns/{campaign}/turns")
@@ -168,7 +190,12 @@ def test_corrupt_saved_campaign_returns_clear_error(client, campaign):
         )
     res = client.get(f"/api/campaigns/{campaign}/current")
     assert res.status_code == 500
-    assert "corrupt" in res.json()["detail"].lower()
+    detail = res.json()["detail"]
+    assert detail["error"] == "corrupt_record"
+    assert detail["request_id"]
+    # The player-facing message must not leak table names or record paths.
+    assert "payload_json" not in detail["message"]
+    assert "campaigns" not in detail["message"]
 
 
 def test_get_current_has_turn_package(client, campaign):
@@ -193,9 +220,7 @@ def test_current_unknown_campaign_returns_404(client):
 # ---------------------------------------------------------------------------
 
 def test_submit_advice_advances_turn(client, campaign):
-    res = client.post(
-        f"/api/campaigns/{campaign}/advice", json={"advice_id": "controlled_disclosure"}
-    )
+    res = _submit(client, campaign, "controlled_disclosure")
     assert res.status_code == 200
     body = res.json()
     assert body["turn_number"] == 1
@@ -208,20 +233,38 @@ def test_submit_advice_advances_turn(client, campaign):
 
 
 def test_submit_unknown_advice_returns_400(client, campaign):
-    res = client.post(
-        f"/api/campaigns/{campaign}/advice", json={"advice_id": "no_such_option"}
-    )
+    res = _submit(client, campaign, "no_such_option")
     assert res.status_code == 400
-    assert "unknown advice" in res.json()["detail"].lower()
+    assert res.json()["detail"]["error"] == "unknown_advice_option"
+    # A rejected option must not consume the turn.
+    assert client.get(f"/api/campaigns/{campaign}/current").json()["summary"][
+        "turn_number"
+    ] == 1
+
+
+_VALID_KEY = "a" * 32
 
 
 @pytest.mark.parametrize(
     "payload",
     [
-        {"advice_id": ""},
-        {"advice_id": "x" * 65},
-        {"advice_id": "NOT VALID"},
-        {"advice_id": "mutual_aid", "unexpected": True},
+        {"advice_id": "", "expected_turn": 1, "idempotency_key": _VALID_KEY},
+        {"advice_id": "x" * 65, "expected_turn": 1, "idempotency_key": _VALID_KEY},
+        {"advice_id": "NOT VALID", "expected_turn": 1, "idempotency_key": _VALID_KEY},
+        {"advice_id": "mutual_aid", "expected_turn": 1, "idempotency_key": _VALID_KEY, "unexpected": True},
+        # Missing revision / key.
+        {"advice_id": "mutual_aid"},
+        {"advice_id": "mutual_aid", "expected_turn": 1},
+        {"advice_id": "mutual_aid", "idempotency_key": _VALID_KEY},
+        # Out-of-bounds revision.
+        {"advice_id": "mutual_aid", "expected_turn": 0, "idempotency_key": _VALID_KEY},
+        {"advice_id": "mutual_aid", "expected_turn": 100000, "idempotency_key": _VALID_KEY},
+        {"advice_id": "mutual_aid", "expected_turn": "one", "idempotency_key": _VALID_KEY},
+        # Out-of-bounds / malformed idempotency keys.
+        {"advice_id": "mutual_aid", "expected_turn": 1, "idempotency_key": "short"},
+        {"advice_id": "mutual_aid", "expected_turn": 1, "idempotency_key": "k" * 65},
+        {"advice_id": "mutual_aid", "expected_turn": 1, "idempotency_key": "has spaces!"},
+        {"advice_id": "mutual_aid", "expected_turn": 1, "idempotency_key": ""},
     ],
 )
 def test_submit_advice_rejects_invalid_payloads(client, campaign, payload):
@@ -230,21 +273,20 @@ def test_submit_advice_rejects_invalid_payloads(client, campaign, payload):
 
 
 def test_submit_advice_unknown_campaign_returns_404(client):
-    res = client.post("/api/campaigns/nope/advice", json={"advice_id": "controlled_disclosure"})
+    res = _submit(client, "nope", "controlled_disclosure", expected_turn=1)
     assert res.status_code == 404
 
 
 def test_advancing_terminal_campaign_returns_409(client, campaign):
     # Play to completion.
     for advice_id in SURVIVAL_SEQUENCE:
-        res = client.post(f"/api/campaigns/{campaign}/advice", json={"advice_id": advice_id})
+        res = _submit(client, campaign, advice_id)
         if res.json()["status_after"] in ("COMPLETED", "FAILED"):
             break
     # Further advice on a terminal campaign must 409.
-    res = client.post(
-        f"/api/campaigns/{campaign}/advice", json={"advice_id": "controlled_disclosure"}
-    )
+    res = _submit(client, campaign, "controlled_disclosure")
     assert res.status_code == 409
+    assert res.json()["detail"]["error"] == "campaign_terminal"
 
 
 # ---------------------------------------------------------------------------
@@ -254,7 +296,7 @@ def test_advancing_terminal_campaign_returns_409(client, campaign):
 def test_full_campaign_completes_and_turns_recorded(client, campaign):
     last_status = "ACTIVE"
     for advice_id in SURVIVAL_SEQUENCE:
-        res = client.post(f"/api/campaigns/{campaign}/advice", json={"advice_id": advice_id})
+        res = _submit(client, campaign, advice_id)
         assert res.status_code == 200
         last_status = res.json()["status_after"]
         if last_status in ("COMPLETED", "FAILED"):
@@ -269,7 +311,7 @@ def test_full_campaign_completes_and_turns_recorded(client, campaign):
 
 def test_dossier_endpoint_returns_markdown(client, campaign):
     # Resolve one turn so the dossier has a timeline.
-    client.post(f"/api/campaigns/{campaign}/advice", json={"advice_id": "controlled_disclosure"})
+    _submit(client, campaign, "controlled_disclosure")
     res = client.get(f"/api/campaigns/{campaign}/dossier")
     assert res.status_code == 200
     body = res.json()
@@ -358,7 +400,7 @@ def test_model_runs_empty_for_new_campaign(client, campaign):
 def test_draft_memo_works_on_terminal_campaign(client, campaign):
     """Drafting a memo must not require an active turn (advisory, no state change)."""
     for advice_id in SURVIVAL_SEQUENCE:
-        res = client.post(f"/api/campaigns/{campaign}/advice", json={"advice_id": advice_id})
+        res = _submit(client, campaign, advice_id)
         if res.json()["status_after"] in ("COMPLETED", "FAILED"):
             break
     res = client.post(

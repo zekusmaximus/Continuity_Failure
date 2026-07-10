@@ -70,8 +70,29 @@ memory/     versioned SQLite repository (campaigns, immutable snapshots, model r
   campaign JSON reconstructs typed engine dataclasses exactly; separate
   append-only end-of-turn snapshots prevent later history rewrites; model runs
   use the same repository without gaining state-mutation authority. The path is
-  configurable with `CF_DATABASE_PATH` and schema version 1 is forward-migrated
-  through `schema_migrations` using only Python's standard library.
+  configurable with `CF_DATABASE_PATH` and schema versions are forward-migrated
+  through `schema_migrations` using only Python's standard library (v1 = base
+  tables, v2 = `turn_idempotency`).
+* **Atomic, idempotent turn resolution**: `POST /api/campaigns/{id}/advice`
+  requires `expected_turn` (the revision the client composed against) and a
+  bounded `idempotency_key`. `SQLiteRepository.transaction()` yields a
+  `RepositoryTransaction` and the campaign service performs the whole unit
+  inside it — idempotency lookup, terminal/revision guards, `advance_turn`,
+  campaign save, snapshot append, idempotency record — committing all of it or
+  rolling all of it back. `BEGIN IMMEDIATE` takes SQLite's write lock before the
+  campaign is read, so two competing submissions cannot both advance the same
+  turn; the loser sees `stale_turn`. `(campaign_id, idempotency_key)` is a
+  primary key, so an exact retry replays the stored response
+  (`Idempotent-Replay: true`) and never resolves a second turn.
+* **Request identity and structured logs** (`backend/app/observability.py`): a
+  pure-ASGI middleware adopts a valid inbound `X-Request-ID` or generates one,
+  echoes it, and emits one JSON line per request with `request_id`, `method`,
+  `route`, `status`, `duration_ms`, `campaign_id`, `turn_number`,
+  `expected_turn`, and the `idempotency` outcome (`resolved` / `replayed` /
+  `key_conflict` / `stale_turn` / `terminal` / `rejected` / `not_applicable`).
+  Loggable fields are an allow-list, so memo prose, prompts, and model output
+  cannot leak into request logs. Errors share one body shape:
+  `{"detail": {error, message, request_id, ...}}`.
 * **Dormant, validation-gated AI-assist layer** (`backend/app/ai/`): a memo
   drafter is the first implemented tool. `run_artifact` renders the versioned
   prompt, calls a provider (default `NullProvider`, which never succeeds), 

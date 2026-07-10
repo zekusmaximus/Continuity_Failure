@@ -86,6 +86,32 @@ the tests in `tests/`.
    `test_engine_imports_only_stdlib_and_itself`) so the check is independent
    of test collection order and what other tests import.
 
+7. **A turn resolves atomically, at most once per idempotency key.**
+   `POST /advice` carries `expected_turn` (the revision the client composed
+   against) and a bounded `idempotency_key`. `campaign_service.submit_advice`
+   opens one `SQLiteRepository.transaction()` and inside it checks the
+   idempotency record, guards terminal/revision, runs `engine.turn.advance_turn`,
+   saves the campaign, appends the immutable snapshot, and records the
+   idempotency result. All of it commits or none of it does — there is no
+   half-saved turn. Uniqueness of `(campaign_id, idempotency_key)` is a SQLite
+   primary key, not merely an application check. Conflicts are typed and stable:
+   same key + same payload replays the original response (`Idempotent-Replay:
+   true`); same key + different payload is `idempotency_key_conflict`; a
+   mismatched revision is `stale_turn`; a terminal campaign is
+   `campaign_terminal`. Covered by `tests/test_turn_atomicity.py`.
+   Transactionality lives in the application/repository layer; the engine stays
+   pure (invariant 6).
+
+8. **Every request is identified and every request logs one structured line.**
+   `RequestContextMiddleware` adopts a well-formed inbound `X-Request-ID` or
+   mints one, echoes it on the response, and emits a single JSON log record
+   with `request_id`, `method`, `route`, `status`, `duration_ms`, `campaign_id`,
+   `turn_number`, `expected_turn`, and the `idempotency` outcome. The field set
+   is an allow-list (`observability._BINDABLE_FIELDS`): advice memo text,
+   prompts, secrets, and model inputs/outputs can never enter a request log.
+   Error bodies are always `{"detail": {error, message, request_id, ...}}` with
+   player-safe prose and no internals.
+
 ## Tone
 
 The tone should be:
@@ -267,11 +293,13 @@ When making changes:
 
 ## Current Priority
 
-The deterministic Northbridge MVP is implemented, playable, and tested (156
-tests). A dormant, validation-gated AI-assist layer (memo drafter +
-`ModelRun` logging) is wired end to end and off by default. Build out the
-remaining read-only AI tools and add durable persistence before implementing
-autonomous multi-agent behavior.
+The deterministic Northbridge MVP is implemented, playable, and tested (212
+tests as of this commit — always re-derive the count with `pytest -q` rather
+than trusting this number). A dormant, validation-gated AI-assist layer (memo
+drafter + `ModelRun` logging) is wired end to end and off by default. Durable
+SQLite persistence and atomic, idempotent turn resolution are in place. Build
+out the remaining read-only AI tools before implementing autonomous
+multi-agent behavior.
 
 The first technical milestone (met):
 

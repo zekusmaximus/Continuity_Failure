@@ -255,23 +255,147 @@ export interface ModelRun {
   turn_number: number | null;
 }
 
+// --- Errors -----------------------------------------------------------------
+// The backend returns `{"detail": {error, message, request_id, ...}}` for every
+// failure. `code` is the stable machine-readable discriminator; `message` is
+// already player-safe prose and never contains internals.
+
+export type ApiErrorCode =
+  | "campaign_not_found"
+  | "campaign_terminal"
+  | "stale_turn"
+  | "idempotency_key_conflict"
+  | "unknown_advice_option"
+  | "corrupt_record"
+  | "network_error"
+  | "unexpected_error";
+
+export class ApiError extends Error {
+  readonly code: ApiErrorCode | string;
+  readonly status: number;
+  readonly requestId: string | null;
+  readonly expectedTurn: number | null;
+  readonly currentTurn: number | null;
+
+  constructor(init: {
+    code: string;
+    message: string;
+    status: number;
+    requestId?: string | null;
+    expectedTurn?: number | null;
+    currentTurn?: number | null;
+  }) {
+    super(init.message);
+    this.name = "ApiError";
+    this.code = init.code;
+    this.status = init.status;
+    this.requestId = init.requestId ?? null;
+    this.expectedTurn = init.expectedTurn ?? null;
+    this.currentTurn = init.currentTurn ?? null;
+  }
+}
+
+// `status === 0` marks a transport failure: the request may or may not have
+// reached the backend, which is exactly why retries must reuse the same key.
+const NETWORK_STATUS = 0;
+const RETRY_DELAYS_MS = [250, 750];
+
+function isRetriable(error: ApiError): boolean {
+  return (
+    error.status === NETWORK_STATUS ||
+    error.status === 408 ||
+    error.status === 429 ||
+    error.status >= 500
+  );
+}
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// Distinguishes keys minted in the same millisecond when the last-resort branch
+// below is the only one available. Two submissions must never share a key.
+let keyCounter = 0;
+
+/**
+ * Mint one idempotency key per deliberate user submission.
+ *
+ * Reuse it for every transport retry of that submission so a lost response can
+ * never resolve a second turn. A new submission must call this again.
+ *
+ * `randomUUID` needs a secure context; `getRandomValues` does not, so it covers
+ * plain-HTTP dev. The final branch runs only without Web Crypto entirely, and
+ * still cannot collide: the counter makes it unique within a page session.
+ */
+export function newIdempotencyKey(): string {
+  const source = globalThis.crypto;
+  if (typeof source?.randomUUID === "function") return source.randomUUID();
+  if (typeof source?.getRandomValues === "function") {
+    const bytes = new Uint8Array(16);
+    source.getRandomValues(bytes);
+    return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+  }
+  keyCounter += 1;
+  const drift = Math.random().toString(36).slice(2).padEnd(8, "0").slice(0, 8);
+  return `k-${Date.now().toString(36)}-${keyCounter.toString(36)}-${drift}`;
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(path, {
-    headers: { "Content-Type": "application/json" },
-    ...init,
-  });
+  let res: Response;
+  try {
+    res = await fetch(path, {
+      headers: { "Content-Type": "application/json" },
+      ...init,
+    });
+  } catch {
+    throw new ApiError({
+      code: "network_error",
+      message:
+        "The workstation could not reach the backend. Check the connection and retry.",
+      status: NETWORK_STATUS,
+    });
+  }
+
   if (!res.ok) {
-    let detail = `${res.status} ${res.statusText}`;
+    const requestId = res.headers.get("X-Request-ID");
+    let detail: Record<string, unknown> | null = null;
     try {
       const body = await res.json();
-      if (body?.detail) detail = body.detail;
+      if (body?.detail && typeof body.detail === "object") detail = body.detail;
+      else if (typeof body?.detail === "string") detail = { message: body.detail };
     } catch {
-      /* keep default */
+      /* fall through to the status-line default */
     }
-    throw new Error(detail);
+    throw new ApiError({
+      code: (detail?.error as string) ?? "unexpected_error",
+      message:
+        (detail?.message as string) ?? `${res.status} ${res.statusText}`,
+      status: res.status,
+      requestId: (detail?.request_id as string) ?? requestId,
+      expectedTurn: (detail?.expected_turn as number) ?? null,
+      currentTurn: (detail?.current_turn as number) ?? null,
+    });
   }
+
   if (res.status === 204) return undefined as unknown as T;
   return (await res.json()) as T;
+}
+
+/**
+ * Retry only transport-level failures, never a decided answer.
+ *
+ * A 4xx is the backend's verdict on this exact request and must not be
+ * retried. The request body is byte-identical across attempts, so the
+ * idempotency key is reused and the backend replays rather than re-resolves.
+ */
+async function requestWithRetry<T>(path: string, init: RequestInit): Promise<T> {
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      return await request<T>(path, init);
+    } catch (error) {
+      const exhausted = attempt >= RETRY_DELAYS_MS.length;
+      if (!(error instanceof ApiError) || !isRetriable(error) || exhausted) throw error;
+      await sleep(RETRY_DELAYS_MS[attempt]);
+    }
+  }
 }
 
 export const api = {
@@ -289,10 +413,24 @@ export const api = {
     ),
   getCurrent: (id: string) =>
     request<CurrentTurn>(`/api/campaigns/${id}/current`),
-  submitAdvice: (id: string, adviceId: string) =>
-    request<TurnResult>(`/api/campaigns/${id}/advice`, {
+  /**
+   * Resolve one turn. `expectedTurn` is the revision this submission was
+   * composed against; `idempotencyKey` must come from `newIdempotencyKey()`
+   * once per deliberate submission and is reused across transport retries.
+   */
+  submitAdvice: (
+    id: string,
+    adviceId: string,
+    expectedTurn: number,
+    idempotencyKey: string,
+  ) =>
+    requestWithRetry<TurnResult>(`/api/campaigns/${id}/advice`, {
       method: "POST",
-      body: JSON.stringify({ advice_id: adviceId }),
+      body: JSON.stringify({
+        advice_id: adviceId,
+        expected_turn: expectedTurn,
+        idempotency_key: idempotencyKey,
+      }),
     }),
   getTurns: (id: string) =>
     request<TurnHistory>(`/api/campaigns/${id}/turns`),
