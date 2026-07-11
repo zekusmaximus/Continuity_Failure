@@ -103,6 +103,7 @@ function baseResult(report: ConsequenceReport, diffs: TurnResult["diffs"] = []):
     faction_shifts: [],
     call_variant_id: null,
     powered_subsystem: null,
+    consequence_lead: { headline: "", future_hook: "", references: [] },
   };
 }
 

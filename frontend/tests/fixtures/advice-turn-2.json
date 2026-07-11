@@ -11,7 +11,7 @@
     "involved_factions": [
       "Northbridge Public Schools"
     ],
-    "memo_id": "memo_fbf27a822bf14cdd9176c712399ebc45",
+    "memo_id": "memo_5be995eb1a5741bc967a1346f5eb81a4",
     "public_status": "public",
     "source": "Northbridge Public Schools",
     "tags": [
@@ -20,6 +20,27 @@
     ],
     "title": "Turn 2: PARTIALLY_FOLLOWED on Full disclosure and emergency conservation order",
     "turn_number": 2
+  },
+  "consequence_lead": {
+    "future_hook": "No single variable is at a breaking point, but several are trending the wrong way.",
+    "headline": "You advised Full disclosure and emergency conservation order; the Northbridge Public Schools adopted part of it. This turn's largest recorded move: Media Pressure rose 11 under the recorded decision.",
+    "references": [
+      {
+        "id": "full_disclosure",
+        "kind": "decision",
+        "label": "Full disclosure and emergency conservation order"
+      },
+      {
+        "id": "media_pressure",
+        "kind": "diff",
+        "label": "Media Pressure"
+      },
+      {
+        "id": "turn_2_second_order_0",
+        "kind": "decision",
+        "label": "Second-order consequence"
+      }
+    ]
   },
   "consequence_report": {
     "variables": [
@@ -412,7 +433,7 @@
       ],
       "outcome_reason": "On-brief: Full disclosure and emergency conservation order was one of the options the Northbridge Public Schools asked about; the Northbridge Public Schools acted on it per its own risk posture."
     },
-    "memo_id": "memo_fbf27a822bf14cdd9176c712399ebc45",
+    "memo_id": "memo_5be995eb1a5741bc967a1346f5eb81a4",
     "memo_revision": 1,
     "modifications": {},
     "off_brief": false,
@@ -564,7 +585,7 @@
     "classification": "proposed",
     "content": "RECOMMENDATION\nRelease the preliminary result with a conservation order, notify the state agency in writing, and publish the response timeline.\n\nRATIONALE\nMinimizes legal exposure and protects information integrity.\n\nOPERATIONAL STEPS\n- Transmit the preliminary result and response timeline to the state liaison in writing.\n- Issue the conservation order with separate hospital and school operating instructions.\n- Publish the source report, known uncertainties, and the next verification deadline together.\n\nCOMMUNICATIONS\nFrame public communications around Full disclosure and emergency conservation order. State only what the record supports.\n\nLIKELY OPPOSITION\nExpect review or resistance from: Town Manager's Office, Local Media / Rumor Network, Parent and Resident Coalition, Local Business Alliance.\n\nSECOND-ORDER RISKS\n- Short-term public-order shock and media amplification.\n- Business and school disruption spike before mitigation lands.\n\nFALLBACK PLAN\nIf the client deviates from this advice, preserve the written advice of record and revisit at the next call.",
     "content_digest": "95bd13bbef8d5c824567a6575e58be5b73db32ad6e5fa59a33d69f95c1ef5117",
-    "memo_id": "memo_fbf27a822bf14cdd9176c712399ebc45",
+    "memo_id": "memo_5be995eb1a5741bc967a1346f5eb81a4",
     "name": "Advice of record — Full disclosure and emergency conservation order",
     "provenance": {
       "fallback_used": true,
@@ -576,7 +597,7 @@
       "workflow": "deterministic_fallback"
     },
     "revision": 1,
-    "sent_at": "2026-07-11T17:38:44.341662+00:00",
+    "sent_at": "2026-07-11T22:39:10.501639+00:00",
     "source": "system"
   },
   "status_after": "ACTIVE",
