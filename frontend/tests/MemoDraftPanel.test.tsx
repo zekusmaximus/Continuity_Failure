@@ -50,6 +50,35 @@ describe("persistent memo workbench", () => {
     expect(onSave).toHaveBeenCalledWith("Advice of record", "Player-edited content");
   });
 
+  test("distinguishes a desk template from a later player revision", () => {
+    const template = {
+      ...memo,
+      source: "system" as const,
+      provenance: {
+        ...memo.provenance,
+        workflow: "deterministic_template" as const,
+        fallback_used: false,
+        validation_status: null,
+      },
+    };
+    const { rerender } = render(
+      <MemoDraftPanel memo={template} loading={false} saving={false} error={null} onSave={vi.fn()} />,
+    );
+    expect(screen.getByText("Deterministic desk template")).toBeInTheDocument();
+    expect(screen.queryByText(/Player-edited from/)).not.toBeInTheDocument();
+
+    rerender(
+      <MemoDraftPanel
+        memo={{ ...template, source: "player", revision: 2 }}
+        loading={false}
+        saving={false}
+        error={null}
+        onSave={vi.fn()}
+      />,
+    );
+    expect(screen.getByText(/Player-edited from deterministic desk template/)).toBeInTheDocument();
+  });
+
   test("sent artifacts are visibly immutable", () => {
     render(
       <MemoDraftPanel

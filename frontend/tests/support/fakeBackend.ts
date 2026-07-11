@@ -76,6 +76,7 @@ export function createFakeBackend(options: Options = {}): FakeBackend {
   const adviceKeys: string[] = [];
   const injections: { fragment: string; injection: Injection }[] = [];
   let memos: Record<string, unknown>[] = [];
+  let pendingPresentation: Record<string, unknown> | null = null;
 
   function takeInjection(path: string): Injection | null {
     const index = injections.findIndex((i) => path.includes(i.fragment));
@@ -101,6 +102,7 @@ export function createFakeBackend(options: Options = {}): FakeBackend {
       resolved = 0;
       idempotency.clear();
       memos = [];
+      pendingPresentation = null;
       const summary = CURRENT_BY_TURN[0].summary;
       return json({
         id: CAMPAIGN_ID,
@@ -123,6 +125,23 @@ export function createFakeBackend(options: Options = {}): FakeBackend {
       return json(CURRENT_BY_TURN[turnNumber - 1]);
     }
 
+    if (method === "GET" && path.endsWith("/presentation")) {
+      return json(pendingPresentation);
+    }
+
+    if (method === "POST" && path.endsWith("/presentation/acknowledge")) {
+      const acknowledgedTurn = Number(body?.turn_number);
+      if (!pendingPresentation || pendingPresentation.turn_number !== acknowledgedTurn) {
+        return errorResponse(409, "turn_presentation_not_found", "No pending resolved turn.");
+      }
+      pendingPresentation = null;
+      return json({
+        campaign_id: CAMPAIGN_ID,
+        turn_number: acknowledgedTurn,
+        acknowledged: true,
+      });
+    }
+
     if (method === "GET" && path.endsWith("/turns")) {
       return json(TURNS_BY_RESOLVED[resolved]);
     }
@@ -141,7 +160,9 @@ export function createFakeBackend(options: Options = {}): FakeBackend {
 
     if (method === "POST" && path.endsWith("/memos")) {
       const now = "2026-07-10T00:00:00+00:00";
-      const source = body?.creation_mode === "ai" ? "system" : "player";
+      const isManual = body?.creation_mode === "manual";
+      const isTemplate = body?.creation_mode === "template";
+      const source = isManual ? "player" : "system";
       const content = String(body?.content ?? "Deterministic assisted memo content.");
       const memo = {
         id: `memo_${String(memos.length + 1).padStart(32, "0")}`,
@@ -156,13 +177,17 @@ export function createFakeBackend(options: Options = {}): FakeBackend {
         source,
         classification: "proposed",
         provenance: {
-          workflow: source === "player" ? "manual" : "deterministic_fallback",
+          workflow: isManual
+            ? "manual"
+            : isTemplate
+              ? "deterministic_template"
+              : "deterministic_fallback",
           model_run_id: null,
           prompt_version: source === "player" ? null : "v1",
           model_name: source === "player" ? null : "disabled",
           provider: source === "player" ? null : "disabled",
           validation_status: source === "player" ? null : "fallback",
-          fallback_used: source !== "player",
+          fallback_used: !isManual && !isTemplate,
         },
         turn_number: turnNumber,
         call_id: `call_${turnNumber}`,
@@ -213,7 +238,14 @@ export function createFakeBackend(options: Options = {}): FakeBackend {
         return errorResponse(409, "stale_turn", "The engagement record has moved on.");
       }
 
+      const resolvedTurn = turnNumber;
       const response = ADVICE_BY_TURN[turnNumber - 1];
+      pendingPresentation = {
+        campaign_id: CAMPAIGN_ID,
+        turn_number: resolvedTurn,
+        current_turn: CURRENT_BY_TURN[turnNumber - 1],
+        result: response,
+      };
       idempotency.set(key, { fingerprint, response });
       turnNumber += 1;
       resolved += 1;

@@ -123,3 +123,14 @@ class MemoAdviceMismatch(TurnResolutionError):
             "The attached memo was drafted for a different advice option. "
             "Create or select a memo for this recommendation."
         )
+
+
+class PresentationNotFound(TurnResolutionError):
+    code = "turn_presentation_not_found"
+    status_code = 409
+
+    def __init__(self, turn_number: int) -> None:
+        super().__init__(
+            f"Resolved turn {turn_number} is not awaiting Next Call acknowledgement."
+        )
+        self.turn_number = turn_number

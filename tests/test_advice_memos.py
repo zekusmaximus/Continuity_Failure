@@ -155,11 +155,53 @@ def test_ai_disabled_creation_uses_validated_deterministic_fallback(client, camp
     assert "_" not in memo["content"].split("LIKELY OPPOSITION", 1)[-1]
 
 
+def test_desk_template_is_system_authored_until_player_edits(client, campaign):
+    advice_id = _advice(client, campaign)
+    created = client.post(
+        f"/api/campaigns/{campaign}/memos",
+        json={
+            "creation_mode": "template",
+            "advice_id": advice_id,
+            "name": "Desk template",
+        },
+    )
+    assert created.status_code == 201
+    template = created.json()
+    assert template["source"] == "system"
+    assert template["author"] == "Continuity Desk"
+    assert template["provenance"]["workflow"] == "deterministic_template"
+    assert template["provenance"]["fallback_used"] is False
+    assert template["revisions"][0]["source"] == "system"
+
+    edited = client.patch(
+        f"/api/campaigns/{campaign}/memos/{template['id']}",
+        json={
+            "expected_revision": 1,
+            "name": "Player-revised template",
+            "content": template["content"] + "\n\nPLAYER NOTE\nPreserve this addition.",
+        },
+    )
+    assert edited.status_code == 200
+    revision = edited.json()
+    assert revision["source"] == "player"
+    assert [item["source"] for item in revision["revisions"]] == ["system", "player"]
+    assert revision["provenance"]["workflow"] == "deterministic_template"
+
+    sent = _send(client, campaign, advice_id, revision)
+    assert sent.status_code == 200
+    snapshot = sent.json()["sent_memo"]
+    assert snapshot["source"] == "player"
+    assert snapshot["provenance"]["workflow"] == "deterministic_template"
+    dossier = client.get(f"/api/campaigns/{campaign}/dossier").json()["markdown"]
+    assert "Workflow:** deterministic desk template" in dossier
+
+
 @pytest.mark.parametrize(
     "payload",
     [
         {"creation_mode": "manual", "advice_id": "controlled_disclosure", "name": "x"},
         {"creation_mode": "ai", "advice_id": "controlled_disclosure", "name": "x", "content": "no"},
+        {"creation_mode": "template", "advice_id": "controlled_disclosure", "name": "x", "content": "no"},
         {"creation_mode": "manual", "advice_id": "controlled_disclosure", "name": "x", "content": " "},
         {"creation_mode": "manual", "advice_id": "controlled_disclosure", "name": "x", "content": "ok", "effects": {}},
         {"creation_mode": "manual", "advice_id": "BAD ID", "name": "x", "content": "ok"},

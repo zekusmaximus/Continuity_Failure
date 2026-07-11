@@ -54,7 +54,7 @@ test.describe("keyboard operation", () => {
     await page.keyboard.press("Space");
     await expect(option).toBeChecked();
 
-    await pressButton(page, "Create manual memo");
+    await pressButton(page, "Create desk template");
     await expect(page.getByText(/Memo attached for send/)).toBeVisible();
     await pressButton(page, "Send Advice");
     await expect(page.getByText(/Client decision · Turn 1/)).toBeVisible();

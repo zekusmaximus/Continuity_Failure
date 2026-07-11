@@ -28,6 +28,39 @@ async function playOneTurn(page: import("@playwright/test").Page): Promise<strin
 }
 
 test.describe("durable resume", () => {
+  test("a resolved turn survives refresh and backend restart until Next Call", async ({ page }) => {
+    await beginIntake(page);
+    await walkToAdvice(page);
+    await adviceOption(page, FULL_DISCLOSURE).check();
+    await sendAdvice(page);
+
+    await expect(page.getByText(/Client decision · Turn 1/)).toBeVisible();
+    await page.reload();
+    await expect(page.getByText(/Client decision · Turn 1/)).toBeVisible();
+    await expect(turnBadge(page)).toHaveText("TURN 1 / 10");
+    await expect(page.getByText("Northbridge Public Schools")).toHaveCount(0);
+
+    await primaryAction(page, "Review Consequences").click();
+    await expect(page.getByText("How the state moved")).toBeVisible();
+    await restartBackend();
+    await page.reload();
+    await expect(page.getByText(/Client decision · Turn 1/)).toBeVisible();
+    await expect(turnBadge(page)).toHaveText("TURN 1 / 10");
+
+    await primaryAction(page, "Review Consequences").click();
+    await primaryAction(page, "Close Turn").click();
+    await expect(page.getByText(/Turn archive · Turn 1 filed/)).toBeVisible();
+    await page.reload();
+    await expect(page.getByText(/Client decision · Turn 1/)).toBeVisible();
+    await expect(turnBadge(page)).toHaveText("TURN 1 / 10");
+
+    await primaryAction(page, "Review Consequences").click();
+    await primaryAction(page, "Close Turn").click();
+    await primaryAction(page, "Next Call").click();
+    await expect(page.getByText(/Incoming call · Turn 2/)).toBeVisible();
+    await expect(turnBadge(page)).toHaveText("TURN 2 / 10");
+  });
+
   test("a refresh reopens the same campaign from the URL", async ({ page }) => {
     const campaignId = await playOneTurn(page);
 

@@ -66,8 +66,10 @@ The API is served at `http://localhost:8000`. Interactive docs:
 | GET    | `/api/campaigns?limit=5` | Minimal recent-campaign metadata for resume |
 | GET    | `/api/campaigns/{id}` | Campaign summary + current world state |
 | GET    | `/api/campaigns/{id}/current` | Current turn package (state, call, advice, last turn) |
+| GET    | `/api/campaigns/{id}/presentation` | Resolved turn awaiting explicit Next Call acknowledgement |
+| POST   | `/api/campaigns/{id}/presentation/acknowledge` | Idempotently acknowledge the resolved turn before loading the next call |
 | POST   | `/api/campaigns/{id}/advice` | Submit advice, resolve NPC decision, advance one turn |
-| GET/POST | `/api/campaigns/{id}/memos` | List or create persistent manual/AI-assisted memo drafts |
+| GET/POST | `/api/campaigns/{id}/memos` | List or create manual, desk-template, or AI-assisted memo drafts |
 | PATCH  | `/api/campaigns/{id}/memos/{memo_id}` | Save a new player-authored draft revision |
 | GET    | `/api/campaigns/{id}/turns` | Full turn history + canon archive |
 | GET    | `/api/campaigns/{id}/dossier` | Campaign dossier as Markdown |
@@ -87,7 +89,7 @@ remains available through its deterministic fallback.
 ## Persistence
 
 Campaigns (including versioned `AdviceMemo` aggregates), immutable end-of-turn
-snapshots, and complete advisory `ModelRun` records are stored in SQLite through
+snapshots, unresolved presentation checkpoints, and complete advisory `ModelRun` records are stored in SQLite through
 `memory/persistence.py`. A sent memo's exact content, digest, provenance, and
 revision are copied into the immutable turn snapshot in the same transaction as
 the NPC decision and AppliedDiff record. The default file
@@ -99,7 +101,7 @@ export CF_DATABASE_PATH=/path/to/continuity_failure.sqlite3
 ```
 
 The repository uses Python's standard-library `sqlite3`. Schema changes are
-tracked in `schema_migrations`; campaign, snapshot, and model-run JSON envelopes
+tracked in `schema_migrations`; campaign, snapshot, presentation, and model-run JSON envelopes
 currently use document version 1. Tests always override the path with isolated
 temporary databases.
 

@@ -27,7 +27,7 @@ export default function MemoDraftPanel({ memo, loading, saving, error, onSave }:
   if (!memo) {
     return (
       <div className="cd-memo-panel cd-muted" role="status">
-        No memo attached. Create a manual draft or request an assisted draft before sending.
+        No memo attached. Create a desk template or request an assisted draft before sending.
       </div>
     );
   }
@@ -38,7 +38,9 @@ export default function MemoDraftPanel({ memo, loading, saving, error, onSave }:
     ? "Validated AI-assisted source"
     : memo.provenance.workflow === "deterministic_fallback"
       ? "Deterministic system fallback"
-      : "Manual player draft";
+      : memo.provenance.workflow === "deterministic_template"
+        ? "Deterministic desk template"
+        : "Manual player draft";
 
   return (
     <div className="cd-memo-panel">

@@ -144,25 +144,46 @@ export default function App() {
   }, []);
 
   const reopenCampaign = useCallback(async (id: string) => {
-    const [cur, turns, memoRecords] = await Promise.all([
+    const [cur, turns, memoRecords, presentation] = await Promise.all([
       api.getCurrent(id),
       api.getTurns(id),
       api.getMemos(id),
+      api.getPresentation(id),
     ]);
     setCampaignId(id);
-    setCurrent(cur);
-    setSummary(cur.summary);
     setHistory(turns);
     setMemos(memoRecords);
-    setLastResult(null);
-    setSelected(null);
-    setMemo(null);
     setMemoError(null);
-    if (cur.summary.status === "ACTIVE") {
+    if (presentation) {
+      const frozen = presentation.current_turn;
+      const result = presentation.result;
+      setCurrent(frozen);
+      setSummary(frozen.summary);
+      setLastResult(result);
+      setSelected(result.advice_id);
+      setMemo(
+        memoRecords.find((item) => item.id === result.sent_memo?.memo_id) ?? null,
+      );
+      setMaxReachedIndex(TURN_STEPS.indexOf("CLIENT_DECISION"));
+      gotoPhase(
+        "CLIENT_DECISION",
+        `Turn ${result.turn_number} remains resolved. Review it before loading the next call.`,
+      );
+    } else if (cur.summary.status === "ACTIVE") {
+      setCurrent(cur);
+      setSummary(cur.summary);
+      setLastResult(null);
+      setSelected(null);
+      setMemo(null);
       setMaxReachedIndex(0);
       gotoPhase("CALL", `Turn ${cur.summary.turn_number} incoming call loaded.`);
       showFirstTurnGuide(cur.summary.turn_number);
     } else {
+      setCurrent(cur);
+      setSummary(cur.summary);
+      setLastResult(null);
+      setSelected(null);
+      setMemo(null);
       setMaxReachedIndex(TURN_STEPS.length - 1);
       gotoPhase("DOSSIER", "Campaign dossier loaded.");
     }
@@ -298,30 +319,27 @@ export default function App() {
   }, [campaignId, selected, current, submitting, memo, refreshCurrent, refreshHistory, gotoPhase]);
 
   const handleNextCall = useCallback(async () => {
-    if (!campaignId) return;
+    if (!campaignId || !lastResult) return;
     setLoading(true);
     setError(null);
     try {
-      const cur = await refreshCurrent(campaignId);
-      setSelected(null);
-      setLastResult(null);
-      setMemo(null);
-      setMemoError(null);
-      await refreshMemos(campaignId);
-      setMaxReachedIndex(0);
-      gotoPhase("CALL", `Turn ${cur.summary.turn_number} incoming call loaded.`);
+      await api.acknowledgePresentation(campaignId, lastResult.turn_number);
+      await reopenCampaign(campaignId);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setLoading(false);
     }
-  }, [campaignId, refreshCurrent, refreshMemos, gotoPhase]);
+  }, [campaignId, lastResult, reopenCampaign]);
 
   const handleOpenDossier = useCallback(async () => {
     if (!campaignId) return;
     setLoading(true);
     setError(null);
     try {
+      if (lastResult) {
+        await api.acknowledgePresentation(campaignId, lastResult.turn_number);
+      }
       await Promise.all([refreshCurrent(campaignId), refreshHistory(campaignId)]);
       setLastResult(null);
       gotoPhase("DOSSIER", "Campaign dossier loaded.");
@@ -330,7 +348,7 @@ export default function App() {
     } finally {
       setLoading(false);
     }
-  }, [campaignId, refreshCurrent, refreshHistory, gotoPhase]);
+  }, [campaignId, lastResult, refreshCurrent, refreshHistory, gotoPhase]);
 
   const handleRestart = useCallback(() => {
     if (
@@ -369,15 +387,13 @@ export default function App() {
     if (!campaignId || !selected || !current) return;
     const option = current.advice_options.find((item) => item.id === selected);
     if (!option) return;
-    const steps = option.operational_steps.map((step) => `- ${step}`).join("\n");
     setMemoLoading(true);
     setMemoError(null);
     try {
       const created = await api.createMemo(campaignId, {
-        creation_mode: "manual",
+        creation_mode: "template",
         advice_id: selected,
         name: `Advice of record — ${option.title || option.label}`,
-        content: `RECOMMENDATION\n${option.recommendation || option.summary}\n\nRATIONALE\n${option.rationale}\n\nOPERATIONAL STEPS\n${steps}`,
       });
       setMemo(created);
       setMemos((records) => [...records, created]);

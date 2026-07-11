@@ -27,7 +27,7 @@ from typing import Any, Dict, Iterator, List, Mapping, Optional, Protocol, Union
 from engine.models import Campaign
 
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 DOCUMENT_VERSION = 1
 
 
@@ -41,6 +41,10 @@ class CorruptRecordError(StorageError):
 
 class ImmutableSnapshotError(StorageError):
     """A save attempted to change an already-recorded turn snapshot."""
+
+
+class ImmutablePresentationError(StorageError):
+    """A resolved-turn presentation record was changed after insertion."""
 
 
 class DuplicateIdempotencyKeyError(StorageError):
@@ -64,6 +68,10 @@ class CampaignRepository(Protocol):
     def list_recent(self, limit: int = 5) -> List[dict]: ...
     def add_model_run(self, payload: Mapping[str, Any]) -> None: ...
     def model_runs_for_campaign(self, campaign_id: str) -> List[dict]: ...
+    def pending_turn_presentation(self, campaign_id: str) -> Optional[dict]: ...
+    def acknowledge_turn_presentation(
+        self, campaign_id: str, turn_number: int
+    ) -> bool: ...
     def transaction(self) -> Any: ...
 
 
@@ -368,6 +376,78 @@ class RepositoryTransaction:
                 f"Idempotency key already recorded for campaign {campaign_id}"
             ) from exc
 
+    def save_turn_presentation(
+        self,
+        *,
+        campaign_id: str,
+        turn_number: int,
+        current_turn: Mapping[str, Any],
+        result: Mapping[str, Any],
+    ) -> None:
+        """Append the exact resolved-turn UI checkpoint inside the turn transaction."""
+        payload = _json_document(
+            "turn_presentation",
+            {
+                "campaign_id": campaign_id,
+                "turn_number": turn_number,
+                "current_turn": dict(current_turn),
+                "result": dict(result),
+            },
+        )
+        existing = self._connection.execute(
+            "SELECT payload_json FROM turn_presentations "
+            "WHERE campaign_id = ? AND turn_number = ?",
+            (campaign_id, turn_number),
+        ).fetchone()
+        if existing is None:
+            self._connection.execute(
+                "INSERT INTO turn_presentations("
+                "campaign_id, turn_number, created_at, acknowledged_at, payload_json) "
+                "VALUES (?, ?, ?, NULL, ?)",
+                (campaign_id, turn_number, _utc_now(), payload),
+            )
+        elif existing["payload_json"] != payload:
+            raise ImmutablePresentationError(
+                f"Turn {turn_number} presentation for campaign {campaign_id} is immutable"
+            )
+
+    def pending_turn_presentation(self, campaign_id: str) -> Optional[dict]:
+        row = self._connection.execute(
+            "SELECT payload_json FROM turn_presentations "
+            "WHERE campaign_id = ? AND acknowledged_at IS NULL "
+            "ORDER BY turn_number LIMIT 1",
+            (campaign_id,),
+        ).fetchone()
+        if row is None:
+            return None
+        return _read_document(row["payload_json"], "turn_presentation")
+
+    def acknowledge_turn_presentation(
+        self, campaign_id: str, turn_number: int
+    ) -> bool:
+        row = self._connection.execute(
+            "SELECT acknowledged_at FROM turn_presentations "
+            "WHERE campaign_id = ? AND turn_number = ?",
+            (campaign_id, turn_number),
+        ).fetchone()
+        if row is None:
+            return False
+        if row["acknowledged_at"] is not None:
+            return True
+        pending = self._connection.execute(
+            "SELECT MIN(turn_number) AS turn_number FROM turn_presentations "
+            "WHERE campaign_id = ? AND acknowledged_at IS NULL",
+            (campaign_id,),
+        ).fetchone()
+        if pending is None or pending["turn_number"] != turn_number:
+            return False
+        self._connection.execute(
+            "UPDATE turn_presentations SET acknowledged_at = ? "
+            "WHERE campaign_id = ? AND turn_number = ?",
+            (_utc_now(), campaign_id, turn_number),
+        )
+        return True
+
 
 class SQLiteRepository:
     """SQLite implementation of the campaign/model-run storage boundary."""
@@ -464,6 +544,30 @@ class SQLiteRepository:
                     "INSERT INTO schema_migrations(version, applied_at) VALUES (?, ?)",
                     (2, _utc_now()),
                 )
+            if current < 3:
+                # Presentation checkpoints are application workflow state, not
+                # WorldState. They preserve the exact resolved turn across a
+                # refresh until the player explicitly acknowledges Next Call.
+                connection.executescript(
+                    """
+                    CREATE TABLE turn_presentations (
+                        campaign_id TEXT NOT NULL,
+                        turn_number INTEGER NOT NULL,
+                        created_at TEXT NOT NULL,
+                        acknowledged_at TEXT,
+                        payload_json TEXT NOT NULL,
+                        PRIMARY KEY (campaign_id, turn_number),
+                        FOREIGN KEY (campaign_id) REFERENCES campaigns(id)
+                            ON DELETE CASCADE
+                    );
+                    CREATE INDEX turn_presentations_pending_idx
+                        ON turn_presentations(campaign_id, acknowledged_at, turn_number);
+                    """
+                )
+                connection.execute(
+                    "INSERT INTO schema_migrations(version, applied_at) VALUES (?, ?)",
+                    (3, _utc_now()),
+                )
 
     @contextmanager
     def transaction(self) -> Iterator["RepositoryTransaction"]:
@@ -520,6 +624,17 @@ class SQLiteRepository:
                 (limit,),
             ).fetchall()
         return [dict(row) for row in rows]
+
+    def pending_turn_presentation(self, campaign_id: str) -> Optional[dict]:
+        with self._lock, self._connect() as connection:
+            active = RepositoryTransaction(connection)
+            return active.pending_turn_presentation(campaign_id)
+
+    def acknowledge_turn_presentation(
+        self, campaign_id: str, turn_number: int
+    ) -> bool:
+        with self.transaction() as active:
+            return active.acknowledge_turn_presentation(campaign_id, turn_number)
 
     def snapshot_json(self, campaign_id: str, turn_number: int) -> Optional[str]:
         """Inspection hook used by persistence regression tests."""

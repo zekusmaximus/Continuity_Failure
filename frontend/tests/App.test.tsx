@@ -80,7 +80,7 @@ describe("temporal snapshot", () => {
     await user.click(
       screen.getByRole("radio", { name: /Full disclosure and emergency conservation order/ }),
     );
-    await user.click(screen.getByRole("button", { name: "Create manual memo" }));
+    await user.click(screen.getByRole("button", { name: "Create desk template" }));
     await screen.findByText(/Memo attached for send/);
     await user.click(screen.getByRole("button", { name: "Send Advice" }));
     await screen.findByText(/Client decision · Turn 1/);
@@ -106,7 +106,7 @@ describe("temporal snapshot", () => {
     await user.click(
       screen.getByRole("radio", { name: /Full disclosure and emergency conservation order/ }),
     );
-    await user.click(screen.getByRole("button", { name: "Create manual memo" }));
+    await user.click(screen.getByRole("button", { name: "Create desk template" }));
     await screen.findByText(/Memo attached for send/);
     await user.click(screen.getByRole("button", { name: "Send Advice" }));
     await user.click(await screen.findByRole("button", { name: "Review Consequences" }));
@@ -119,6 +119,34 @@ describe("temporal snapshot", () => {
     expect(turnText()).toBe("TURN 2 / 10");
     expect(backend.resolvedTurns, "one turn resolved, not two").toBe(1);
     expect(backend.requestsFor("/advice", "POST").length).toBe(1);
+  });
+
+  test("a refresh reconstructs the resolved turn until Next Call is acknowledged", async () => {
+    const user = userEvent.setup();
+    const mounted = render(<App />);
+
+    await startAndReachAdvice(user);
+    await user.click(
+      screen.getByRole("radio", { name: /Full disclosure and emergency conservation order/ }),
+    );
+    await user.click(screen.getByRole("button", { name: "Create desk template" }));
+    await user.click(screen.getByRole("button", { name: "Send Advice" }));
+    await screen.findByText(/Client decision · Turn 1/);
+
+    mounted.unmount();
+    render(<App />);
+
+    await screen.findByText(/Client decision · Turn 1/);
+    expect(turnText()).toBe("TURN 1 / 10");
+    expect(screen.queryByText("Northbridge Public Schools")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Review Consequences" }));
+    await user.click(screen.getByRole("button", { name: "Close Turn" }));
+    await user.click(screen.getByRole("button", { name: "Next Call" }));
+
+    await screen.findByText(/Incoming call · Turn 2/);
+    expect(turnText()).toBe("TURN 2 / 10");
+    expect(backend.requestsFor("/presentation/acknowledge", "POST")).toHaveLength(1);
   });
 });
 

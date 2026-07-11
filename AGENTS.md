@@ -112,6 +112,14 @@ the tests in `tests/`.
    Error bodies are always `{"detail": {error, message, request_id, ...}}` with
    player-safe prose and no internals.
 
+9. **A resolved turn remains frozen until the player explicitly moves on.**
+   The advice transaction appends an immutable `turn_presentations` record with
+   the exact pre-resolution turn package and resolved result. Refresh and
+   backend restart restore that record at Client Decision; only the idempotent
+   presentation acknowledgement used by **Next Call** (or the terminal dossier
+   action) releases the following call. This checkpoint is application workflow
+   state outside `engine/` and never mutates `WorldState`.
+
 ## Tone
 
 The tone should be:

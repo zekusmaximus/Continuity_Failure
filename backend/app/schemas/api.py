@@ -311,7 +311,9 @@ class CanonEntryModel(BaseModel):
 
 
 class MemoProvenanceModel(BaseModel):
-    workflow: str = Field(pattern=r"^(manual|ai_assisted|deterministic_fallback)$")
+    workflow: str = Field(
+        pattern=r"^(manual|deterministic_template|ai_assisted|deterministic_fallback)$"
+    )
     model_run_id: Optional[str] = None
     prompt_version: Optional[str] = None
     model_name: Optional[str] = None
@@ -366,7 +368,7 @@ class AdviceMemoModel(BaseModel):
 
 
 class CreateMemoRequest(StrictRequestModel):
-    creation_mode: Literal["manual", "ai"]
+    creation_mode: Literal["manual", "template", "ai"]
     advice_id: str = Field(min_length=1, max_length=64, pattern=r"^[a-z0-9_]+$")
     name: str = Field(min_length=1, max_length=120, pattern=r"^.*\S.*$")
     content: Optional[str] = Field(default=None, min_length=1, max_length=12000)
@@ -380,8 +382,8 @@ class CreateMemoRequest(StrictRequestModel):
     def validate_creation_mode(self):
         if self.creation_mode == "manual" and not (self.content and self.content.strip()):
             raise ValueError("manual memos require non-blank content")
-        if self.creation_mode == "ai" and self.content is not None:
-            raise ValueError("AI-assisted memos do not accept supplied content")
+        if self.creation_mode in ("template", "ai") and self.content is not None:
+            raise ValueError("template and AI-assisted memos do not accept supplied content")
         if self.content is not None:
             self.content = self.content.strip()
         return self
@@ -491,6 +493,24 @@ class CurrentTurnModel(BaseModel):
     open_threads: List[OpenThreadModel] = Field(default_factory=list)
     system_status: SystemStatusModel
     last_turn: Optional[TurnResultModel] = None
+
+
+class TurnPresentationModel(BaseModel):
+    """Unacknowledged resolved turn, frozen until explicit Next Call."""
+    campaign_id: str
+    turn_number: int = Field(ge=1)
+    current_turn: CurrentTurnModel
+    result: TurnResultModel
+
+
+class AcknowledgePresentationRequest(StrictRequestModel):
+    turn_number: int = Field(ge=1, le=MAX_TURN_NUMBER, strict=True)
+
+
+class PresentationAcknowledgedModel(BaseModel):
+    campaign_id: str
+    turn_number: int = Field(ge=1)
+    acknowledged: Literal[True] = True
 
 
 class TurnHistoryModel(BaseModel):

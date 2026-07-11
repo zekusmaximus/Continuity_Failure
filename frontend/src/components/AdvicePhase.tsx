@@ -301,7 +301,7 @@ export default function AdvicePhase({
             onClick={onCreateManualMemo}
             disabled={memoLoading || !!memo}
           >
-            Create manual memo
+            Create desk template
           </button>
           <button
             className="cd-btn cd-btn-ghost"

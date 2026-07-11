@@ -183,7 +183,7 @@ export interface CanonEntry {
 }
 
 export interface MemoProvenance {
-  workflow: "manual" | "ai_assisted" | "deterministic_fallback";
+  workflow: "manual" | "deterministic_template" | "ai_assisted" | "deterministic_fallback";
   model_run_id: string | null;
   prompt_version: string | null;
   model_name: string | null;
@@ -320,6 +320,13 @@ export interface CurrentTurn {
   open_threads: OpenThread[];
   system_status: SystemStatus;
   last_turn: TurnResult | null;
+}
+
+export interface TurnPresentation {
+  campaign_id: string;
+  turn_number: number;
+  current_turn: CurrentTurn;
+  result: TurnResult;
 }
 
 export interface TurnHistory {
@@ -552,6 +559,16 @@ export const api = {
     ),
   getCurrent: (id: string) =>
     request<CurrentTurn>(`/api/campaigns/${id}/current`),
+  getPresentation: (id: string) =>
+    request<TurnPresentation | null>(`/api/campaigns/${id}/presentation`),
+  acknowledgePresentation: (id: string, turnNumber: number) =>
+    request<{ campaign_id: string; turn_number: number; acknowledged: true }>(
+      `/api/campaigns/${id}/presentation/acknowledge`,
+      {
+        method: "POST",
+        body: JSON.stringify({ turn_number: turnNumber }),
+      },
+    ),
   /**
    * Resolve one turn. `expectedTurn` is the revision this submission was
    * composed against; `idempotencyKey` must come from `newIdempotencyKey()`
@@ -584,7 +601,7 @@ export const api = {
   createMemo: (
     id: string,
     payload: {
-      creation_mode: "manual" | "ai";
+      creation_mode: "manual" | "template" | "ai";
       advice_id: string;
       name: string;
       content?: string;

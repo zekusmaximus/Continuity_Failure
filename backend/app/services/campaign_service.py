@@ -153,11 +153,8 @@ def list_recent_campaigns(limit: int = 5) -> list[schemas.RecentCampaignModel]:
     ]
 
 
-def get_current(campaign_id: str) -> Optional[schemas.CurrentTurnModel]:
-    campaign = _require_campaign_or_none(campaign_id)
-    if campaign is None:
-        return None
-
+def _current_model(campaign: Campaign) -> schemas.CurrentTurnModel:
+    """Map one campaign revision to the exact turn package shown by the desk."""
     call = campaign.current_call()
     client_call = schemas.ClientCallModel.model_validate(asdict(call)) if call else None
     advice_options = [
@@ -179,6 +176,38 @@ def get_current(campaign_id: str) -> Optional[schemas.CurrentTurnModel]:
         open_threads=_open_threads(campaign),
         system_status=_system_status(campaign),
         last_turn=last_turn,
+    )
+
+
+def get_current(campaign_id: str) -> Optional[schemas.CurrentTurnModel]:
+    campaign = _require_campaign_or_none(campaign_id)
+    if campaign is None:
+        return None
+    return _current_model(campaign)
+
+
+def get_pending_presentation(
+    campaign_id: str,
+) -> Optional[schemas.TurnPresentationModel]:
+    """Return the oldest resolved turn not yet acknowledged by Next Call."""
+    if get_repository().get(campaign_id) is None:
+        raise errors.CampaignNotFound(campaign_id)
+    payload = get_repository().pending_turn_presentation(campaign_id)
+    if payload is None:
+        return None
+    return schemas.TurnPresentationModel.model_validate(payload)
+
+
+def acknowledge_presentation(
+    campaign_id: str, turn_number: int
+) -> schemas.PresentationAcknowledgedModel:
+    """Idempotently record the player's explicit transition beyond a resolved turn."""
+    if get_repository().get(campaign_id) is None:
+        raise errors.CampaignNotFound(campaign_id)
+    if not get_repository().acknowledge_turn_presentation(campaign_id, turn_number):
+        raise errors.PresentationNotFound(turn_number)
+    return schemas.PresentationAcknowledgedModel(
+        campaign_id=campaign_id, turn_number=turn_number
     )
 
 
@@ -391,6 +420,7 @@ def submit_advice(
                 raise errors.MemoAdviceMismatch()
 
         sent_at = _utc_now()
+        current_before_resolution = _current_model(campaign)
         sent_snapshot = SentMemoSnapshot(
             memo_id=memo.id,
             revision=memo.revision,
@@ -430,6 +460,12 @@ def submit_advice(
 
         response = schemas.TurnResultModel.model_validate(asdict(result))
         active.save_campaign(campaign, snapshot_turn=result.turn_number)
+        active.save_turn_presentation(
+            campaign_id=campaign_id,
+            turn_number=result.turn_number,
+            current_turn=current_before_resolution.model_dump(mode="json"),
+            result=response.model_dump(mode="json"),
+        )
         active.save_idempotency_record(
             campaign_id=campaign_id,
             idempotency_key=idempotency_key,
@@ -494,7 +530,7 @@ def create_memo(
 ) -> schemas.AdviceMemoModel:
     """Create a persistent proposed memo without touching WorldState."""
     artifact = None
-    if creation_mode == "ai":
+    if creation_mode in ("template", "ai"):
         campaign = _require_campaign(campaign_id)
         option = next(
             (item for item in campaign.available_advice() if item.id == advice_id),
@@ -505,17 +541,20 @@ def create_memo(
         payload = fallbacks.build_memo_input(
             option, campaign.current_call(), campaign.world_state.factions
         )
-        artifact = run_artifact(
-            prompt_name="memo_drafter",
-            prompt_version="v1",
-            input_payload=payload,
-            schema=MemoDraft,
-            fallback=fallbacks.memo_fallback,
-            input_summary=f"turn {campaign.turn_number}: {option.label}",
-            campaign_id=campaign.id,
-            turn_number=campaign.turn_number,
-        )
-        content = _memo_content_text(artifact.content)
+        if creation_mode == "template":
+            content = _memo_content_text(fallbacks.memo_fallback(payload))
+        else:
+            artifact = run_artifact(
+                prompt_name="memo_drafter",
+                prompt_version="v1",
+                input_payload=payload,
+                schema=MemoDraft,
+                fallback=fallbacks.memo_fallback,
+                input_summary=f"turn {campaign.turn_number}: {option.label}",
+                campaign_id=campaign.id,
+                turn_number=campaign.turn_number,
+            )
+            content = _memo_content_text(artifact.content)
 
     with get_repository().transaction() as active:
         campaign = active.get_campaign(campaign_id)
@@ -524,10 +563,16 @@ def create_memo(
         if not any(item.id == advice_id for item in campaign.available_advice()):
             raise errors.UnknownAdvice(advice_id)
 
-        if artifact is None:
+        if creation_mode == "manual":
             provenance = MemoProvenance(workflow="manual", fallback_used=False)
             source = "player"
             author = "Player consultant"
+        elif creation_mode == "template":
+            provenance = MemoProvenance(
+                workflow="deterministic_template", fallback_used=False
+            )
+            source = "system"
+            author = "Continuity Desk"
         else:
             provenance = MemoProvenance(
                 workflow=(

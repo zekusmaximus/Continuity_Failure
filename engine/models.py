@@ -371,7 +371,7 @@ class CanonEntry:
 @dataclass
 class MemoProvenance:
     """Audit metadata for advisory prose; never an input to engine effects."""
-    workflow: str                 # manual / ai_assisted / deterministic_fallback
+    workflow: str                 # manual / deterministic_template / ai_assisted / deterministic_fallback
     model_run_id: Optional[str] = None
     prompt_version: Optional[str] = None
     model_name: Optional[str] = None

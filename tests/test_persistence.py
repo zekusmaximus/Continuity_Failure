@@ -134,7 +134,7 @@ def test_schema_version_is_recorded(tmp_path):
         version = connection.execute(
             "SELECT MAX(version) FROM schema_migrations"
         ).fetchone()[0]
-    assert version == SCHEMA_VERSION == 2
+    assert version == SCHEMA_VERSION == 3
 
 
 def test_idempotency_uniqueness_is_enforced_by_sqlite(tmp_path):
@@ -168,17 +168,21 @@ def test_existing_v1_database_upgrades_without_losing_campaigns(tmp_path):
 
     # Rewind the file to the Batch 1 schema.
     with sqlite3.connect(database) as connection:
+        connection.execute("DROP TABLE turn_presentations")
         connection.execute("DROP TABLE turn_idempotency")
-        connection.execute("DELETE FROM schema_migrations WHERE version = 2")
+        connection.execute("DELETE FROM schema_migrations WHERE version IN (2, 3)")
 
     upgraded = SQLiteRepository(database)
 
     with sqlite3.connect(database) as connection:
         assert connection.execute(
             "SELECT MAX(version) FROM schema_migrations"
-        ).fetchone()[0] == 2
+        ).fetchone()[0] == 3
         assert connection.execute(
             "SELECT COUNT(*) FROM turn_idempotency"
+        ).fetchone()[0] == 0
+        assert connection.execute(
+            "SELECT COUNT(*) FROM turn_presentations"
         ).fetchone()[0] == 0
     restored = upgraded.get(campaign.id)
     assert restored.turn_number == 2

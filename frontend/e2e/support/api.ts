@@ -104,6 +104,13 @@ export async function seedTerminalCampaign(
       idempotencyKey: `seed-${campaignId}-${turn}`,
     });
     if (status !== 200) throw new Error(`seed turn ${turn} failed with ${status}`);
+    const acknowledged = await request.post(
+      `${BACKEND_URL}/api/campaigns/${campaignId}/presentation/acknowledge`,
+      { data: { turn_number: summary.turn_number }, failOnStatusCode: false },
+    );
+    if (!acknowledged.ok()) {
+      throw new Error(`seed presentation ${turn} failed with ${acknowledged.status()}`);
+    }
   }
   throw new Error("Campaign never reached a terminal status within 12 turns.");
 }

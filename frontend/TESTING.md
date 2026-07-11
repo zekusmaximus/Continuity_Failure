@@ -87,6 +87,7 @@ The generator uses its own temporary database and never touches real saves.
 | Journey | Where |
 | --- | --- |
 | Resolve a turn; see its snapshot; next-turn data stays hidden until Next Call | `e2e/turn-flow.spec.ts`, `tests/App.test.tsx` |
+| Refresh/restart during a resolved turn restores the frozen Decision record | `e2e/resume.spec.ts`, `tests/App.test.tsx` |
 | Next Call advances exactly once | `e2e/turn-flow.spec.ts`, `tests/App.test.tsx` |
 | Resume from URL / local storage; resume after a backend restart | `e2e/resume.spec.ts` |
 | Retry with the same idempotency key does not duplicate a turn | `e2e/idempotency.spec.ts`, `tests/apiClient.test.ts` |

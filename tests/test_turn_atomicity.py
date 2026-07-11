@@ -166,6 +166,9 @@ def test_exact_retry_returns_the_original_response_without_advancing(client, cam
     assert _turn_number(client, campaign) == 2
     assert len(client.get(f"/api/campaigns/{campaign}/turns").json()["turns"]) == 1
     assert _idempotency_rows(campaign) == [(key, 1)]
+    assert _snapshot_state(campaign)["presentation_rows"] == 1
+    pending = client.get(f"/api/campaigns/{campaign}/presentation").json()
+    assert pending["result"] == first.json()
 
 
 def test_many_retries_of_one_key_never_create_a_second_turn(client, campaign):
@@ -372,6 +375,10 @@ def _snapshot_state(campaign_id) -> dict:
             "SELECT COUNT(*) FROM turn_idempotency WHERE campaign_id = ?",
             (campaign_id,),
         ).fetchone()[0]
+        presentations = connection.execute(
+            "SELECT COUNT(*) FROM turn_presentations WHERE campaign_id = ?",
+            (campaign_id,),
+        ).fetchone()[0]
     return {
         "turn_number": campaign.turn_number,
         "status": campaign.status,
@@ -380,6 +387,7 @@ def _snapshot_state(campaign_id) -> dict:
         "canon": len(campaign.canon),
         "snapshots": snapshots,
         "idempotency_rows": keys,
+        "presentation_rows": presentations,
     }
 
 

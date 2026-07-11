@@ -47,9 +47,9 @@ export const adviceOption = (page: Page, label: RegExp): Locator =>
 
 /** Submit the selected advice and land on the client decision. */
 export async function sendAdvice(page: Page): Promise<void> {
-  const manual = primaryAction(page, "Create manual memo");
-  if (await manual.isVisible()) {
-    await manual.click();
+  const template = primaryAction(page, "Create desk template");
+  if (await template.isVisible()) {
+    await template.click();
     await expect(page.getByText(/Memo attached for send/)).toBeVisible();
   }
   await primaryAction(page, "Send Advice").click();

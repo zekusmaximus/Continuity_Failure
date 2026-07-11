@@ -160,7 +160,13 @@ def render_dossier_markdown(campaign: Campaign) -> str:
             lines.append(f"- **Sent:** {memo.sent_at}")
             lines.append(f"- **Authorship/source:** {memo.author} / {memo.source}")
             lines.append(f"- **Classification:** {memo.classification}")
-            lines.append(f"- **Workflow:** {memo.provenance.workflow}")
+            workflow_label = {
+                "manual": "manual player draft",
+                "deterministic_template": "deterministic desk template",
+                "ai_assisted": "AI-assisted and validated",
+                "deterministic_fallback": "deterministic system fallback",
+            }.get(memo.provenance.workflow, memo.provenance.workflow)
+            lines.append(f"- **Workflow:** {workflow_label}")
             if memo.provenance.model_run_id:
                 lines.append(f"- **Model run:** `{memo.provenance.model_run_id}`")
             lines.append(f"- **SHA-256:** `{memo.content_digest}`")

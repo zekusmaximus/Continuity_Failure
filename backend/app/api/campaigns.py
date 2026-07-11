@@ -155,6 +155,37 @@ def get_turns(campaign_id: str):
 
 
 @router.get(
+    "/{campaign_id}/presentation",
+    response_model=schemas.TurnPresentationModel | None,
+    summary="Get the resolved turn awaiting explicit Next Call acknowledgement",
+)
+def get_turn_presentation(campaign_id: str):
+    bind_log_fields(campaign_id=campaign_id)
+    try:
+        return campaign_service.get_pending_presentation(campaign_id)
+    except errors.TurnResolutionError as exc:
+        raise _turn_error(campaign_id, exc) from None
+
+
+@router.post(
+    "/{campaign_id}/presentation/acknowledge",
+    response_model=schemas.PresentationAcknowledgedModel,
+    responses={404: {"model": schemas.ApiErrorModel}, 409: {"model": schemas.ApiErrorModel}},
+    summary="Acknowledge a resolved turn before loading the next call",
+)
+def acknowledge_turn_presentation(
+    campaign_id: str, payload: schemas.AcknowledgePresentationRequest
+):
+    bind_log_fields(campaign_id=campaign_id, turn_number=payload.turn_number)
+    try:
+        return campaign_service.acknowledge_presentation(
+            campaign_id, payload.turn_number
+        )
+    except errors.TurnResolutionError as exc:
+        raise _turn_error(campaign_id, exc) from None
+
+
+@router.get(
     "/{campaign_id}/memos",
     response_model=list[schemas.AdviceMemoModel],
     summary="List persistent advice memos for a campaign",

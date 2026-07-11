@@ -27,6 +27,10 @@
 >   fallback `ModelRun`). Drafting and editing never change state. Sending
 >   attaches one exact memo revision to the deterministic NPC decision, turn
 >   snapshot, canon reference, and dossier; sent records are immutable.
+> - **Resolved-turn presentation (as built):** resolution atomically stores the
+>   exact pre-resolution turn package beside the result. Refresh or backend
+>   restart returns to Client Decision; it cannot reveal the next call until the
+>   player explicitly chooses Next Call (or opens the terminal dossier).
 > - **Planned next:** the optional AI-use phase (a validation-gated, read-only
 >   Research Console that only proposes classified facts), which would sit
 >   between BRIEF/EVIDENCE and ADVICE, plus the remaining read-only tools

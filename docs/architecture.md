@@ -73,7 +73,13 @@ memory/     versioned SQLite repository (campaigns/memos, immutable snapshots, m
   use the same repository without gaining state-mutation authority. The path is
   configurable with `CF_DATABASE_PATH` and schema versions are forward-migrated
   through `schema_migrations` using only Python's standard library (v1 = base
-  tables, v2 = `turn_idempotency`).
+  tables, v2 = `turn_idempotency`, v3 = resolved-turn presentation checkpoints).
+* **Durable presentation gate**: the turn transaction appends the exact
+  pre-resolution `CurrentTurn` package and resolved `TurnResult` outside the
+  engine. `GET /presentation` restores that frozen record after refresh or
+  backend restart. Only the idempotent `POST /presentation/acknowledge` used by
+  Next Call (or the terminal dossier action) releases the next call to the UI.
+  This is application workflow state and never mutates `WorldState`.
 * **Atomic, idempotent turn resolution**: `POST /api/campaigns/{id}/advice`
   requires `expected_turn` (the revision the client composed against) and a
   bounded `idempotency_key`. `SQLiteRepository.transaction()` yields a
@@ -101,9 +107,11 @@ memory/     versioned SQLite repository (campaigns/memos, immutable snapshots, m
   per-turn "State reconciliation" lines. `engine/state.py` also exposes the
   authoritative direction vocabulary (`variable_direction`,
   higher_is_better / higher_is_worse).
-* **Persistent advice of record**: manual and validation-gated assisted drafts
-  are `AdviceMemo` aggregates with append-only revisions and explicit
-  provenance. A submission identifies one memo revision; resolution seals an
+* **Persistent advice of record**: manual, deterministic-template, and
+  validation-gated assisted drafts are `AdviceMemo` aggregates with append-only
+  revisions and explicit provenance. Desk templates begin as `system`
+  revisions; later player edits append distinct `player` revisions. A
+  submission identifies one memo revision; resolution seals an
   exact-content SHA-256 snapshot and links it to `NpcDecision`, `TurnResult`,
   canon, and dossier inside the existing transaction. Memo prose is attached
   only after deterministic resolution and never enters rules or effects.

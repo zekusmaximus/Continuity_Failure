@@ -134,6 +134,7 @@ function VariableBlock({
 
 const WORKFLOW_LABEL: Record<string, string> = {
   manual: "drafted manually",
+  deterministic_template: "started from a desk template",
   ai_assisted: "AI-assisted draft",
   deterministic_fallback: "standard advisory template",
 };

@@ -253,7 +253,8 @@ Implemented:
   and successful 10-turn completion.
 * Full turn history, canon archive, and open-thread tracking.
 * Durable SQLite storage for complete typed campaigns, append-only end-of-turn
-  snapshots, and advisory model-run logs. URL/local-storage campaign IDs resume
+  snapshots, unresolved presentation checkpoints, and advisory model-run logs.
+  URL/local-storage campaign IDs resume
   after backend restart, and the intro screen lists recent engagements.
 * **Continuity Desk — Guided Intake** web UI: a boot/intro screen, then a
   phased turn flow (incoming call → situation brief → evidence review → advice →
