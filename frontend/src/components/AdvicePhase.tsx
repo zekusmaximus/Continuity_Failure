@@ -8,6 +8,7 @@ import type {
   SystemStatus,
 } from "../api/client";
 import { levelClass, titleCase, POWER_ALLOCATIONS, VARIABLE_META } from "../domain";
+import { useTelemetry } from "../telemetry/TelemetryProvider";
 import MemoDraftPanel from "./MemoDraftPanel";
 
 interface Props {
@@ -263,6 +264,7 @@ export default function AdvicePhase({
   poweredSubsystem = null,
   onAllocatePower,
 }: Props) {
+  const { report } = useTelemetry();
   const allocationRequired = !!systemStatus?.requires_power_allocation;
   // Once a gated drafting action has committed the turn's allocation on the
   // backend, the route is locked: the submission must carry the same one.
@@ -344,7 +346,16 @@ export default function AdvicePhase({
       <ul className="cd-advice-list-outer">{primary.map(card)}</ul>
 
       {alternatives.length > 0 && (
-        <details className="cd-alt-advice">
+        <details
+          className="cd-alt-advice"
+          onToggle={(event) =>
+            report({
+              event_type: "alternative_section_toggled",
+              expanded: event.currentTarget.open,
+              alternative_count: alternatives.length,
+            })
+          }
+        >
           <summary>
             Strategic alternatives · off-brief ({alternatives.length})
           </summary>

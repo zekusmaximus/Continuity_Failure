@@ -7,7 +7,11 @@
 // authority — clearing telemetry can never clear campaigns, preferences, or
 // canon, which live under their own keys.
 
-import { parseTelemetryEvent, type TelemetryEventV1 } from "./events";
+import {
+  TELEMETRY_SCHEMA_VERSION,
+  parseTelemetryEvent,
+  type TelemetryEventV1,
+} from "./events";
 
 export const TELEMETRY_STORAGE_KEY = "continuity-failure.telemetry.v1";
 
@@ -96,4 +100,91 @@ export function clearTelemetryEvents(
   } catch {
     // Storage refused the delete; nothing further to do.
   }
+}
+
+// --- Collection preference — Wave 3 Batch A2 ---------------------------------
+// A local on/off switch under its own key. The switch's state is itself never
+// sent anywhere; absent an explicit choice, the build default applies
+// (collection on for local development builds, off for packaged builds).
+
+export const TELEMETRY_ENABLED_STORAGE_KEY = "continuity-failure.telemetry-enabled.v1";
+
+export function readTelemetryEnabled(
+  defaultEnabled: boolean,
+  storage: TelemetryStorage | null = defaultTelemetryStorage(),
+): boolean {
+  if (!storage) return false;
+  let stored: string | null;
+  try {
+    stored = storage.getItem(TELEMETRY_ENABLED_STORAGE_KEY);
+  } catch {
+    return false;
+  }
+  if (stored === "on") return true;
+  if (stored === "off") return false;
+  return defaultEnabled;
+}
+
+export function writeTelemetryEnabled(
+  enabled: boolean,
+  storage: TelemetryStorage | null = defaultTelemetryStorage(),
+): void {
+  try {
+    storage?.setItem(TELEMETRY_ENABLED_STORAGE_KEY, enabled ? "on" : "off");
+  } catch {
+    // The preference simply does not persist; collection still follows it
+    // for this page session via component state.
+  }
+}
+
+// --- Footprint and explicit export — Wave 3 Batch A2 -------------------------
+
+export interface TelemetryFootprint {
+  event_count: number;
+  first_occurred_at: string | null;
+  last_occurred_at: string | null;
+  approx_bytes: number;
+}
+
+/** What the player sees before deciding to export or clear. */
+export function telemetryFootprint(
+  storage: TelemetryStorage | null = defaultTelemetryStorage(),
+): TelemetryFootprint {
+  const events = readTelemetryEvents(storage);
+  return {
+    event_count: events.length,
+    first_occurred_at: events.length > 0 ? events[0].occurred_at : null,
+    last_occurred_at: events.length > 0 ? events[events.length - 1].occurred_at : null,
+    approx_bytes: events.length > 0 ? JSON.stringify(events).length : 0,
+  };
+}
+
+export interface TelemetryExportManifestV1 {
+  schema_version: typeof TELEMETRY_SCHEMA_VERSION;
+  app_version: string;
+  ruleset_version: string | null;
+  variant_id: string | null;
+  exported_at: string;
+}
+
+export interface TelemetryExportV1 {
+  manifest: TelemetryExportManifestV1;
+  events: TelemetryEventV1[];
+}
+
+/**
+ * Assemble the explicit-download payload: a manifest plus the validated
+ * events, nothing else. No campaign snapshot, memo, document, or prose can
+ * enter here — the events were already vocabulary-checked on read.
+ */
+export function buildTelemetryExport(
+  events: TelemetryEventV1[],
+  manifest: Omit<TelemetryExportManifestV1, "schema_version">,
+): TelemetryExportV1 {
+  return {
+    manifest: { schema_version: TELEMETRY_SCHEMA_VERSION, ...manifest },
+    events: events.map((event) => parseTelemetryEvent(event)).filter(
+      (event): event is TelemetryEventV1 => event !== null,
+    ),
+  };
 }

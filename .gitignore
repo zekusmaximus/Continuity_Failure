@@ -24,3 +24,7 @@ Thumbs.db
 *.sqlite
 *.sqlite3
 *.log
+
+# Playwright artifacts (accidental repo-root runs)
+test-results/
+playwright-report/

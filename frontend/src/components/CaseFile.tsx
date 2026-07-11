@@ -1,4 +1,4 @@
-import { useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import type { CurrentTurn, TurnHistory } from "../api/client";
 import EvidenceBoard from "./EvidenceBoard";
 import FactionPanel from "./FactionPanel";
@@ -9,9 +9,40 @@ import TurnHistoryPanel from "./TurnHistory";
 import CampaignDossier from "./CampaignDossier";
 import ModelRunPanel from "./ModelRunPanel";
 import AccessibleDialog from "./AccessibleDialog";
+import TelemetryPanel from "./TelemetryPanel";
+import { useTelemetry } from "../telemetry/TelemetryProvider";
 
-type Tab = "Evidence" | "Factions" | "Full State" | "Canon" | "Timeline" | "Model Runs" | "Dossier";
-const TABS: Tab[] = ["Evidence", "Factions", "Full State", "Canon", "Timeline", "Model Runs", "Dossier"];
+type Tab =
+  | "Evidence"
+  | "Factions"
+  | "Full State"
+  | "Canon"
+  | "Timeline"
+  | "Model Runs"
+  | "Dossier"
+  | "Playtest Data";
+const TABS: Tab[] = [
+  "Evidence",
+  "Factions",
+  "Full State",
+  "Canon",
+  "Timeline",
+  "Model Runs",
+  "Dossier",
+  "Playtest Data",
+];
+
+// Stable scalar ids for telemetry — display names may change wording.
+const TAB_IDS: Record<Tab, string> = {
+  Evidence: "evidence",
+  Factions: "factions",
+  "Full State": "full_state",
+  Canon: "canon",
+  Timeline: "timeline",
+  "Model Runs": "model_runs",
+  Dossier: "dossier",
+  "Playtest Data": "playtest_data",
+};
 
 interface Props {
   open: boolean;
@@ -28,6 +59,26 @@ interface Props {
 export default function CaseFile({ open, onClose, campaignId, current, history }: Props) {
   const [tab, setTab] = useState<Tab>("Evidence");
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const { report } = useTelemetry();
+
+  // One event per drawer opening, carrying the tab it opened on; further tab
+  // selections report through selectTab. The ref survives StrictMode's
+  // double effect run.
+  const reportedOpen = useRef(false);
+  useEffect(() => {
+    if (!open) {
+      reportedOpen.current = false;
+      return;
+    }
+    if (reportedOpen.current) return;
+    reportedOpen.current = true;
+    report({ event_type: "case_file_opened", tab_id: TAB_IDS[tab] });
+  }, [open, report, tab]);
+
+  const selectTab = (next: Tab) => {
+    if (next !== tab) report({ event_type: "case_file_opened", tab_id: TAB_IDS[next] });
+    setTab(next);
+  };
 
   const selectByKeyboard = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
     let next = index;
@@ -37,7 +88,7 @@ export default function CaseFile({ open, onClose, campaignId, current, history }
     else if (event.key === "End") next = TABS.length - 1;
     else return;
     event.preventDefault();
-    setTab(TABS[next]);
+    selectTab(TABS[next]);
     tabRefs.current[next]?.focus();
   };
 
@@ -74,7 +125,7 @@ export default function CaseFile({ open, onClose, campaignId, current, history }
               aria-controls={`cd-case-panel-${index}`}
               tabIndex={tab === t ? 0 : -1}
               className={`cd-drawer-tab ${tab === t ? "cd-drawer-tab-active" : ""}`}
-              onClick={() => setTab(t)}
+              onClick={() => selectTab(t)}
               onKeyDown={(event) => selectByKeyboard(event, index)}
             >
               {t}
@@ -130,6 +181,7 @@ export default function CaseFile({ open, onClose, campaignId, current, history }
           {tab === "Timeline" && <TurnHistoryPanel history={history} />}
           {tab === "Model Runs" && <ModelRunPanel campaignId={campaignId} />}
           {tab === "Dossier" && <CampaignDossier campaignId={campaignId} embedded />}
+          {tab === "Playtest Data" && <TelemetryPanel summary={current?.summary ?? null} />}
       </div>
     </AccessibleDialog>
   );

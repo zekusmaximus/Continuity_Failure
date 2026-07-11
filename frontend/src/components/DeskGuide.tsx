@@ -1,4 +1,6 @@
+import { useEffect, useRef, type ReactNode } from "react";
 import AccessibleDialog from "./AccessibleDialog";
+import { useTelemetry } from "../telemetry/TelemetryProvider";
 
 export const ONBOARDING_STORAGE_KEY = "continuity-failure.desk-guide.v1";
 
@@ -10,6 +12,34 @@ interface Props {
 
 /** A compact, diegetic orientation brief with progressive definitions. */
 export default function DeskGuide({ open, firstRun, onClose }: Props) {
+  const { report } = useTelemetry();
+
+  // One event per guide opening. The ref survives StrictMode's double
+  // effect run, so re-running with the guide still open emits nothing.
+  const reportedShown = useRef(false);
+  useEffect(() => {
+    if (!open) {
+      reportedShown.current = false;
+      return;
+    }
+    if (reportedShown.current) return;
+    reportedShown.current = true;
+    report({ event_type: "guide_topic_shown", topic_id: "desk_operating_brief" });
+  }, [open, report]);
+
+  const topic = (topicId: string, summary: string, body: ReactNode) => (
+    <details
+      onToggle={(event) => {
+        if (event.currentTarget.open) {
+          report({ event_type: "guide_topic_opened", topic_id: topicId });
+        }
+      }}
+    >
+      <summary>{summary}</summary>
+      {body}
+    </details>
+  );
+
   return (
     <AccessibleDialog
       open={open}
@@ -48,48 +78,54 @@ export default function DeskGuide({ open, firstRun, onClose }: Props) {
         </ol>
 
         <div className="cd-guide-definitions">
-          <details>
-            <summary>Authority, adherence, and rejection</summary>
+          {topic(
+            "adherence",
+            "Authority, adherence, and rejection",
             <p>
               Your recommendation is advisory. The client may follow, modify,
               delay, or reject it. Adherence is the share of the advice effects
               the client actually carries into the deterministic resolution;
               client modifications are recorded separately.
-            </p>
-          </details>
-          <details>
-            <summary>Indicators, thresholds, and ambient drift</summary>
-            <p>
-              “↑ better” marks capacity; “↑ risk” or “↑ worse” marks exposure.
-              Higher is not always better. The engagement fails if Water
-              Security, Hospital Stability, or Public Order reach 10 or below;
-              Public Trust reaches 5 or below; Budget Capacity reaches 0; or
-              Legal Exposure or State Oversight Risk reaches 95 or above.
-            </p>
-            <p>
-              Ambient crisis pressure is applied every resolved turn whether or
-              not your advice addressed it. The consequence record labels that
-              movement as Drift so it is not mistaken for your recommendation.
-            </p>
-          </details>
-          <details>
-            <summary>Evidence freshness and reliability</summary>
+            </p>,
+          )}
+          {topic(
+            "thresholds_drift",
+            "Indicators, thresholds, and ambient drift",
+            <>
+              <p>
+                “↑ better” marks capacity; “↑ risk” or “↑ worse” marks exposure.
+                Higher is not always better. The engagement fails if Water
+                Security, Hospital Stability, or Public Order reach 10 or below;
+                Public Trust reaches 5 or below; Budget Capacity reaches 0; or
+                Legal Exposure or State Oversight Risk reaches 95 or above.
+              </p>
+              <p>
+                Ambient crisis pressure is applied every resolved turn whether or
+                not your advice addressed it. The consequence record labels that
+                movement as Drift so it is not mistaken for your recommendation.
+              </p>
+            </>,
+          )}
+          {topic(
+            "evidence_freshness",
+            "Evidence freshness and reliability",
             <p>
               A document’s turn number is its freshness marker. Its source and
               reliability describe how much weight it can bear; public status
               describes who may already know it. Old, contested, leaked, and
               private records remain evidence, but not equivalent evidence.
-            </p>
-          </details>
-          <details>
-            <summary>Turn resolution and Next Call</summary>
+            </p>,
+          )}
+          {topic(
+            "turn_resolution",
+            "Turn resolution and Next Call",
             <p>
               Send Advice commits one deterministic turn. Client Decision,
               Consequences, and Archive progressively disclose that same stored
               result. Next Call performs no new decision and changes no state;
               it loads the next call package only after the current record closes.
-            </p>
-          </details>
+            </p>,
+          )}
         </div>
 
         <div className="cd-guide-actions">

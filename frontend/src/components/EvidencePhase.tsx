@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import type { ClientCall, DocumentRecord } from "../api/client";
+import { useTelemetry } from "../telemetry/TelemetryProvider";
 import DocumentDetail from "./DocumentDetail";
 import StatusTag from "./StatusTag";
 import {
@@ -34,10 +35,21 @@ function tierOf(doc: DocumentRecord, attached: boolean): EvidenceTier {
  */
 export default function EvidencePhase({ documents, call, onOpenCaseFile }: Props) {
   const [openDoc, setOpenDoc] = useState<DocumentRecord | null>(null);
+  const { report } = useTelemetry();
   const attachedIds = useMemo(
     () => new Set(call?.attached_document_ids ?? []),
     [call],
   );
+
+  const openDocument = (doc: DocumentRecord) => {
+    setOpenDoc(doc);
+    report({ event_type: "evidence_opened", document_id: doc.id });
+  };
+
+  const closeDocument = () => {
+    if (openDoc) report({ event_type: "evidence_closed", document_id: openDoc.id });
+    setOpenDoc(null);
+  };
 
   const grouped = useMemo(() => {
     const byTier: Record<EvidenceTier, DocumentRecord[]> = {
@@ -82,7 +94,7 @@ export default function EvidencePhase({ documents, call, onOpenCaseFile }: Props
               <ul className="cd-ev-list">
                 {docs.map((doc) => (
                   <li key={doc.id}>
-                    <button className="cd-ev-item" onClick={() => setOpenDoc(doc)}>
+                    <button className="cd-ev-item" onClick={() => openDocument(doc)}>
                       <div className="cd-ev-item-main">
                         <span className="cd-doc-type">{titleCase(doc.type)}</span>
                         <span className="cd-ev-item-title">{doc.title}</span>
@@ -120,7 +132,7 @@ export default function EvidencePhase({ documents, call, onOpenCaseFile }: Props
         Open Case File →
       </button>
 
-      <DocumentDetail doc={openDoc} onClose={() => setOpenDoc(null)} />
+      <DocumentDetail doc={openDoc} onClose={closeDocument} />
     </section>
   );
 }
