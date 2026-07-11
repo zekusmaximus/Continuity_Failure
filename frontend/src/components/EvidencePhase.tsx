@@ -99,6 +99,13 @@ export default function EvidencePhase({ documents, call, onOpenCaseFile }: Props
                           className={PUBLIC_STATUS_CLASS[doc.public_status] ?? "tag-private"}
                         />
                         <StatusTag label={`Turn ${doc.turn_number}`} className="tag-turn" />
+                        {doc.unverified_offline && (
+                          <StatusTag
+                            label="Unverified — offline"
+                            className="tag-offline"
+                            title="Live feeds were already down when this record reached the desk."
+                          />
+                        )}
                       </div>
                     </button>
                   </li>

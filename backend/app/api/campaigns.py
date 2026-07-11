@@ -132,6 +132,36 @@ def get_current(campaign_id: str):
 
 
 @router.post(
+    "/{campaign_id}/power-allocation",
+    response_model=schemas.CurrentTurnModel,
+    responses={
+        404: {"model": schemas.ApiErrorModel},
+        409: {"model": schemas.ApiErrorModel},
+        422: {"model": schemas.ApiErrorModel},
+    },
+    summary="Commit the turn's auxiliary-power allocation (CRITICAL band only)",
+)
+def allocate_power(campaign_id: str, payload: schemas.PowerAllocationRequest):
+    """Bind auxiliary power to one subsystem at the top of the turn.
+
+    The pre-decision seam of the CRITICAL band: COMMUNICATIONS makes the
+    caller readable before advice is composed, MODEL_ACCESS lifts the
+    drafting gate. Binding for the turn; re-committing the same subsystem is
+    a no-op, a different one is 409 ``power_allocation_conflict``. Outside
+    CRITICAL: 409 ``power_allocation_not_available``.
+    """
+    bind_log_fields(campaign_id=campaign_id, expected_turn=payload.expected_turn)
+    try:
+        return campaign_service.allocate_power(
+            campaign_id,
+            allocation=payload.allocation,
+            expected_turn=payload.expected_turn,
+        )
+    except errors.TurnResolutionError as exc:
+        raise _turn_error(campaign_id, exc) from None
+
+
+@router.post(
     "/{campaign_id}/advice",
     response_model=schemas.TurnResultModel,
     responses={

@@ -61,6 +61,12 @@ one pass):
 
 - **Unique ids** across factions, advice (global + per-turn share one namespace),
   calls, documents, and threads.
+- **API-requestable ids** — advice ids, document ids, and seed-variant ids ride
+  on HTTP requests (submissions, citations, campaign creation), so they must
+  match the API's identifier shape: lowercase letters, digits, underscores,
+  max 64 chars (`engine/content/schema.py::API_IDENTIFIER_PATTERN`). An id
+  like `hot-summer` would validate as content yet be unrequestable — that is
+  now an authoring error.
 - **Known cross-references** — call `caller_faction_id`, call
   `attached_document_ids`, call `crisis_id`, and advice `affected_factions`.
 - **Required fields** present; **unknown fields rejected** (a typo'd key that
@@ -90,6 +96,16 @@ one pass):
   rejected outright. See `engine/rules.py::_modulate`.
 - **operational_steps / expected_benefits / expected_harms** — non-empty lists of
   non-empty strings (no free-lunch advice, and a defensible step list).
+- **Faction advice trust costs** — a faction may declare `advice_trust_costs`:
+  a list of `{advice_tag, delta, reason}` reactions applied to its
+  `trust_in_player` when advice carrying that tag is actually acted on
+  (FOLLOWED / PARTIALLY_FOLLOWED / MODIFIED) while **someone else** is on the
+  line (the caller's seat keeps its own trust rules). `advice_tag` must be a
+  recognized decision tag, `delta` is a bounded nudge (±20, non-zero), and
+  `reason` is required — it becomes the recorded `FactionShift` reason. This
+  is how a faction targeted by a strategy reacts off-call (e.g. the contractor
+  squeezed three turns running stops negotiating through the consultant,
+  which is what arms the turn-4 ultimatum call variant).
 - **Document tags** — non-empty; **freshness** (`turn_number`) in range.
 - **Threshold coverage** — every variable the failure thresholds and ambient
   drift reference has a starting value.
@@ -126,7 +142,10 @@ one pass):
   `open_decision_types`); conditions reference known variables with `<=`/`>=`
   ops and 0–100 thresholds; `open_advice_tags`/`resolve_tags` are recognized
   decision tags; `open_decision_types` are known decision types; `due_in >= 1`;
-  `repeat_every >= 0`; `escalation_effects` require an `escalation_note`; spec
+  `repeat_every >= 0`; `escalation_effects` require an `escalation_note`; a
+  spec that carries `escalation_effects` (or a `repeat_every` cadence) must
+  also carry `due_in` — without a first deadline the thread would open with
+  `due_turn = None` and the schedule would never fire; spec
   ids are unique and must not collide with seeded `threads.json` ids (a spec
   never re-opens an id already on the record). Trigger semantics: all
   `open_conditions_all` AND (any `open_conditions_any`, when present) AND — when

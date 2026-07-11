@@ -107,6 +107,24 @@ class PowerAllocation:
 # ---------------------------------------------------------------------------
 
 @dataclass
+class FactionAdviceTrustCost:
+    """A content-authored trust reaction to advice, even off the caller's line.
+
+    When the resolved advice carries ``advice_tag`` and the client actually
+    acted on it (FOLLOWED / PARTIALLY_FOLLOWED / MODIFIED), the owning faction's
+    ``trust_in_player`` moves by ``delta`` -- recorded as a FactionShift with
+    ``reason``. This is how a faction that is not on the line reacts to being
+    the *target* of a strategy: a contractor squeezed three turns running stops
+    negotiating through the consultant. Applied only when the faction is not
+    the caller (the caller's own trust rules in engine/factions.py govern that
+    seat). Authored in factions.json, validated like every other content field.
+    """
+    advice_tag: str
+    delta: int
+    reason: str
+
+
+@dataclass
 class Faction:
     id: str
     name: str
@@ -123,6 +141,9 @@ class Faction:
     current_pressure: int = 30            # 0-100 pressure they are applying now
     red_lines: List[str] = field(default_factory=list)   # things they will not accept
     tags: List[str] = field(default_factory=list)
+    # Authored trust reactions to advice aimed at this faction while someone
+    # else is on the line (see FactionAdviceTrustCost). Empty for most factions.
+    advice_trust_costs: List[FactionAdviceTrustCost] = field(default_factory=list)
 
 
 @dataclass
@@ -711,6 +732,14 @@ class Campaign:
     # for snapshots persisted before the field existed: such campaigns simply
     # have no authored episodes mid-flight.
     ambient_windows: List[AmbientWindow] = field(default_factory=list)
+    # Auxiliary-power commitments, turn_number -> PowerAllocation. At CRITICAL,
+    # the FIRST gated action of a turn binds the turn's single auxiliary
+    # allocation: a drafting request that routes power to MODEL_ACCESS commits
+    # the turn to MODEL_ACCESS, and the advice submission must then carry the
+    # same allocation (engine/turn.py raises PowerAllocationConflict
+    # otherwise). Keyed by turn so stale entries from resolved turns are inert.
+    # Defaults to empty for snapshots persisted before the field existed.
+    power_commitments: Dict[int, str] = field(default_factory=dict)
 
     def is_terminal(self) -> bool:
         return self.status in (CampaignStatus.COMPLETED, CampaignStatus.FAILED)

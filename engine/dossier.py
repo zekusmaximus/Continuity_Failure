@@ -170,6 +170,16 @@ def render_dossier_markdown(campaign: Campaign) -> str:
                          f"(adherence {int(round(t.decision.adherence * 100))}%)")
             lines.append(f"- **Status after:** {t.status_after}")
             lines.append(f"- **Client:** {t.decision.decider}")
+            if t.call_variant_id:
+                lines.append(
+                    f"- **Call on the line:** variant `{t.call_variant_id}` \u2014 "
+                    f"the caller's state selected an alternate opening"
+                )
+            if t.powered_subsystem:
+                lines.append(
+                    f"- **Auxiliary power:** {t.powered_subsystem} \u2014 the desk "
+                    f"was CRITICAL; one subsystem carried this turn"
+                )
             lines.append(f"- **Aftermath:** {t.aftermath_summary}")
             if t.sent_memo is not None:
                 lines.append(
@@ -189,12 +199,20 @@ def render_dossier_markdown(campaign: Campaign) -> str:
         lines.append("_No advice memos have been sent._")
         lines.append("")
     else:
+        memo_records = {m.id: m for m in campaign.advice_memos}
         for turn in sent:
             memo = turn.sent_memo
             assert memo is not None
             lines.append(f"### Turn {turn.turn_number} — {memo.name}")
             lines.append("")
             lines.append(f"- **Memo ID / revision:** `{memo.memo_id}` / {memo.revision}")
+            record = memo_records.get(memo.memo_id)
+            if record is not None and record.call_id:
+                lines.append(f"- **Call of record:** `{record.call_id}`")
+            if turn.powered_subsystem:
+                lines.append(
+                    f"- **Auxiliary power at send:** {turn.powered_subsystem}"
+                )
             lines.append(f"- **Sent:** {memo.sent_at}")
             lines.append(f"- **Authorship/source:** {memo.author} / {memo.source}")
             lines.append(f"- **Classification:** {memo.classification}")

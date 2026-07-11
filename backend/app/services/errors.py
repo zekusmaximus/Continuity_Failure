@@ -115,6 +115,60 @@ class PowerAllocationUnavailable(TurnResolutionError):
         self.band = band
 
 
+class UnknownPowerAllocation(TurnResolutionError):
+    """The named subsystem is not one auxiliary power can support."""
+
+    code = "unknown_power_allocation"
+    status_code = 422
+
+    def __init__(self, allocation: str) -> None:
+        super().__init__(
+            f"Unknown auxiliary-power subsystem: {allocation}. Auxiliary "
+            "power supports MODEL_ACCESS, COMMUNICATIONS, or LIVE_DATA."
+        )
+        self.allocation = allocation
+
+
+class PowerAllocationConflict(TurnResolutionError):
+    """The turn's auxiliary power is already committed to another subsystem."""
+
+    code = "power_allocation_conflict"
+    status_code = 409
+
+    def __init__(self, committed: str, requested: Optional[str]) -> None:
+        super().__init__(
+            f"Auxiliary power is already committed to {committed} this turn "
+            "(a drafting request energized that circuit). Auxiliary power "
+            f"supports one subsystem per turn; resubmit with {committed} or "
+            "wait for the next cycle."
+        )
+        self.committed = committed
+        self.requested = requested
+
+
+class RulesetIncompatible(TurnResolutionError):
+    """The stored campaign was created under a different deterministic ruleset.
+
+    Continuing it under the current rules would silently produce a hybrid
+    record mislabeled with the old version, so continuation is refused. The
+    campaign stays readable: history, canon, and the dossier remain available.
+    """
+
+    code = "ruleset_incompatible"
+    status_code = 409
+
+    def __init__(self, campaign_version: str, current_version: str) -> None:
+        super().__init__(
+            f"This engagement was resolved under ruleset {campaign_version}, "
+            f"but this build executes ruleset {current_version}. Its record "
+            "remains readable and the dossier can be exported, but further "
+            "turns cannot be resolved under rules that did not produce it. "
+            "Start a new engagement to play on the current ruleset."
+        )
+        self.campaign_version = campaign_version
+        self.current_version = current_version
+
+
 class EvidenceUnverifiable(TurnResolutionError):
     """Citations were submitted without the live-data circuit powered."""
 

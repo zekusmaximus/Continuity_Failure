@@ -19,6 +19,7 @@ Design notes
 
 from __future__ import annotations
 
+import re
 from typing import Any, Dict, List, Optional, Set
 
 from engine.content import schema
@@ -112,6 +113,21 @@ class _Collector:
     def check_nonempty_str(self, file: str, path: str, value: Any, label: str) -> None:
         if not isinstance(value, str) or not value.strip():
             self.add(file, path, f"{label} must be a non-empty string")
+
+    def check_api_identifier(self, file: str, path: str, value: Any, label: str) -> None:
+        """Ids that clients echo back through the HTTP API must match its
+        request patterns, or the content is authored-but-unrequestable."""
+        if not isinstance(value, str) or not value.strip():
+            self.add(file, path, f"{label} must be a non-empty string")
+            return
+        if not re.fullmatch(schema.API_IDENTIFIER_PATTERN, value):
+            self.add(
+                file, path,
+                f"{label} '{value}' must match {schema.API_IDENTIFIER_PATTERN!r} "
+                "(lowercase letters, digits, underscores; max 64 chars) -- the "
+                "HTTP API rejects any other shape, so this content could never "
+                "be requested",
+            )
 
     def check_str_list(
         self, file: str, path: str, value: Any, label: str, *, require_nonempty: bool
@@ -288,13 +304,43 @@ def _validate_faction(c: _Collector, file: str, path: str, faction: Dict[str, An
         if key in faction:
             c.check_str_list(file, f"{path}.{key}", faction[key], key, require_nonempty=False)
 
+    costs = faction.get("advice_trust_costs")
+    if costs is not None and c.is_list(
+        file, f"{path}.advice_trust_costs", costs, "advice_trust_costs"
+    ):
+        for i, cost in enumerate(costs):
+            cpath = f"{path}.advice_trust_costs[{i}]"
+            if not c.is_mapping(file, cpath, cost, "advice trust cost"):
+                continue
+            c.check_fields(file, cpath, cost,
+                           schema.FIELD_SPECS["faction_advice_trust_cost"],
+                           "advice trust cost")
+            tag = cost.get("advice_tag")
+            if tag is not None and tag not in schema.KNOWN_DECISION_TAGS:
+                c.add(file, f"{cpath}.advice_tag",
+                      f"advice trust cost tag '{tag}' is not a recognized "
+                      f"decision tag (one of "
+                      f"{', '.join(sorted(schema.KNOWN_DECISION_TAGS))})")
+            if "delta" in cost:
+                c.check_int_range(file, f"{cpath}.delta", cost["delta"],
+                                  schema.MIN_TRUST_COST_DELTA,
+                                  schema.MAX_TRUST_COST_DELTA)
+                if cost["delta"] == 0:
+                    c.add(file, f"{cpath}.delta",
+                          "advice trust cost delta must not be zero (a "
+                          "reaction that moves nothing is dead content)")
+            # A trust move must say why, on the record (FactionShift.reason).
+            if "reason" in cost:
+                c.check_nonempty_str(file, f"{cpath}.reason", cost["reason"], "reason")
+
 
 def _validate_advice(
     c: _Collector, file: str, path: str, advice: Dict[str, Any], faction_ids: Set[str]
 ) -> None:
     c.check_fields(file, path, advice, schema.FIELD_SPECS["advice"], "advice option")
     if "id" in advice:
-        c.check_nonempty_str(file, f"{path}.id", advice["id"], "advice id")
+        # Advice ids ride on POST /advice requests: enforce the API shape.
+        c.check_api_identifier(file, f"{path}.id", advice["id"], "advice id")
     for key in ("label", "summary", "rationale"):
         if key in advice:
             c.check_nonempty_str(file, f"{path}.{key}", advice[key], key)
@@ -545,7 +591,10 @@ def _validate_document(
     c: _Collector, file: str, path: str, doc: Dict[str, Any], max_turns: Optional[int]
 ) -> None:
     c.check_fields(file, path, doc, schema.FIELD_SPECS["document"], "document")
-    for key in ("id", "title", "source"):
+    if "id" in doc:
+        # Document ids ride on citation requests: enforce the API shape.
+        c.check_api_identifier(file, f"{path}.id", doc["id"], "document id")
+    for key in ("title", "source"):
         if key in doc:
             c.check_nonempty_str(file, f"{path}.{key}", doc[key], key)
     if "type" in doc:
@@ -575,7 +624,11 @@ def _validate_seed_variant(
     for key in sorted(schema.VARIANT_REQUIRED_KEYS):
         if key not in variant:
             c.add(file, path, f"seed variant is missing required field '{key}'")
-    for key in ("id", "name", "description"):
+    if "id" in variant:
+        # Variant ids ride on campaign-creation requests: enforce the API
+        # shape ("hot-summer" would validate here yet be unrequestable).
+        c.check_api_identifier(file, f"{path}.id", variant["id"], "seed variant id")
+    for key in ("name", "description"):
         if key in variant:
             c.check_nonempty_str(file, f"{path}.{key}", variant[key], key)
 
@@ -682,6 +735,18 @@ def _validate_thread_spec(
         if isinstance(repeat, bool) or not isinstance(repeat, int) or repeat < 0:
             c.add(file, f"{path}.repeat_every",
                   "thread spec repeat_every must be a non-negative integer")
+    # An escalation schedule without due_in opens its thread with
+    # due_turn=None: the effects (and any repeat cadence) could never fire.
+    if due_in is None:
+        if spec.get("escalation_effects"):
+            c.add(file, f"{path}.due_in",
+                  "thread spec carries escalation_effects but no due_in; the "
+                  "thread would open with no deadline and the escalation "
+                  "would never fire")
+        elif isinstance(repeat, int) and not isinstance(repeat, bool) and repeat > 0:
+            c.add(file, f"{path}.due_in",
+                  "thread spec sets repeat_every but no due_in; with no first "
+                  "deadline the schedule never arms")
 
     effects = spec.get("escalation_effects")
     if effects is not None and c.is_mapping(

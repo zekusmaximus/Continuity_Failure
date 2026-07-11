@@ -2,10 +2,10 @@
 
 Three drivers, all through ``apply_diffs`` with legible reasons: the authored
 heat-event ambient window (scenario.json ``ambient_windows``), the grid-stress
-thread spec (opens when power <= 55, escalates -4 every 2 turns), and the
-turn-5 load-shedding advice (a real counterplay, priced like every other
-option). None touches a failure-threshold variable -- that invariant is pinned
-in tests/test_ruleset_version.py.
+thread spec (opens when power <= 55; under ruleset 3 it escalates -6 every
+peak cycle once due), and the turn-5 load-shedding advice (a real counterplay,
+priced like every other option). None touches a failure-threshold variable --
+that invariant is pinned in tests/test_ruleset_version.py.
 """
 
 from __future__ import annotations
@@ -114,13 +114,15 @@ def test_ignoring_power_opens_and_escalates_the_grid_thread():
     assert campaign.status == CampaignStatus.COMPLETED
     thread = _grid_thread(campaign)
     assert thread is not None
-    assert thread.escalation_count == 2
-    assert campaign.world_state.variables["power_stability"] == 40
+    # Opens after turn 5 (power 54), first due turn 7, then every peak cycle:
+    # escalations on turns 7, 8, 9, 10.
+    assert thread.escalation_count == 4
+    assert campaign.world_state.variables["power_stability"] == 24
     escalations = [
         d for result in campaign.turn_history for d in result.diffs
         if d.source_type == SourceType.THREAD and d.variable == "power_stability"
     ]
-    assert [d.delta for d in escalations] == [-4, -4]
+    assert [d.delta for d in escalations] == [-6, -6, -6, -6]
 
 
 def test_prompt_load_shedding_keeps_the_grid_thread_from_opening():

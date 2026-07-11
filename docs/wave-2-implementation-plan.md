@@ -598,3 +598,118 @@ To be appended to `docs/major-enhancement-roadmap.md` when implementation lands:
    SURVIVAL_SEQUENCE fails on `strained_finances` (each variant documents its
    own survival trace)? The plan assumes yes; the alternative is softer
    perturbations.
+
+---
+
+## 9. Wave 2 balance pass (adversarial-review fixes, ruleset "3")
+
+An adversarial review of the shipped Wave 2 found three marquee mechanics
+that were technically implemented but not truthful in ordinary play, plus a
+set of presentation/validation gaps. This pass fixes them; the deterministic
+rules version is now **"3"** (goldens for "1" and "2" preserved in
+`tests/test_ruleset_version.py`).
+
+### High-severity fixes
+
+1. **Auxiliary power is bindable, not bypassable.** A CRITICAL-band drafting
+   request routed to `MODEL_ACCESS` now *commits* the turn's single
+   allocation (`Campaign.power_commitments`, bound durably before the model
+   runs); the advice submission must carry the same allocation or it is a
+   typed `power_allocation_conflict` (409). The engine re-enforces the
+   commitment in `advance_turn` (defense in depth, one semantics). The UI
+   locks the allocation picker once committed. Witness:
+   `tests/test_wave2_balance.py::test_the_hostile_two_subsystem_probe_is_a_typed_conflict`.
+2. **CRITICAL is reachable through authored play.** The grid-stress thread
+   now escalates every peak cycle once due (−6, `repeat_every: 1`) and
+   `hot_summer` enters at power 60. The hot-summer neglect route runs
+   NOMINAL → STRAINED (t3) → DEGRADED (t6) → CRITICAL (t8), with turns 9–10
+   played under a real allocation, and still completes. Baseline neglect
+   bottoms out at DEGRADED (24) — CRITICAL remains a compounding-neglect
+   outcome. Witnesses: `tests/test_seed_variants.py::test_hot_summer_completes_on_the_canonical_sequence`,
+   `tests/test_wave2_balance.py::test_hot_summer_neglect_route_reaches_critical_with_turns_left_to_play`.
+3. **The turn-4 contractor ultimatum is live content.** Factions may author
+   `advice_trust_costs` (content-driven cross-faction trust): advice that
+   targets a faction while someone else is on the line moves its trust when
+   acted on. The contractor loses 6 trust per acted-on squeeze, so three
+   squeezes reach 22 ≤ 25 and the ultimatum variant fires. Witness:
+   `tests/test_wave2_balance.py::test_three_squeezes_reach_the_turn_four_ultimatum`.
+
+### Medium fixes
+
+- **Stale evidence is labeled.** Once live feeds are lost, documents newer
+  than `last_live_turn` carry `unverified_offline` in the API projection and
+  an "Unverified — arrived after feed loss" tag on the board, instead of
+  contradicting the last-verified stamp.
+- **The dossier renders the Wave-2 facts.** The timeline shows the resolved
+  call variant and the turn's auxiliary allocation; the memo-of-record block
+  shows the call of record and the allocation at send.
+- **Ruleset versioning is executable.** A stored ACTIVE campaign whose
+  `ruleset_version` differs from the current one refuses continuation with a
+  typed `ruleset_incompatible` (409); its history, canon, and dossier remain
+  readable. No more hybrid campaigns mislabeled with an old version.
+- **Validator gaps closed.** Advice/document/seed-variant ids must match the
+  API identifier shape (`hot-summer` is now an authoring error); a thread
+  spec with `escalation_effects` or `repeat_every` but no `due_in` (a
+  schedule that could never fire) is rejected; `advice_trust_costs` entries
+  are fully validated (recognized tag, bounded non-zero delta, required
+  reason).
+
+### Ending reachability (ruleset "3" + `competitive_procurement`)
+
+The review found only two of five completed-campaign verdicts reachable. The
+structural blocker: `contractor_dependency` was a pure ratchet — nothing in
+the game reduced it, so the independence axis could never hold. The turn-4
+per-turn option **`competitive_procurement`** (qualify a second firm; slower
+water, real dependency relief, and it offends Marquotte — same `contractor`
+tag, so it also costs contractor trust) is the authored counterplay. All
+five verdicts now have pinned, replayable witnesses in
+`tests/test_ending_reachability.py`:
+
+| Verdict | Status |
+| --- | --- |
+| A defensible stabilization | witnessed |
+| The water flowed; consent drained away | witnessed |
+| Stabilized, and discoverable | witnessed |
+| The clock ran out before the water was safe | witnessed |
+| Stabilized — on someone else's terms | witnessed |
+
+Known remaining gap (documented, not hidden): the *strong* independence band
+(dependency + oversight averaging ≤ 30) is still unreachable — the single
+turn-4 lever cannot carry dependency from 52 to ≤ 40 against drift. Making
+"strong independence" live would need a repeatable dependency reducer and its
+own balance pass; until then it is display vocabulary, not an attainable
+band, and the same holds for a few other extreme bands (strong harm avoided,
+strong consultant standing, compromised/failed institutional primacy).
+
+### COMMUNICATIONS pre-decision usefulness (follow-up)
+
+The review's remaining medium: the auxiliary allocation only arrived with the
+advice submission, so committing COMMUNICATIONS could never inform the advice
+it was submitted with — and `advance_turn` falsified the stored explanation
+by overwriting the caller's memory with the dark line.
+
+Fixed in two moves:
+
+1. **Pre-turn allocation.** `POST /api/campaigns/{id}/power-allocation`
+   (`{allocation, expected_turn}`) commits the turn's auxiliary allocation at
+   the top of the turn, on the same `Campaign.power_commitments` binding used
+   by drafting and submission. Committing COMMUNICATIONS makes the caller's
+   disposition readable at the Call phase — the pre-decision payoff;
+   committing MODEL_ACCESS lifts the drafting gate for the whole turn (and
+   the system status says so). Binding is unchanged: a later gated action or
+   submission naming a different subsystem is `power_allocation_conflict`.
+   The Call screen now carries the routing panel; the Advice-phase picker
+   remains for players who defer the choice.
+2. **Truthful record, masked presentation.** `advance_turn` no longer
+   overwrites `decision.explanation.memory`: the authoritative record keeps
+   what the caller actually remembered (the blackout is the desk's, not the
+   caller's). The service projection (`_turn_result_model`) masks the memory
+   with the communications-dark line whenever the turn resolved with
+   COMMUNICATIONS unpowered — deterministically, from the recorded
+   allocation, across the submit response, turn history, and the frozen
+   presentation snapshot.
+
+Witnesses: `tests/test_wave2_balance.py` §8–9 (pre-turn commitment reveals
+the disposition and binds the submission; the record keeps the Town
+Manager's true turn-1 memory at turn 10 while every projection shows the
+dark line) and `tests/test_api.py` (endpoint contract: 200/409/422 paths).

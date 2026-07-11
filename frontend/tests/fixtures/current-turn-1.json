@@ -313,7 +313,8 @@
       ],
       "title": "Preliminary Water Quality Lab Report",
       "turn_number": 1,
-      "type": "LAB_REPORT"
+      "type": "LAB_REPORT",
+      "unverified_offline": false
     },
     {
       "content": "M. VELEZ (Town Manager): \"Pressure dropped twelve percent overnight in the south zone. The lab flagged a preliminary result. I have an emergency council session in the morning. I need to know what I can say and what I must say before the second lab comes back.\"\n[Consultant retained on a 30-day emergency stabilization engagement.]",
@@ -328,7 +329,8 @@
       ],
       "title": "Town Manager Call Transcript",
       "turn_number": 1,
-      "type": "CALL_TRANSCRIPT"
+      "type": "CALL_TRANSCRIPT",
+      "unverified_offline": false
     },
     {
       "content": "[Executive session, sealed pending vote.]\nMAJORITY COUNSEL: \"Frame this as accelerating deferred maintenance, not a contamination event, until the second lab returns.\"\nOPPOSITION (on record): \"Note for the record: we disagree with framing before confirmation either way.\"\nACTION: Manager authorized to pre-position mitigation; disclosure posture deferred to consultant advice.",
@@ -344,7 +346,8 @@
       ],
       "title": "Council Executive Session Excerpt",
       "turn_number": 1,
-      "type": "MEETING_MINUTES"
+      "type": "MEETING_MINUTES",
+      "unverified_offline": false
     }
   ],
   "last_turn": null,
@@ -409,12 +412,12 @@
     }
   ],
   "summary": {
-    "created_at": "2026-07-11T15:08:41.117350+00:00",
+    "created_at": "2026-07-11T17:38:44.183954+00:00",
     "failure_reason": null,
     "id": "test-campaign",
     "max_turns": 10,
     "name": "Northbridge Water Failure",
-    "ruleset_version": "2",
+    "ruleset_version": "3",
     "scenario_id": "northbridge_water_failure",
     "status": "ACTIVE",
     "turn_number": 1,
@@ -429,6 +432,7 @@
     "live_feeds": true,
     "model_status": "AI assist present — off by default (returns system drafts)",
     "power": 72,
+    "power_commitment": null,
     "requires_power_allocation": false,
     "staff_capacity": 50
   },
@@ -443,6 +447,7 @@
     },
     "factions": [
       {
+        "advice_trust_costs": [],
         "alignment": "authority",
         "current_pressure": 62,
         "description": "Appointed executive running day-to-day municipal operations.",
@@ -465,6 +470,7 @@
         "type": "EXECUTIVE"
       },
       {
+        "advice_trust_costs": [],
         "alignment": "authority",
         "current_pressure": 55,
         "description": "Governing bloc controlling appropriations and emergency authorities.",
@@ -487,6 +493,7 @@
         "type": "LEGISLATIVE"
       },
       {
+        "advice_trust_costs": [],
         "alignment": "opposition",
         "current_pressure": 58,
         "description": "Minority bloc poised to capitalize on any misstep.",
@@ -509,6 +516,7 @@
         "type": "LEGISLATIVE"
       },
       {
+        "advice_trust_costs": [],
         "alignment": "service",
         "current_pressure": 64,
         "description": "Operators of the treatment plant, mains, and pressure system.",
@@ -531,6 +539,7 @@
         "type": "UTILITY"
       },
       {
+        "advice_trust_costs": [],
         "alignment": "service",
         "current_pressure": 50,
         "description": "Regional acute-care facility dependent on municipal water.",
@@ -553,6 +562,7 @@
         "type": "HOSPITAL"
       },
       {
+        "advice_trust_costs": [],
         "alignment": "neutral",
         "current_pressure": 66,
         "description": "Organized residents tracking school and household risk.",
@@ -575,6 +585,7 @@
         "type": "RESIDENT_GROUP"
       },
       {
+        "advice_trust_costs": [],
         "alignment": "neutral",
         "current_pressure": 44,
         "description": "Employers and retailers sensitive to disruption and reputation.",
@@ -597,6 +608,7 @@
         "type": "BUSINESS"
       },
       {
+        "advice_trust_costs": [],
         "alignment": "authority",
         "current_pressure": 48,
         "description": "State agency observer with authority to trigger oversight.",
@@ -619,6 +631,13 @@
         "type": "STATE_ACTOR"
       },
       {
+        "advice_trust_costs": [
+          {
+            "advice_tag": "contractor",
+            "delta": -6,
+            "reason": "The consultant's squeeze strategy reached Marquotte's contracts office; the firm reads the desk as adversarial and copies it on less."
+          }
+        ],
         "alignment": "service",
         "current_pressure": 60,
         "description": "Sole qualified firm able to repair the failing system.",
@@ -641,6 +660,7 @@
         "type": "CONTRACTOR"
       },
       {
+        "advice_trust_costs": [],
         "alignment": "neutral",
         "current_pressure": 52,
         "description": "Patchwork of outlets and social channels amplifying uncertainty.",

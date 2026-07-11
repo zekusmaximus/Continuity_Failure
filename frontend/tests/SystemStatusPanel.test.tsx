@@ -21,8 +21,9 @@ function status(overrides: Partial<SystemStatus> = {}): SystemStatus {
     live_feeds: true,
     last_live_turn: 1,
     requires_power_allocation: false,
+    power_commitment: null,
     ...overrides,
-  };
+  } as SystemStatus;
 }
 
 const STRAINED = status({

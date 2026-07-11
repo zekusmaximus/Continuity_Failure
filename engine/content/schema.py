@@ -30,6 +30,7 @@ from engine.models import (
     DecisionType,
     Document,
     Faction,
+    FactionAdviceTrustCost,
     OpenThread,
     PublicStatus,
     Reliability,
@@ -58,6 +59,19 @@ KNOWN_VARIABLES: Set[str] = set(STATE_VARIABLE_LABELS)
 # Deltas are bounded so a fat-fingered effect (e.g. 500 instead of 5) is caught.
 MIN_EFFECT_DELTA = -100
 MAX_EFFECT_DELTA = 100
+
+# A single authored trust reaction is a nudge, not a cliff: bounded tighter
+# than effect deltas so one squeeze cannot zero a relationship by typo.
+MIN_TRUST_COST_DELTA = -20
+MAX_TRUST_COST_DELTA = 20
+
+# Content ids that clients echo back through the HTTP API (advice ids on
+# submissions, document ids in citations, seed-variant ids at intake) must
+# satisfy the API's request patterns (backend/app/schemas/api.py, all
+# ``^[a-z0-9_]+$`` with a 64-char bound). Content that validates here but can
+# never be requested is dead content, so the validator enforces the same
+# constraint at authoring time.
+API_IDENTIFIER_PATTERN = r"[a-z0-9_]{1,64}"
 
 
 def _string_values(cls) -> Set[str]:
@@ -138,6 +152,7 @@ class FieldSpec:
 
 FIELD_SPECS: Dict[str, FieldSpec] = {
     "faction": FieldSpec(Faction),
+    "faction_advice_trust_cost": FieldSpec(FactionAdviceTrustCost),
     "advice": FieldSpec(AdviceOption),
     "call": FieldSpec(ClientCall),
     "call_decision_profile": FieldSpec(CallDecisionProfile),

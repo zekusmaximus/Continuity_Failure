@@ -219,6 +219,7 @@ describe("auxiliary-power allocation (CRITICAL band)", () => {
     live_feeds: false,
     last_live_turn: 2,
     requires_power_allocation: true,
+    power_commitment: null,
   };
 
   function renderCritical(poweredSubsystem: "MODEL_ACCESS" | "LIVE_DATA" | null) {
