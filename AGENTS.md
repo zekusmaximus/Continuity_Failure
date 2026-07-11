@@ -307,7 +307,7 @@ When making changes:
 
 The deterministic Northbridge MVP is implemented, playable, and tested (531
 Python tests as of this commit — always re-derive the count with `pytest -q`
-rather than trusting this number; plus 46 vitest and 24 Playwright tests). A
+rather than trusting this number; plus 49 vitest and 24 Playwright tests). A
 dormant, validation-gated AI-assist layer (memo drafter + `ModelRun` logging)
 is wired end to end and off by default. Durable SQLite persistence and atomic,
 idempotent turn resolution are in place. The Wave 2 balance pass (ruleset "3")
