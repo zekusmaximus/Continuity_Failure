@@ -72,6 +72,19 @@ export default function ConsequencesPhase({ result }: { result: TurnResult }) {
           items={stack.resolved_threads ?? []}
           tone="thread-resolved"
         />
+        <StackSection
+          title="Faction standing shifts"
+          items={(result.faction_shifts ?? []).map((s) => {
+            const label =
+              s.field === "trust_in_player"
+                ? "trust"
+                : s.field === "current_pressure"
+                  ? "pressure"
+                  : "influence";
+            return `${s.faction_name}: ${label} ${s.old_value}→${s.new_value} — ${s.reason}`;
+          })}
+          tone="faction-shift"
+        />
       </div>
 
       <div className="cd-changes">

@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import Dict, List, Optional, Tuple
 
-from engine import ledger
+from engine import factions, ledger
 from engine.models import (
     AdherenceFactor,
     AdviceOption,
@@ -568,6 +568,7 @@ def _modulate(
 
     risk_tol = faction.risk_tolerance if faction is not None else 50
     pressure = faction.current_pressure if faction is not None else 50
+    trust = faction.trust_in_player if faction is not None else 50
     advice_risk = _advice_risk(advice)
     risk_gap = advice_risk - risk_tol
 
@@ -617,11 +618,16 @@ def _modulate(
         # Discomfort = how far the advice outruns their appetite + how little
         # slack they have for unsolicited advice, less any standing precedent
         # of the same kind (they've done this before), less the weight of any
-        # relevant, reliable evidence the memo was staked on.
+        # relevant, reliable evidence the memo was staked on, adjusted by the
+        # caller's working trust in the consultant.
         discomfort = max(0, risk_gap) + (50 - off_brief_tolerance)
         if precedent_count > 0:
             discomfort -= ledger.PRECEDENT_FAMILIARITY_RELIEF
         discomfort -= citation_weight.relief
+        if trust <= factions.TRUST_LOW:
+            discomfort += factions.TRUST_DISCOMFORT_PENALTY
+        elif trust >= factions.TRUST_HIGH:
+            discomfort -= factions.TRUST_DISCOMFORT_RELIEF
         conflicts.append(
             f"This is not what the {decider} called about — they asked: “{call.ask}”."
             if call is not None else
@@ -636,11 +642,17 @@ def _modulate(
                 f"beyond its appetite ({risk_tol})."
             )
         elif discomfort >= OFF_BRIEF_BALK:
-            decision_type = _downgrade(decision_type, 1)
+            # Collapsed working trust costs an extra rung on the ladder.
+            steps = 2 if trust <= factions.TRUST_LOW else 1
+            decision_type = _downgrade(decision_type, steps)
             adherence = min(adherence, _LADDER_ADHERENCE[decision_type])
             outcome_reason = (
                 f"The {decider} pared back off-brief advice that ran ahead of its risk "
                 f"appetite (advice risk {advice_risk} vs tolerance {risk_tol})."
+                + (
+                    " Collapsed working trust made the pare-back sharper."
+                    if trust <= factions.TRUST_LOW else ""
+                )
             )
         else:
             adherence = round(adherence * OFF_BRIEF_ADHERENCE_FACTOR, 3)
@@ -668,7 +680,7 @@ def _modulate(
         advice_risk=advice_risk, risk_gap=risk_gap, red_line_hit=red_line_hit,
         conflicts=conflicts, outcome_reason=outcome_reason, primary=primary,
         precedent_kind=precedent_kind, precedent_count=precedent_count,
-        citation_factors=citation_weight.factors,
+        citation_factors=citation_weight.factors, trust=trust,
     )
     return (
         decision_type, adherence, modifications, off_brief,
@@ -718,7 +730,7 @@ def _build_explanation(
     campaign, advice, call, faction, profile, decider, *,
     off_brief, risk_tol, pressure, advice_risk, risk_gap, red_line_hit,
     conflicts, outcome_reason, primary,
-    precedent_kind=None, precedent_count=0, citation_factors=None,
+    precedent_kind=None, precedent_count=0, citation_factors=None, trust=50,
 ) -> DecisionExplanation:
     incentives: list = []
     if faction is not None:
@@ -750,6 +762,15 @@ def _build_explanation(
             "Caller pressure",
             f"{decider} is under {pressure}/100 pressure to act.",
             "increase" if pressure >= 55 else "neutral",
+        ),
+        AdherenceFactor(
+            "Working trust",
+            f"{decider} trust in the consultant is {trust}/100.",
+            (
+                "decrease" if trust <= factions.TRUST_LOW
+                else "increase" if trust >= factions.TRUST_HIGH
+                else "neutral"
+            ),
         ),
     ]
     if red_line_hit:

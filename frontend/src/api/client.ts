@@ -156,6 +156,17 @@ export interface DecisionExplanation {
   memory: string[];
 }
 
+/** One faction-relationship move: which faction, which field, old → new, why. */
+export interface FactionShift {
+  faction_id: string;
+  faction_name: string;
+  field: string;
+  old_value: number;
+  new_value: number;
+  delta: number;
+  reason: string;
+}
+
 /** One emergency precedent on the institutional debt ledger. */
 export interface PrecedentEntry {
   id: string;
@@ -286,7 +297,7 @@ export interface ConsequenceStack {
 
 /** One attributed step in a variable's start → final reconciliation. */
 export interface ConsequenceDelta {
-  source_type: string; // "advice" | "npc_modification" | "ambient" | "decision" | "thread"
+  source_type: string; // "advice" | "npc_modification" | "ambient" | "decision" | "thread" | "leak"
   delta: number; // effective (post-clamp) change, never zero
   reason: string;
   value_before: number;
@@ -333,6 +344,7 @@ export interface TurnResult {
   failure_reason: string | null;
   sent_memo: SentMemoSnapshot | null;
   consequence_report: ConsequenceReport;
+  faction_shifts: FactionShift[];
 }
 
 export interface SystemStatus {
@@ -354,6 +366,7 @@ export interface CurrentTurn {
   debt_ledger: PrecedentEntry[];
   system_status: SystemStatus;
   last_turn: TurnResult | null;
+  caller_disposition: string;
 }
 
 export interface TurnPresentation {

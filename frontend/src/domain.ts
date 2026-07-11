@@ -114,6 +114,7 @@ export const SOURCE_LABEL: Record<string, string> = {
   ambient: "Drift",
   decision: "Decision",
   thread: "Thread",
+  leak: "Leak",
 };
 
 // Player-facing source attribution for the causal waterfall. Same vocabulary
@@ -126,6 +127,7 @@ export const CAUSAL_SOURCE_LABEL: Record<string, string> = {
   decision: "Decision cost",
   ambient: "Ambient drift",
   thread: "Open thread",
+  leak: "Faction leak",
 };
 
 // Direction-aware reading of a delta: on a higher-is-worse variable a negative

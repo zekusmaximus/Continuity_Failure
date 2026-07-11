@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import List, Optional
 
-from engine import rules
+from engine import factions, rules
 from engine.consequences import build_consequence_report, build_consequence_stack
 from engine.diffs import apply_diffs
 from engine.ledger import record_precedents
@@ -155,6 +155,17 @@ def advance_turn(
     )
     diffs += thread_diffs
 
+    # Faction relationships move on the record: trust follows how the advice
+    # served the caller, influence follows sustained pressure, and a faction
+    # out of trust and under pressure may leak a private record this turn.
+    faction_shifts = factions.update_faction_relations(
+        campaign, advice, decision, diffs
+    )
+    leak_diffs, leak_media_lines, leak_canon = factions.process_leaks(
+        campaign, resolving_turn
+    )
+    diffs += leak_diffs
+
     rules.update_faction_postures(campaign)
     rules.update_crisis_severity(campaign)
 
@@ -188,6 +199,7 @@ def advance_turn(
     consequence_stack.resolved_threads = [
         f"{e.title} — {e.note}" for e in thread_events if e.kind == "resolved"
     ]
+    consequence_stack.media_framing.extend(leak_media_lines)
 
     canon_entry = CanonEntry(
         id=f"canon_turn_{resolving_turn}",
@@ -205,6 +217,9 @@ def advance_turn(
     )
     consequence_stack.canonized_events = [canon_entry.title]
     campaign.canon.append(canon_entry)
+    if leak_canon is not None:
+        campaign.canon.append(leak_canon)
+        consequence_stack.canonized_events.append(leak_canon.title)
 
     # Record any emergency precedent this decision set on the debt ledger and
     # surface it in the turn's legal fallout so the cost is visible at once.
@@ -237,6 +252,7 @@ def advance_turn(
         consequence_report=build_consequence_report(
             start_values, diffs, advice, decision
         ),
+        faction_shifts=faction_shifts,
     )
     campaign.turn_history.append(turn_result)
     return turn_result

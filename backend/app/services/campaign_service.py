@@ -160,6 +160,29 @@ def list_recent_campaigns(limit: int = 5) -> list[schemas.RecentCampaignModel]:
     ]
 
 
+def _caller_disposition(campaign: Campaign) -> str:
+    """How the caller opens the line, from live trust. Presentation-only."""
+    call = campaign.current_call()
+    if call is None:
+        return ""
+    faction = next(
+        (f for f in campaign.world_state.factions if f.id == call.caller_faction_id),
+        None,
+    )
+    if faction is None:
+        return ""
+    trust = faction.trust_in_player
+    if trust <= 30:
+        band = "opens guarded — working trust is close to exhausted"
+    elif trust <= 45:
+        band = "opens wary — earlier turns are remembered"
+    elif trust >= 70:
+        band = "opens direct — the desk's record has earned the benefit of the doubt"
+    else:
+        band = "opens professionally"
+    return f"The {faction.name} {band} (trust {trust}/100)."
+
+
 def _current_model(campaign: Campaign) -> schemas.CurrentTurnModel:
     """Map one campaign revision to the exact turn package shown by the desk."""
     call = campaign.current_call()
@@ -184,6 +207,7 @@ def _current_model(campaign: Campaign) -> schemas.CurrentTurnModel:
         debt_ledger=_debt_ledger(campaign),
         system_status=_system_status(campaign),
         last_turn=last_turn,
+        caller_disposition=_caller_disposition(campaign),
     )
 
 

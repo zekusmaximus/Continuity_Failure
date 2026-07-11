@@ -11,7 +11,13 @@ import {
  * CALL phase — only the incoming client call. No state, factions, documents, or
  * dossier. The one question here: will you take the call?
  */
-export default function CallPhase({ call }: { call: ClientCall | null }) {
+export default function CallPhase({
+  call,
+  disposition = "",
+}: {
+  call: ClientCall | null;
+  disposition?: string;
+}) {
   if (!call) {
     return (
       <section className="cd-stage-panel">
@@ -32,6 +38,7 @@ export default function CallPhase({ call }: { call: ClientCall | null }) {
       <div className="cd-call-caller">
         <div className="cd-call-name">{call.caller}</div>
         {call.caller_role && <div className="cd-call-role">{call.caller_role}</div>}
+        {disposition && <p className="cd-muted cd-call-disposition">{disposition}</p>}
       </div>
 
       <div className="cd-tagrow">

@@ -36,6 +36,7 @@ class PrecedentKind:
     INFORMAL_HOSPITAL_PRIORITY = "informal_hospital_priority"
     COMPENSATION_FRAMEWORK = "compensation_framework"
     RED_LINE_CROSSED = "red_line_crossed"
+    LEAK = "leak"                     # recorded by engine/factions.py
 
 
 PRECEDENT_LABELS: Dict[str, str] = {
@@ -44,6 +45,7 @@ PRECEDENT_LABELS: Dict[str, str] = {
     PrecedentKind.INFORMAL_HOSPITAL_PRIORITY: "Informal hospital priority",
     PrecedentKind.COMPENSATION_FRAMEWORK: "Emergency compensation framework",
     PrecedentKind.RED_LINE_CROSSED: "Advice across a client red line",
+    PrecedentKind.LEAK: "Private record leaked",
 }
 
 # The advice decision-tag whose precedent history bears on a proposal of the

@@ -341,6 +341,15 @@ def _faction_reactions(campaign: Campaign) -> List[FactionReaction]:
             "Pressing for an on-the-record school decision before pressure drops again.")
     if order < 50:
         add("business_alliance", "Restive; weighing an injunction over mandatory restrictions.")
+    # High-influence factions lead the briefing: their reactions carry the most
+    # weight this turn. Stable sort, so equal-influence factions keep rule order.
+    reactions.sort(
+        key=lambda r: -(by_id[r.faction_id].influence if r.faction_id in by_id else 0)
+    )
+    for reaction in reactions:
+        faction = by_id.get(reaction.faction_id)
+        if faction is not None and faction.influence >= 70:
+            reaction.reaction = "[carrying weight this turn] " + reaction.reaction
     return reactions
 
 

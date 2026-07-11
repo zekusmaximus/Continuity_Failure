@@ -18,7 +18,7 @@ PUBLIC_STATUS_PATTERN = r"^(public|private|leaked|sealed|disputed|unknown)$"
 RELIABILITY_PATTERN = r"^(high|medium|low|unknown|contested)$"
 CAMPAIGN_STATUS_PATTERN = r"^(ACTIVE|COMPLETED|FAILED)$"
 DECISION_TYPE_PATTERN = r"^(FOLLOWED|PARTIALLY_FOLLOWED|MODIFIED|DELAYED|REJECTED)$"
-SOURCE_TYPE_PATTERN = r"^(advice|npc_modification|ambient|decision|thread)$"
+SOURCE_TYPE_PATTERN = r"^(advice|npc_modification|ambient|decision|thread|leak)$"
 FACT_CLASSIFICATION_PATTERN = r"^(canon|proposed|rejected|rumor|unverified|contradicted)$"
 MEMO_ID_PATTERN = r"^memo_[a-f0-9]{32}$"
 
@@ -292,6 +292,17 @@ class DecisionExplanationModel(BaseModel):
     memory: List[str] = Field(default_factory=list)
 
 
+class FactionShiftModel(BaseModel):
+    """One faction-relationship move: which faction, which field, old -> new, why."""
+    faction_id: str
+    faction_name: str
+    field: str = Field(pattern=r"^(trust_in_player|influence|current_pressure)$")
+    old_value: int = Field(ge=0, le=100)
+    new_value: int = Field(ge=0, le=100)
+    delta: int
+    reason: str
+
+
 class PrecedentEntryModel(BaseModel):
     """One emergency precedent on the institutional debt ledger."""
     id: str
@@ -513,6 +524,7 @@ class TurnResultModel(BaseModel):
     # Defaulted so idempotent replays recorded before this field existed still
     # validate; every freshly resolved turn carries the populated report.
     consequence_report: ConsequenceReportModel = Field(default_factory=ConsequenceReportModel)
+    faction_shifts: List[FactionShiftModel] = Field(default_factory=list)
 
 
 class SystemStatusModel(BaseModel):
@@ -544,6 +556,8 @@ class CurrentTurnModel(BaseModel):
     debt_ledger: List[PrecedentEntryModel] = Field(default_factory=list)
     system_status: SystemStatusModel
     last_turn: Optional[TurnResultModel] = None
+    # Computed presentation line: how the caller opens, from live faction trust.
+    caller_disposition: str = ""
 
 
 class TurnPresentationModel(BaseModel):

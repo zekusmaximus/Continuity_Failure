@@ -35,6 +35,7 @@ class SourceType:
     AMBIENT = "ambient"
     DECISION = "decision"
     THREAD = "thread"
+    LEAK = "leak"
 
 
 class FactClassification:
@@ -524,6 +525,22 @@ class TurnResult:
     # Defaulted so pre-existing persisted turns rebuild cleanly with an empty
     # report; every newly resolved turn carries the full causal decomposition.
     consequence_report: ConsequenceReport = field(default_factory=ConsequenceReport)
+    # Faction relationship moves this turn (trust / influence / pressure),
+    # recorded like diffs: old -> new with a legible reason.
+    faction_shifts: List["FactionShift"] = field(default_factory=list)
+
+
+@dataclass
+class FactionShift:
+    """One faction-relationship move, recorded with the same legibility as an
+    AppliedDiff: which faction, which field, old -> new, and why."""
+    faction_id: str
+    faction_name: str
+    field: str              # "trust_in_player" / "influence" / "current_pressure"
+    old_value: int
+    new_value: int
+    delta: int
+    reason: str
 
 
 @dataclass

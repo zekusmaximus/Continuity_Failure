@@ -85,7 +85,7 @@ export default function GuidedTurn(props: Props) {
 
   switch (phase) {
     case "CALL":
-      panel = <CallPhase call={call} />;
+      panel = <CallPhase call={call} disposition={current?.caller_disposition ?? ""} />;
       action = call ? (
         <PrimaryAction
           label="Accept Call"
