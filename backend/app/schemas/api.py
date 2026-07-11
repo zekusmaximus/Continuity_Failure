@@ -27,6 +27,13 @@ class StrictRequestModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+class FactionAdviceTrustCostModel(BaseModel):
+    """Authored trust reaction to advice targeting this faction off the line."""
+    advice_tag: str
+    delta: int = Field(ge=-20, le=20)
+    reason: str
+
+
 class FactionModel(BaseModel):
     id: str
     name: str
@@ -42,6 +49,7 @@ class FactionModel(BaseModel):
     current_pressure: int = Field(default=30, ge=0, le=100)
     red_lines: List[str] = Field(default_factory=list)
     tags: List[str] = Field(default_factory=list)
+    advice_trust_costs: List[FactionAdviceTrustCostModel] = Field(default_factory=list)
 
 
 class CrisisModel(BaseModel):
@@ -118,6 +126,11 @@ class DocumentModel(BaseModel):
     summary: str = ""
     content: str = ""
     tags: List[str] = Field(default_factory=list)
+    # True when live feeds are down and this document became available after
+    # the last live turn: it did not arrive over a verified feed, so the board
+    # labels it instead of contradicting its own last-verified stamp.
+    # Presentation-only; authored reliability is untouched.
+    unverified_offline: bool = False
 
 
 class ThreadConditionModel(BaseModel):
@@ -598,6 +611,11 @@ class SystemStatusModel(BaseModel):
     live_feeds: bool = True
     last_live_turn: int = Field(default=0, ge=0)
     requires_power_allocation: bool = False
+    # The turn's bound auxiliary allocation, when a gated drafting action has
+    # already committed it (CRITICAL band only). The submission must match.
+    power_commitment: Optional[str] = Field(
+        default=None, pattern=r"^(MODEL_ACCESS|COMMUNICATIONS|LIVE_DATA)$"
+    )
 
 
 class CurrentTurnModel(BaseModel):

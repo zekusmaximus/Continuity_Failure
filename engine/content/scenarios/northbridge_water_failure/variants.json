@@ -2,10 +2,10 @@
   {
     "id": "hot_summer",
     "name": "Hot Summer",
-    "description": "A weeks-long regional heat event precedes the failure: source water is already stressed, the south-zone drop starts deeper, and the grid enters the crisis with less margin than the operators would like.",
+    "description": "A weeks-long regional heat event precedes the failure: source water is already stressed, the south-zone drop starts deeper, and the grid enters the crisis with materially less margin than the operators would like. Left unmanaged, the desk's own power fails with the town's.",
     "variable_overrides": {
       "water_security": 40,
-      "power_stability": 64
+      "power_stability": 60
     }
   },
   {

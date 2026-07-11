@@ -82,6 +82,19 @@ SUBSET_PAIRS = [
 _PAIR_IDS_FULL = [dc.__name__ for dc, _ in FULL_ASDICT_PAIRS]
 _PAIR_IDS_SUBSET = [dc.__name__ for dc, _ in SUBSET_PAIRS]
 
+# Presentation fields the SERVICE computes and injects at the API boundary,
+# keyed by Pydantic model name. The engine never emits these -- the service
+# sets each one explicitly before ``model_validate`` (grep the field name in
+# campaign_service.py for the injection site). Every entry here is a
+# deliberate, documented derived-presentation field, not drift; anything NOT
+# listed still fails the exact-parity assertion below.
+SERVICE_DERIVED_FIELDS = {
+    # Set in campaign_service._documents: once live feeds are lost, documents
+    # newer than the last live turn are labeled unverified rather than
+    # contradicting the board's own last-verified stamp.
+    "DocumentModel": {"unverified_offline"},
+}
+
 # The set of engine dataclasses / Pydantic models that appear nested inside
 # another entity. When a field's type resolves to one of these, we treat it as
 # an opaque "object" so ``List[Faction]`` (dataclass) and ``List[FactionModel]``
@@ -150,7 +163,9 @@ def test_pydantic_model_field_sets_match_dataclass(dc, model):
     dc_fields = {f.name for f in dataclasses.fields(dc)}
     model_fields = set(model.model_fields)
     missing_on_model = dc_fields - model_fields
-    extra_on_model = model_fields - dc_fields
+    extra_on_model = (
+        model_fields - dc_fields - SERVICE_DERIVED_FIELDS.get(model.__name__, set())
+    )
     assert not missing_on_model, (
         f"{dc.__name__} field(s) {sorted(missing_on_model)} are exposed by "
         f"asdict but missing from {model.__name__} -- the API would silently "

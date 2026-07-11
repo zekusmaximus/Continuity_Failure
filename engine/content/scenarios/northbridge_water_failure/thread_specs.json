@@ -177,11 +177,11 @@
    }
   ],
   "due_in": 2,
-  "repeat_every": 2,
+  "repeat_every": 1,
   "escalation_effects": {
-   "power_stability": -4
+   "power_stability": -6
   },
-  "escalation_note": "Another peak-load cycle passed without a load-management order; feeder trips are getting longer.",
+  "escalation_note": "Another peak-load cycle passed without a load-management order; feeder trips are getting longer and the margin is going with them.",
   "resolve_tags": [
    "load_shedding"
   ],

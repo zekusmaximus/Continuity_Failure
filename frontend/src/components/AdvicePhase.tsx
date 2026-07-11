@@ -283,6 +283,9 @@ export default function AdvicePhase({
   onAllocatePower,
 }: Props) {
   const allocationRequired = !!systemStatus?.requires_power_allocation;
+  // Once a gated drafting action has committed the turn's allocation on the
+  // backend, the route is locked: the submission must carry the same one.
+  const powerCommitment = systemStatus?.power_commitment ?? null;
   const draftingDark = allocationRequired && poweredSubsystem !== "MODEL_ACCESS";
   const citationsDark = allocationRequired && poweredSubsystem !== "LIVE_DATA";
   const selectedOption = options.find((o) => o.id === selected) ?? null;
@@ -383,6 +386,18 @@ export default function AdvicePhase({
                 The workstation is critical. Route the auxiliary feed before
                 sending advice; everything unpowered stays dark this cycle.
               </p>
+              {powerCommitment && (
+                <p className="cd-muted cd-small" role="status">
+                  ⚠ Auxiliary power is committed to{" "}
+                  <strong>
+                    {POWER_ALLOCATIONS.find((a) => a.id === powerCommitment)?.label ??
+                      powerCommitment}
+                  </strong>{" "}
+                  this turn — a drafting request already energized that
+                  circuit. One subsystem per turn; the advice goes out on the
+                  same allocation.
+                </p>
+              )}
               {POWER_ALLOCATIONS.map((allocation) => (
                 <label key={allocation.id} className="cd-power-option">
                   <input
@@ -390,7 +405,7 @@ export default function AdvicePhase({
                     name="power-allocation"
                     value={allocation.id}
                     checked={poweredSubsystem === allocation.id}
-                    disabled={readOnly}
+                    disabled={readOnly || !!powerCommitment}
                     onChange={() => onAllocatePower?.(allocation.id)}
                   />
                   <span className="cd-power-label">{allocation.label}</span>

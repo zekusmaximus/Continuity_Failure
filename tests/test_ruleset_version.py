@@ -50,6 +50,66 @@ CANONICAL_SEQUENCES = {
 # ---------------------------------------------------------------------------
 
 GOLDEN_TRACES = {
+    # Ruleset "3" (Wave 2 balance pass): an ignored grid-stress thread now
+    # erodes power every peak cycle (-6, repeat 1) instead of -4 every other
+    # turn, and cross-faction trust costs make the turn-4 contractor ultimatum
+    # reachable. None of the canonical sequences plays the load-shedding
+    # counter, so every "3" entry differs from its "2" entry ONLY in
+    # power_stability. The contractor_spam sequence now (correctly) resolves
+    # turn 4 against the ultimatum variant -- asserted by
+    # test_contractor_spam_reaches_the_ultimatum_variant below -- without
+    # changing any final variable other than power_stability.
+    "3": {
+        "survival": {
+            "status": CampaignStatus.COMPLETED,
+            "failure_reason": None,
+            "turns_resolved": 10,
+            "final_variables": {
+                "water_security": 62, "power_stability": 24,
+                "public_trust": 63, "public_order": 54,
+                "budget_capacity": 2, "staff_capacity": 40,
+                "legal_exposure": 60, "media_pressure": 73,
+                "hospital_stability": 74, "school_disruption": 46,
+                "state_oversight_risk": 42, "contractor_dependency": 74,
+                "information_integrity": 79, "player_reputation": 45,
+                "player_perceived_neutrality": 50, "player_shadow_authority": 20,
+            },
+        },
+        "contractor_spam": {
+            "status": CampaignStatus.FAILED,
+            "failure_reason": (
+                "Legal Exposure reached 98 (failure threshold >= 95)."
+            ),
+            "turns_resolved": 10,
+            "final_variables": {
+                "water_security": 87, "power_stability": 24,
+                "public_trust": 46, "public_order": 66,
+                "budget_capacity": 21, "staff_capacity": 40,
+                "legal_exposure": 98, "media_pressure": 70,
+                "hospital_stability": 46, "school_disruption": 58,
+                "state_oversight_risk": 35, "contractor_dependency": 100,
+                "information_integrity": 62, "player_reputation": 42,
+                "player_perceived_neutrality": 44, "player_shadow_authority": 18,
+            },
+        },
+        "delay_spam": {
+            "status": CampaignStatus.FAILED,
+            "failure_reason": (
+                "Legal Exposure reached 100 (failure threshold >= 95)."
+            ),
+            "turns_resolved": 8,
+            "final_variables": {
+                "water_security": 30, "power_stability": 36,
+                "public_trust": 14, "public_order": 63,
+                "budget_capacity": 24, "staff_capacity": 42,
+                "legal_exposure": 100, "media_pressure": 98,
+                "hospital_stability": 48, "school_disruption": 60,
+                "state_oversight_risk": 54, "contractor_dependency": 66,
+                "information_integrity": 43, "player_reputation": 33,
+                "player_perceived_neutrality": 36, "player_shadow_authority": 18,
+            },
+        },
+    },
     # Ruleset "2" (Wave 2b, batch B1): power_stability gained deterministic
     # drivers -- the authored heat-event ambient window (turns 3-6, -6/turn)
     # and the grid-stress thread spec (opens at power <= 55, escalates -4
@@ -208,6 +268,40 @@ def test_canonical_sequences_match_the_golden_traces():
             "intentional, bump CURRENT_RULESET_VERSION in engine/rules.py and "
             "add a new golden entry -- do not edit the existing one."
         )
+
+
+def test_ruleset_three_changed_only_power_stability():
+    """The ruleset-3 balance pass touches no failure-threshold variable:
+    every canonical outcome, turn count, and non-power variable is
+    bit-identical to ruleset "2". The contractor_spam sequence resolves turn 4
+    against the ultimatum variant under "3", but the variant's decision space
+    (contractor_pressure on-brief, same tag handler) leaves the authoritative
+    variables unchanged."""
+    for name in CANONICAL_SEQUENCES:
+        v2 = GOLDEN_TRACES["2"][name]
+        v3 = GOLDEN_TRACES["3"][name]
+        assert v2["status"] == v3["status"], name
+        assert v2["failure_reason"] == v3["failure_reason"], name
+        assert v2["turns_resolved"] == v3["turns_resolved"], name
+        changed = {
+            var for var, value in v3["final_variables"].items()
+            if v2["final_variables"][var] != value
+        }
+        assert changed == {"power_stability"}, (
+            f"{name}: ruleset 3 changed {sorted(changed)}; only "
+            "power_stability may differ from ruleset 2"
+        )
+
+
+def test_contractor_spam_reaches_the_ultimatum_variant():
+    """Under ruleset 3, three acted-on squeezes collapse the contractor's
+    working trust (40 -> 22, at or below the authored threshold 25), so the
+    turn-4 call resolves against the ultimatum variant -- previously dead
+    content (trust could never move before turn 4)."""
+    campaign = _play(CANONICAL_SEQUENCES["contractor_spam"])
+    variants = [t.call_variant_id for t in campaign.turn_history]
+    assert variants[3] == "call_04_terms_ultimatum"
+    assert all(v is None for i, v in enumerate(variants) if i != 3)
 
 
 def test_ruleset_two_changed_only_power_stability():

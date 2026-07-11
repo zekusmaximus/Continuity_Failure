@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import pytest
 
-from engine import seed_data, turn
+from engine import degradation, seed_data, turn
 from engine.content import (
     NORTHBRIDGE_SCENARIO_ID,
     UnknownVariant,
@@ -48,7 +48,13 @@ def _play(sequence, variant_id=""):
     for advice_id in sequence:
         if campaign.is_terminal():
             break
-        turn.advance_turn(campaign, advice_id)
+        kwargs = {}
+        # Under ruleset 3 the hot-summer neglect route genuinely reaches the
+        # CRITICAL band: late turns must allocate auxiliary power like any
+        # ordinary player would (allocation gates capability, never numbers).
+        if degradation.assess_degradation(campaign).requires_power_allocation:
+            kwargs["powered_subsystem"] = "COMMUNICATIONS"
+        turn.advance_turn(campaign, advice_id, **kwargs)
     return campaign
 
 
@@ -70,7 +76,7 @@ def test_variant_overrides_apply_and_the_id_is_stamped():
     assert baseline.variant_id == ""
     assert hot.variant_id == "hot_summer"
     assert hot.world_state.variables["water_security"] == 40
-    assert hot.world_state.variables["power_stability"] == 64
+    assert hot.world_state.variables["power_stability"] == 60
     # Non-overridden variables keep the baseline starting state.
     assert (
         hot.world_state.variables["budget_capacity"]
@@ -101,8 +107,15 @@ def test_same_variant_and_sequence_is_bit_for_bit_repeatable():
 
 
 def test_hot_summer_completes_on_the_canonical_sequence():
+    """The hot-summer survival line is also the CRITICAL-reachability witness:
+    ignoring load shedding, the grid crosses into CRITICAL at the end of turn
+    8, so turns 9 and 10 resolve under a real auxiliary-power allocation --
+    and the campaign still completes."""
     campaign = _play(SURVIVAL_SEQUENCE, "hot_summer")
     assert campaign.status == CampaignStatus.COMPLETED
+    allocations = [t.powered_subsystem for t in campaign.turn_history]
+    assert allocations[:8] == [None] * 8
+    assert allocations[8] is not None and allocations[9] is not None
 
 
 def test_strained_finances_breaks_the_canonical_playbook_but_is_survivable():
@@ -137,4 +150,4 @@ def test_variant_id_survives_persistence(tmp_path):
     repository.put(campaign)
     restored = SQLiteRepository(repository.path).get(campaign.id)
     assert restored.variant_id == "hot_summer"
-    assert restored.world_state.variables["power_stability"] == 64
+    assert restored.world_state.variables["power_stability"] == 60

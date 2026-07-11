@@ -25,6 +25,7 @@ from engine import content
 from engine import degradation as degradation_engine
 from engine import dossier as dossier_engine
 from engine import endings as endings_engine
+from engine import rules as rules_engine
 from engine import seed_data, turn as turn_engine
 from engine.models import (
     AdviceMemo,
@@ -104,10 +105,24 @@ def _world_state(campaign: Campaign) -> schemas.WorldStateModel:
 
 
 def _documents(campaign: Campaign) -> list[schemas.DocumentModel]:
-    return [
-        schemas.DocumentModel.model_validate(asdict(d))
-        for d in campaign.available_documents()
-    ]
+    """Available documents, with honest offline provenance.
+
+    Once live feeds are lost (any band below NOMINAL), a document that became
+    available AFTER the last live turn did not arrive over a verified feed. It
+    stays on the board -- couriered records and desk annotations still exist --
+    but it is flagged ``unverified_offline`` so the board never contradicts its
+    own last-verified stamp. Presentation-only: authored reliability and the
+    engine's citation rules are untouched.
+    """
+    status = degradation_engine.assess_degradation(campaign)
+    documents = []
+    for d in campaign.available_documents():
+        data = asdict(d)
+        data["unverified_offline"] = (
+            not status.live_feeds and d.turn_number > status.last_live_turn
+        )
+        documents.append(schemas.DocumentModel.model_validate(data))
+    return documents
 
 
 def _open_threads(campaign: Campaign) -> list[schemas.OpenThreadModel]:
@@ -168,6 +183,11 @@ def _system_status(campaign: Campaign) -> schemas.SystemStatusModel:
         live_feeds=status.live_feeds,
         last_live_turn=status.last_live_turn,
         requires_power_allocation=status.requires_power_allocation,
+        power_commitment=(
+            campaign.power_commitments.get(campaign.turn_number)
+            if status.requires_power_allocation
+            else None
+        ),
     )
 
 
@@ -445,6 +465,39 @@ def _new_memo(
     return memo
 
 
+def _bind_provisional_allocation(
+    campaign_id: str, powered_subsystem: Optional[str]
+) -> None:
+    """Bind the turn's auxiliary allocation BEFORE a gated drafting action.
+
+    At CRITICAL, a drafting request that routes auxiliary power to
+    MODEL_ACCESS energizes that circuit for the turn: the allocation is
+    recorded on ``campaign.power_commitments`` durably, before the model call
+    runs, and the advice submission must then carry the same allocation
+    (``PowerAllocationConflict`` otherwise). This is what makes the
+    one-subsystem rule truthful -- drafting under MODEL_ACCESS and then
+    submitting under LIVE_DATA would power two subsystems in one turn.
+
+    Outside CRITICAL, or for a request that does not route power to the model
+    circuit, nothing is committed (the request is advisory as before).
+    """
+    if powered_subsystem != PowerAllocation.MODEL_ACCESS:
+        return
+    with get_repository().transaction() as active:
+        campaign = active.get_campaign(campaign_id)
+        if campaign is None:
+            raise errors.CampaignNotFound(campaign_id)
+        if not degradation_engine.assess_degradation(campaign).requires_power_allocation:
+            return
+        committed = campaign.power_commitments.get(campaign.turn_number)
+        if committed is not None:
+            if committed != powered_subsystem:
+                raise errors.PowerAllocationConflict(committed, powered_subsystem)
+            return
+        campaign.power_commitments[campaign.turn_number] = powered_subsystem
+        active.save_campaign(campaign)
+
+
 class ResolvedTurn:
     """A turn-resolution outcome plus whether it replayed a prior submission."""
 
@@ -502,6 +555,16 @@ def submit_advice(
             bind_log_fields(idempotency=IdempotencyOutcome.TERMINAL)
             raise errors.CampaignTerminal(campaign.status, campaign.failure_reason)
 
+        # A stored active campaign from an older ruleset must not silently
+        # continue under the current rules: the record would be a hybrid
+        # mislabeled with the version that did not produce it. It stays
+        # readable (history, canon, dossier); only continuation is refused.
+        if campaign.ruleset_version != rules_engine.CURRENT_RULESET_VERSION:
+            bind_log_fields(idempotency=IdempotencyOutcome.REJECTED)
+            raise errors.RulesetIncompatible(
+                campaign.ruleset_version, rules_engine.CURRENT_RULESET_VERSION
+            )
+
         if campaign.turn_number != expected_turn:
             bind_log_fields(idempotency=IdempotencyOutcome.STALE_TURN)
             raise errors.StaleTurn(expected_turn, campaign.turn_number)
@@ -532,6 +595,10 @@ def submit_advice(
             if powered_subsystem is None:
                 bind_log_fields(idempotency=IdempotencyOutcome.REJECTED)
                 raise errors.PowerAllocationRequired()
+            committed = campaign.power_commitments.get(campaign.turn_number)
+            if committed is not None and powered_subsystem != committed:
+                bind_log_fields(idempotency=IdempotencyOutcome.REJECTED)
+                raise errors.PowerAllocationConflict(committed, powered_subsystem)
             if cited_document_ids and powered_subsystem != PowerAllocation.LIVE_DATA:
                 bind_log_fields(idempotency=IdempotencyOutcome.REJECTED)
                 raise errors.EvidenceUnverifiable(powered_subsystem)
@@ -606,6 +673,11 @@ def submit_advice(
         except turn_engine.PowerAllocationUnavailable as exc:
             bind_log_fields(idempotency=IdempotencyOutcome.REJECTED)
             raise errors.PowerAllocationUnavailable(degradation.band) from exc
+        except turn_engine.PowerAllocationConflict as exc:
+            bind_log_fields(idempotency=IdempotencyOutcome.REJECTED)
+            raise errors.PowerAllocationConflict(
+                exc.committed, exc.requested
+            ) from exc
         except turn_engine.EvidenceUnverifiable as exc:
             bind_log_fields(idempotency=IdempotencyOutcome.REJECTED)
             raise errors.EvidenceUnverifiable(powered_subsystem or "") from exc
@@ -728,6 +800,9 @@ def create_memo(
         if creation_mode == "template":
             content = _memo_content_text(fallbacks.memo_fallback(payload))
         else:
+            # Routing auxiliary power to the model circuit is a gated action:
+            # it binds the turn's single allocation before the model runs.
+            _bind_provisional_allocation(campaign_id, powered_subsystem)
             artifact = run_artifact(
                 prompt_name="memo_drafter",
                 prompt_version="v1",
@@ -851,6 +926,9 @@ def draft_memo(
         campaign.current_call(),
         campaign.world_state.factions,
     )
+    # Routing auxiliary power to the model circuit is a gated action: it
+    # binds the turn's single allocation before the model runs.
+    _bind_provisional_allocation(campaign_id, powered_subsystem)
     artifact = run_artifact(
         prompt_name="memo_drafter",
         prompt_version="v1",

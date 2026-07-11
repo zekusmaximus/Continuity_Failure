@@ -52,6 +52,25 @@ class UnknownPowerAllocation(Exception):
     """The submitted allocation is not a recognized subsystem."""
 
 
+class PowerAllocationConflict(Exception):
+    """The turn's auxiliary power is already committed to another subsystem.
+
+    At CRITICAL, the first gated action of a turn (a drafting request routed
+    to MODEL_ACCESS) binds the turn's single allocation on
+    ``campaign.power_commitments``. A submission that names a different
+    subsystem would power two circuits in one turn -- exactly what the
+    one-subsystem rule forbids -- so it is rejected here, deterministically.
+    """
+
+    def __init__(self, committed: str, requested: str) -> None:
+        self.committed = committed
+        self.requested = requested
+        super().__init__(
+            f"auxiliary power is already committed to {committed} this turn; "
+            f"cannot resolve under {requested}"
+        )
+
+
 class EvidenceUnverifiable(Exception):
     """Citations were submitted while the live-data circuit is unpowered:
     the desk cannot verify evidence it cannot reach."""
@@ -126,6 +145,9 @@ def advance_turn(
             )
         if powered_subsystem not in PowerAllocation.ALL:
             raise UnknownPowerAllocation(powered_subsystem)
+        committed = campaign.power_commitments.get(campaign.turn_number)
+        if committed is not None and powered_subsystem != committed:
+            raise PowerAllocationConflict(committed, powered_subsystem)
         if cited_document_ids and powered_subsystem != PowerAllocation.LIVE_DATA:
             raise EvidenceUnverifiable(
                 "citations require the live-data circuit; auxiliary power "

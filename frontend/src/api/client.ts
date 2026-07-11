@@ -2,6 +2,12 @@
 // All requests use same-origin relative URLs; in dev the Vite proxy forwards
 // them to the FastAPI server at http://localhost:8000.
 
+export interface FactionAdviceTrustCost {
+  advice_tag: string;
+  delta: number;
+  reason: string;
+}
+
 export interface Faction {
   id: string;
   name: string;
@@ -17,6 +23,8 @@ export interface Faction {
   current_pressure: number;
   red_lines: string[];
   tags: string[];
+  // Authored trust reactions when advice targets this faction off the line.
+  advice_trust_costs: FactionAdviceTrustCost[];
 }
 
 export interface Crisis {
@@ -88,6 +96,9 @@ export interface DocumentRecord {
   summary: string;
   content: string;
   tags: string[];
+  // True when live feeds are down and this document arrived after the last
+  // live turn: it did not come over a verified feed.
+  unverified_offline: boolean;
 }
 
 export interface ThreadCondition {
@@ -377,6 +388,9 @@ export interface SystemStatus {
   live_feeds: boolean;
   last_live_turn: number;
   requires_power_allocation: boolean;
+  // The turn's bound auxiliary allocation once a gated drafting action has
+  // committed it (CRITICAL only): the submission must carry the same one.
+  power_commitment: PowerAllocation | null;
 }
 
 export interface CurrentTurn {

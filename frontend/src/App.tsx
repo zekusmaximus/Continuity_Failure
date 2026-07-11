@@ -107,6 +107,14 @@ export default function App() {
   const [memoSaving, setMemoSaving] = useState(false);
   const [memoError, setMemoError] = useState<string | null>(null);
 
+  // The turn's bound auxiliary allocation, once a gated drafting action has
+  // committed it on the backend (CRITICAL band only). While set, the picker
+  // holds that value: the submission must carry the same allocation.
+  const powerCommitment = current?.system_status.power_commitment ?? null;
+  useEffect(() => {
+    if (powerCommitment) setPoweredSubsystem(powerCommitment);
+  }, [powerCommitment]);
+
   const gotoPhase = useCallback((next: Phase, announcement?: string) => {
     setPhase(next);
     const index = TURN_STEPS.indexOf(next);
@@ -414,13 +422,21 @@ export default function App() {
       });
       setMemo(draft);
       setMemos((records) => [...records, draft]);
+      // At CRITICAL, an assisted draft routed to MODEL_ACCESS binds the
+      // turn's allocation server-side; refresh so the picker reflects it.
+      if (
+        current?.system_status.requires_power_allocation &&
+        poweredSubsystem === "MODEL_ACCESS"
+      ) {
+        await refreshCurrent(campaignId).catch(() => undefined);
+      }
     } catch (e) {
       setMemo(null);
       setMemoError(e instanceof Error ? e.message : String(e));
     } finally {
       setMemoLoading(false);
     }
-  }, [campaignId, selected, current, poweredSubsystem]);
+  }, [campaignId, selected, current, poweredSubsystem, refreshCurrent]);
 
   const handleCreateManualMemo = useCallback(async () => {
     if (!campaignId || !selected || !current) return;
@@ -484,11 +500,14 @@ export default function App() {
   }, [current, poweredSubsystem]);
 
   const handleAllocatePower = useCallback((allocation: PowerAllocation) => {
+    // A committed allocation (a drafting action already energized a circuit
+    // this turn) cannot be re-routed; the backend enforces the same rule.
+    if (powerCommitment) return;
     setPoweredSubsystem(allocation);
     // Moving auxiliary power off the live-data circuit invalidates any
     // citations composed under it.
     if (allocation !== "LIVE_DATA") setCitedDocs([]);
-  }, []);
+  }, [powerCommitment]);
 
   const handleSelectAdvice = useCallback(
     (id: string) => {

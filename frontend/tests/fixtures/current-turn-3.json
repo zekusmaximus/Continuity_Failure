@@ -351,7 +351,8 @@
       ],
       "title": "Preliminary Water Quality Lab Report",
       "turn_number": 1,
-      "type": "LAB_REPORT"
+      "type": "LAB_REPORT",
+      "unverified_offline": false
     },
     {
       "content": "M. VELEZ (Town Manager): \"Pressure dropped twelve percent overnight in the south zone. The lab flagged a preliminary result. I have an emergency council session in the morning. I need to know what I can say and what I must say before the second lab comes back.\"\n[Consultant retained on a 30-day emergency stabilization engagement.]",
@@ -366,7 +367,8 @@
       ],
       "title": "Town Manager Call Transcript",
       "turn_number": 1,
-      "type": "CALL_TRANSCRIPT"
+      "type": "CALL_TRANSCRIPT",
+      "unverified_offline": false
     },
     {
       "content": "[Executive session, sealed pending vote.]\nMAJORITY COUNSEL: \"Frame this as accelerating deferred maintenance, not a contamination event, until the second lab returns.\"\nOPPOSITION (on record): \"Note for the record: we disagree with framing before confirmation either way.\"\nACTION: Manager authorized to pre-position mitigation; disclosure posture deferred to consultant advice.",
@@ -382,7 +384,8 @@
       ],
       "title": "Council Executive Session Excerpt",
       "turn_number": 1,
-      "type": "MEETING_MINUTES"
+      "type": "MEETING_MINUTES",
+      "unverified_offline": false
     },
     {
       "content": "FROM: Superintendent's Office\nRE: Closure threshold for south-zone schools\nThree schools depend on the south pressure zone. We will not keep buildings open on a guess. We need a written, defensible pressure threshold and a closure protocol we can show parents on the record.",
@@ -398,7 +401,8 @@
       ],
       "title": "School Superintendent Closure Guidance Request",
       "turn_number": 2,
-      "type": "EMAIL"
+      "type": "EMAIL",
+      "unverified_offline": false
     },
     {
       "content": "FROM: Northbridge Hospital, Office of Counsel\nRE: Priority allocation for clinical water\nDialysis and sterilization depend on stable, pressurized supply. We estimate roughly two days of degraded pressure before elective cancellations become unavoidable. Tanker resupply is available but logistically fragile. We request documented priority allocation, and we ask that any state hospital liaison be briefed through us.",
@@ -414,7 +418,8 @@
       ],
       "title": "Hospital Priority Water Allocation Request",
       "turn_number": 3,
-      "type": "EMAIL"
+      "type": "EMAIL",
+      "unverified_offline": false
     }
   ],
   "last_turn": {
@@ -430,7 +435,7 @@
       "involved_factions": [
         "Northbridge Public Schools"
       ],
-      "memo_id": "memo_774e9091846a4a0d9ab2d4cbbfc30c2a",
+      "memo_id": "memo_fbf27a822bf14cdd9176c712399ebc45",
       "public_status": "public",
       "source": "Northbridge Public Schools",
       "tags": [
@@ -831,7 +836,7 @@
         ],
         "outcome_reason": "On-brief: Full disclosure and emergency conservation order was one of the options the Northbridge Public Schools asked about; the Northbridge Public Schools acted on it per its own risk posture."
       },
-      "memo_id": "memo_774e9091846a4a0d9ab2d4cbbfc30c2a",
+      "memo_id": "memo_fbf27a822bf14cdd9176c712399ebc45",
       "memo_revision": 1,
       "modifications": {},
       "off_brief": false,
@@ -983,7 +988,7 @@
       "classification": "proposed",
       "content": "RECOMMENDATION\nRelease the preliminary result with a conservation order, notify the state agency in writing, and publish the response timeline.\n\nRATIONALE\nMinimizes legal exposure and protects information integrity.\n\nOPERATIONAL STEPS\n- Transmit the preliminary result and response timeline to the state liaison in writing.\n- Issue the conservation order with separate hospital and school operating instructions.\n- Publish the source report, known uncertainties, and the next verification deadline together.\n\nCOMMUNICATIONS\nFrame public communications around Full disclosure and emergency conservation order. State only what the record supports.\n\nLIKELY OPPOSITION\nExpect review or resistance from: Town Manager's Office, Local Media / Rumor Network, Parent and Resident Coalition, Local Business Alliance.\n\nSECOND-ORDER RISKS\n- Short-term public-order shock and media amplification.\n- Business and school disruption spike before mitigation lands.\n\nFALLBACK PLAN\nIf the client deviates from this advice, preserve the written advice of record and revisit at the next call.",
       "content_digest": "95bd13bbef8d5c824567a6575e58be5b73db32ad6e5fa59a33d69f95c1ef5117",
-      "memo_id": "memo_774e9091846a4a0d9ab2d4cbbfc30c2a",
+      "memo_id": "memo_fbf27a822bf14cdd9176c712399ebc45",
       "name": "Advice of record — Full disclosure and emergency conservation order",
       "provenance": {
         "fallback_used": true,
@@ -995,7 +1000,7 @@
         "workflow": "deterministic_fallback"
       },
       "revision": 1,
-      "sent_at": "2026-07-11T15:08:41.379217+00:00",
+      "sent_at": "2026-07-11T17:38:44.341662+00:00",
       "source": "system"
     },
     "status_after": "ACTIVE",
@@ -1062,12 +1067,12 @@
     }
   ],
   "summary": {
-    "created_at": "2026-07-11T15:08:41.117350+00:00",
+    "created_at": "2026-07-11T17:38:44.183954+00:00",
     "failure_reason": null,
     "id": "test-campaign",
     "max_turns": 10,
     "name": "Northbridge Water Failure",
-    "ruleset_version": "2",
+    "ruleset_version": "3",
     "scenario_id": "northbridge_water_failure",
     "status": "ACTIVE",
     "turn_number": 3,
@@ -1082,6 +1087,7 @@
     "live_feeds": true,
     "model_status": "AI assist present — off by default (returns system drafts)",
     "power": 72,
+    "power_commitment": null,
     "requires_power_allocation": false,
     "staff_capacity": 48
   },
@@ -1096,6 +1102,7 @@
     },
     "factions": [
       {
+        "advice_trust_costs": [],
         "alignment": "authority",
         "current_pressure": 62,
         "description": "Appointed executive running day-to-day municipal operations.",
@@ -1118,6 +1125,7 @@
         "type": "EXECUTIVE"
       },
       {
+        "advice_trust_costs": [],
         "alignment": "authority",
         "current_pressure": 55,
         "description": "Governing bloc controlling appropriations and emergency authorities.",
@@ -1140,6 +1148,7 @@
         "type": "LEGISLATIVE"
       },
       {
+        "advice_trust_costs": [],
         "alignment": "opposition",
         "current_pressure": 58,
         "description": "Minority bloc poised to capitalize on any misstep.",
@@ -1162,6 +1171,7 @@
         "type": "LEGISLATIVE"
       },
       {
+        "advice_trust_costs": [],
         "alignment": "service",
         "current_pressure": 64,
         "description": "Operators of the treatment plant, mains, and pressure system.",
@@ -1184,6 +1194,7 @@
         "type": "UTILITY"
       },
       {
+        "advice_trust_costs": [],
         "alignment": "service",
         "current_pressure": 50,
         "description": "Regional acute-care facility dependent on municipal water.",
@@ -1206,6 +1217,7 @@
         "type": "HOSPITAL"
       },
       {
+        "advice_trust_costs": [],
         "alignment": "neutral",
         "current_pressure": 66,
         "description": "Organized residents tracking school and household risk.",
@@ -1228,6 +1240,7 @@
         "type": "RESIDENT_GROUP"
       },
       {
+        "advice_trust_costs": [],
         "alignment": "neutral",
         "current_pressure": 44,
         "description": "Employers and retailers sensitive to disruption and reputation.",
@@ -1250,6 +1263,7 @@
         "type": "BUSINESS"
       },
       {
+        "advice_trust_costs": [],
         "alignment": "authority",
         "current_pressure": 48,
         "description": "State agency observer with authority to trigger oversight.",
@@ -1272,6 +1286,13 @@
         "type": "STATE_ACTOR"
       },
       {
+        "advice_trust_costs": [
+          {
+            "advice_tag": "contractor",
+            "delta": -6,
+            "reason": "The consultant's squeeze strategy reached Marquotte's contracts office; the firm reads the desk as adversarial and copies it on less."
+          }
+        ],
         "alignment": "service",
         "current_pressure": 60,
         "description": "Sole qualified firm able to repair the failing system.",
@@ -1294,6 +1315,7 @@
         "type": "CONTRACTOR"
       },
       {
+        "advice_trust_costs": [],
         "alignment": "neutral",
         "current_pressure": 52,
         "description": "Patchwork of outlets and social channels amplifying uncertainty.",

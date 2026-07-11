@@ -522,7 +522,7 @@ def test_create_campaign_with_variant(client):
 
     current = client.get(f"/api/campaigns/{campaign_id}/current").json()
     assert current["summary"]["variant_id"] == "hot_summer"
-    assert current["world_state"]["variables"]["power_stability"] == 64
+    assert current["world_state"]["variables"]["power_stability"] == 60
     assert current["world_state"]["variables"]["water_security"] == 40
 
 

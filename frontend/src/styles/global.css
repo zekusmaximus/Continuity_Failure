@@ -912,6 +912,7 @@ body {
 .tag-sealed { color: var(--warn); border-color: var(--warn); }
 .tag-disputed { color: var(--crit); border-color: var(--crit); }
 .tag-unknown { color: var(--text-dim); }
+.tag-offline { color: var(--warn); border-color: var(--warn); background: rgba(194,150,80,0.08); }
 .rel-high { color: var(--good); border-color: var(--good); }
 .rel-medium { color: var(--text); border-color: var(--border-strong); }
 .rel-low { color: var(--text-dim); border-color: var(--border-strong); }

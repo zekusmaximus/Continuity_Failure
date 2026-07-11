@@ -43,7 +43,15 @@ from engine.state import clamp, humanize_variable
 #          (authored ambient windows, the grid-stress thread spec, and the
 #          load-shedding advice handler below). Threshold variables are
 #          untouched: the "2" goldens differ from "1" ONLY in power_stability.
-CURRENT_RULESET_VERSION = "2"
+#   "3" -- Wave 2 balance pass (adversarial-review fixes): (a) an ignored
+#          grid-stress thread now erodes power every peak cycle (-6, repeat 1)
+#          and the hot-summer variant enters at power 60, so the CRITICAL band
+#          and its auxiliary-power choice are reachable through authored play;
+#          (b) content-authored cross-faction trust costs
+#          (Faction.advice_trust_costs) let advice aimed at an off-line
+#          faction move its trust, making the turn-4 contractor ultimatum
+#          variant reachable. Failure thresholds and drift are untouched.
+CURRENT_RULESET_VERSION = "3"
 
 
 # An internal working draft of an NPC decision, before the public NpcDecision
