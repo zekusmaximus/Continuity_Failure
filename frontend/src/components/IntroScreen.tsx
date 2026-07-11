@@ -1,10 +1,13 @@
-import type { RecentCampaign } from "../api/client";
+import type { RecentCampaign, ScenarioVariant } from "../api/client";
 
 interface Props {
   onBegin: () => void;
   onResume: (campaignId: string) => void;
   recentCampaigns: RecentCampaign[];
   loading: boolean;
+  variants?: ScenarioVariant[];
+  selectedVariant?: string;
+  onVariantChange?: (variantId: string) => void;
 }
 
 /**
@@ -16,7 +19,11 @@ export default function IntroScreen({
   onResume,
   recentCampaigns,
   loading,
+  variants = [],
+  selectedVariant = "",
+  onVariantChange,
 }: Props) {
+  const activeVariant = variants.find((v) => v.id === selectedVariant);
   return (
     <main id="main-content" className="cd-intro" tabIndex={-1}>
       <div className="cd-intro-card">
@@ -46,6 +53,31 @@ export default function IntroScreen({
           <span className="cd-intro-engagement-k">Current Engagement</span>
           <span className="cd-intro-engagement-v">Northbridge Water Failure</span>
         </div>
+
+        {variants.length > 0 && (
+          <div className="cd-intro-variant">
+            <label className="cd-intro-variant-label" htmlFor="intro-variant">
+              Opening conditions
+            </label>
+            <select
+              id="intro-variant"
+              className="cd-intro-variant-select"
+              value={selectedVariant}
+              onChange={(e) => onVariantChange?.(e.target.value)}
+              disabled={loading}
+            >
+              <option value="">Baseline engagement</option>
+              {variants.map((variant) => (
+                <option key={variant.id} value={variant.id}>
+                  {variant.name}
+                </option>
+              ))}
+            </select>
+            {activeVariant && (
+              <p className="cd-intro-variant-desc">{activeVariant.description}</p>
+            )}
+          </div>
+        )}
 
         <button
           className="cd-btn cd-btn-primary cd-intro-begin"

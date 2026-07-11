@@ -8,8 +8,19 @@ import {
   levelClass,
 } from "../domain";
 
-/** Compact operational state readout of the 16 world-state variables. */
-export default function StateReadout({ state }: { state: WorldState }) {
+/** Compact operational state readout of the 16 world-state variables.
+ *
+ * ``stale`` marks the readout as a last-verified snapshot rather than a live
+ * feed (workstation degradation): the freshness stamp gets warning treatment
+ * and announces itself for assistive tech.
+ */
+export default function StateReadout({
+  state,
+  stale = false,
+}: {
+  state: WorldState;
+  stale?: boolean;
+}) {
   const groups = useMemo(() => {
     const byGroup: Record<string, { key: string; value: number; meta: typeof VARIABLE_META[string] }[]> = {};
     for (const key of VARIABLE_ORDER) {
@@ -24,10 +35,16 @@ export default function StateReadout({ state }: { state: WorldState }) {
   }, [state]);
 
   return (
-    <section className="cd-panel cd-state-readout">
+    <section className={`cd-panel cd-state-readout${stale ? " cd-readout-stale" : ""}`}>
       <header className="cd-panel-head">
         <h2>Operational State Readout</h2>
-        <span className="cd-verified">{state.last_verified}</span>
+        <span
+          className={`cd-verified${stale ? " cd-verified-stale" : ""}`}
+          role={stale ? "status" : undefined}
+        >
+          {stale && <span aria-hidden>⚠ </span>}
+          {state.last_verified}
+        </span>
       </header>
       <div className="cd-state-grid">
         {groups.map(({ group, items }) => (

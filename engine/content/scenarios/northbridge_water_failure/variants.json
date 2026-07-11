@@ -1,0 +1,20 @@
+[
+  {
+    "id": "hot_summer",
+    "name": "Hot Summer",
+    "description": "A weeks-long regional heat event precedes the failure: source water is already stressed, the south-zone drop starts deeper, and the grid enters the crisis with less margin than the operators would like.",
+    "variable_overrides": {
+      "water_security": 40,
+      "power_stability": 64
+    }
+  },
+  {
+    "id": "strained_finances",
+    "name": "Strained Finances",
+    "description": "The town enters the crisis one budget cycle after a failed override vote: the emergency fund is thinner, and an unresolved procurement grievance already sits on the legal record. The playbook that survives the baseline engagement is one mutual-aid activation too rich here.",
+    "variable_overrides": {
+      "budget_capacity": 34,
+      "legal_exposure": 38
+    }
+  }
+]

@@ -117,6 +117,12 @@ export function createFakeBackend(options: Options = {}): FakeBackend {
       return json(options.recent ?? []);
     }
 
+    // Seed variants for the intake screen. Empty keeps the selector hidden;
+    // the variant flow itself is covered by backend/API tests.
+    if (method === "GET" && /\/api\/scenarios\/[a-z0-9_]+\/variants$/.test(path)) {
+      return json([]);
+    }
+
     if (!path.includes(CAMPAIGN_ID)) {
       return errorResponse(404, "campaign_not_found", "Campaign not found.");
     }

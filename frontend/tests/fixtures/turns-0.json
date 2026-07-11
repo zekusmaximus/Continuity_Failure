@@ -40,6 +40,7 @@
       "resolution_note": "A credible squeeze on Marquotte broke the assumption that the town would pay any change order.",
       "resolve_conditions": [
         {
+          "faction_id": null,
           "op": "<=",
           "threshold": 30,
           "variable": "contractor_dependency"
@@ -61,14 +62,16 @@
     }
   ],
   "summary": {
-    "created_at": "2026-07-11T01:54:27.539375+00:00",
+    "created_at": "2026-07-11T15:08:41.117350+00:00",
     "failure_reason": null,
     "id": "test-campaign",
     "max_turns": 10,
     "name": "Northbridge Water Failure",
+    "ruleset_version": "2",
     "scenario_id": "northbridge_water_failure",
     "status": "ACTIVE",
-    "turn_number": 1
+    "turn_number": 1,
+    "variant_id": ""
   },
   "turns": []
 }

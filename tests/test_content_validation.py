@@ -60,9 +60,10 @@ def test_loader_builds_expected_campaign_shape():
     assert campaign.turn_number == 1
     assert len(campaign.world_state.factions) == 10
     assert len(campaign.advice_options) == 6
-    assert set(campaign.per_turn_advice) == {2, 3, 7}
+    assert set(campaign.per_turn_advice) == {2, 3, 5, 7}
     assert set(campaign.client_calls) == set(range(1, 11))
     assert len(campaign.documents) == 12
+    assert len(campaign.thread_specs) == 6
     assert campaign.world_state.active_crisis.id == "northbridge_water_crisis"
     assert len(campaign.world_state.variables) == 16
 
@@ -451,3 +452,285 @@ def test_reject_negative_repeat_every():
     bundle.threads[0]["repeat_every"] = -1
     exc = _expect_invalid(bundle)
     assert any("repeat_every" in m for m in _messages(exc))
+
+
+# ---------------------------------------------------------------------------
+# Thread specs (dynamic-thread opening rules, thread_specs.json)
+# ---------------------------------------------------------------------------
+
+def test_loader_builds_thread_specs():
+    campaign = load_campaign(NORTHBRIDGE_SCENARIO_ID, campaign_id="fixed")
+    assert [s.id for s in campaign.thread_specs] == [
+        "thread_concealment_narrative",
+        "thread_oversight_designation",
+        "thread_contractor_precedent",
+        "thread_school_standoff",
+        "thread_trust_collapse",
+        "thread_grid_stress",
+    ]
+    concealment = campaign.thread_specs[0]
+    assert concealment.open_advice_tags == ["delay"]
+    assert concealment.open_decision_types == ["DELAYED"]
+    assert concealment.open_conditions_all[0].variable == "media_pressure"
+    assert concealment.due_in == 2 and concealment.repeat_every == 2
+
+
+def test_reject_thread_spec_without_any_opening_trigger():
+    bundle = valid_bundle()
+    for key in ("open_conditions_all", "open_conditions_any",
+                "open_advice_tags", "open_decision_types"):
+        bundle.thread_specs[0].pop(key, None)
+    exc = _expect_invalid(bundle)
+    assert any("no opening trigger" in m for m in _messages(exc))
+
+
+def test_reject_thread_spec_with_unknown_open_condition_variable():
+    bundle = valid_bundle()
+    bundle.thread_specs[0]["open_conditions_all"] = [
+        {"variable": "not_a_variable", "op": ">=", "threshold": 45}
+    ]
+    exc = _expect_invalid(bundle)
+    assert any("unknown WorldState variable 'not_a_variable'" in m
+               for m in _messages(exc))
+
+
+def test_reject_thread_spec_with_unknown_advice_tag_or_decision_type():
+    bundle = valid_bundle()
+    bundle.thread_specs[0]["open_advice_tags"] = ["not_a_tag"]
+    bundle.thread_specs[0]["open_decision_types"] = ["SHRUGGED"]
+    exc = _expect_invalid(bundle)
+    messages = _messages(exc)
+    assert any("open advice tag 'not_a_tag'" in m for m in messages)
+    assert any("unknown decision type 'SHRUGGED'" in m for m in messages)
+
+
+def test_reject_thread_spec_escalation_without_note():
+    bundle = valid_bundle()
+    bundle.thread_specs[0]["escalation_note"] = ""
+    exc = _expect_invalid(bundle)
+    assert any("escalation_note" in m for m in _messages(exc))
+
+
+def test_reject_thread_spec_with_bad_due_in():
+    bundle = valid_bundle()
+    bundle.thread_specs[0]["due_in"] = 0
+    exc = _expect_invalid(bundle)
+    assert any("due_in" in m for m in _messages(exc))
+
+
+def test_reject_thread_spec_id_colliding_with_seeded_thread():
+    bundle = valid_bundle()
+    bundle.thread_specs[0]["id"] = bundle.threads[0]["id"]
+    exc = _expect_invalid(bundle)
+    assert any("collides with a seeded thread" in m for m in _messages(exc))
+
+
+def test_reject_duplicate_thread_spec_ids():
+    bundle = valid_bundle()
+    bundle.thread_specs[1]["id"] = bundle.thread_specs[0]["id"]
+    exc = _expect_invalid(bundle)
+    assert any("duplicate thread spec id" in m for m in _messages(exc))
+
+
+def test_reject_unknown_thread_spec_field():
+    bundle = valid_bundle()
+    bundle.thread_specs[0]["opens_when"] = "media is high"
+    exc = _expect_invalid(bundle)
+    assert any("unknown field 'opens_when'" in m for m in _messages(exc))
+
+
+# ---------------------------------------------------------------------------
+# Call variants (branchable / faction-gated calls, authored in calls.json)
+# ---------------------------------------------------------------------------
+
+def _call_with_variants(bundle):
+    call = next(c for c in bundle.calls if c.get("variants"))
+    return call, call["variants"][0]
+
+
+def test_shipped_variants_load_and_validate():
+    bundle = valid_bundle()
+    call, variant = _call_with_variants(bundle)
+    assert variant["call"]["turn"] == call["turn"]
+    validate_bundle(bundle)
+
+
+def test_reject_variant_condition_referencing_unknown_faction():
+    bundle = valid_bundle()
+    _, variant = _call_with_variants(bundle)
+    variant["conditions"] = [
+        {"variable": "trust_in_player", "op": "<=", "threshold": 25,
+         "faction_id": "ministry_of_typos"}
+    ]
+    exc = _expect_invalid(bundle)
+    assert any("references unknown faction 'ministry_of_typos'" in m
+               for m in _messages(exc))
+
+
+def test_reject_variant_condition_on_disallowed_faction_field():
+    bundle = valid_bundle()
+    _, variant = _call_with_variants(bundle)
+    variant["conditions"] = [
+        {"variable": "posture", "op": "<=", "threshold": 25,
+         "faction_id": "utility_contractor"}
+    ]
+    exc = _expect_invalid(bundle)
+    assert any("not a faction condition field" in m for m in _messages(exc))
+
+
+def test_reject_variant_with_empty_conditions():
+    bundle = valid_bundle()
+    _, variant = _call_with_variants(bundle)
+    variant["conditions"] = []
+    exc = _expect_invalid(bundle)
+    assert any("at least one condition" in m for m in _messages(exc))
+
+
+def test_reject_variant_call_turn_mismatch():
+    bundle = valid_bundle()
+    _, variant = _call_with_variants(bundle)
+    variant["call"]["turn"] = variant["call"]["turn"] + 1
+    exc = _expect_invalid(bundle)
+    assert any("must equal the base call's turn" in m for m in _messages(exc))
+
+
+def test_reject_variant_call_id_differing_from_variant_id():
+    bundle = valid_bundle()
+    _, variant = _call_with_variants(bundle)
+    variant["call"]["id"] = "some_other_name"
+    exc = _expect_invalid(bundle)
+    assert any("must equal the variant id" in m for m in _messages(exc))
+
+
+def test_reject_variant_id_colliding_with_a_base_call_id():
+    bundle = valid_bundle()
+    call, variant = _call_with_variants(bundle)
+    other_call_id = next(
+        c["id"] for c in bundle.calls if c["id"] != call["id"]
+    )
+    variant["id"] = other_call_id
+    variant["call"]["id"] = other_call_id
+    exc = _expect_invalid(bundle)
+    assert any(f"duplicate call/variant id '{other_call_id}'" in m
+               for m in _messages(exc))
+
+
+def test_reject_nested_variants():
+    bundle = valid_bundle()
+    _, variant = _call_with_variants(bundle)
+    variant["call"]["variants"] = []
+    exc = _expect_invalid(bundle)
+    assert any("unknown field 'variants'" in m for m in _messages(exc))
+
+
+def test_variant_call_is_validated_as_a_full_call():
+    bundle = valid_bundle()
+    _, variant = _call_with_variants(bundle)
+    del variant["call"]["decision_profile"]
+    variant["call"]["primary_advice_ids"] = ["not_a_real_option"]
+    exc = _expect_invalid(bundle)
+    messages = _messages(exc)
+    assert any("decision_profile" in m for m in messages)
+    assert any("not_a_real_option" in m for m in messages)
+
+
+# ---------------------------------------------------------------------------
+# Seed variants (variants.json)
+# ---------------------------------------------------------------------------
+
+def test_reject_variant_with_unknown_override_variable():
+    bundle = valid_bundle()
+    bundle.variants[0]["variable_overrides"]["watr_security"] = 40
+    exc = _expect_invalid(bundle)
+    assert any("unknown WorldState variable 'watr_security'" in m
+               for m in _messages(exc))
+
+
+def test_reject_variant_with_out_of_range_override():
+    bundle = valid_bundle()
+    bundle.variants[0]["variable_overrides"]["water_security"] = 140
+    exc = _expect_invalid(bundle)
+    assert any("within [0, 100]" in m for m in _messages(exc))
+
+
+def test_reject_variant_with_empty_overrides():
+    bundle = valid_bundle()
+    bundle.variants[0]["variable_overrides"] = {}
+    exc = _expect_invalid(bundle)
+    assert any("must not be empty" in m for m in _messages(exc))
+
+
+def test_reject_variant_missing_description_or_with_unknown_field():
+    bundle = valid_bundle()
+    del bundle.variants[0]["description"]
+    bundle.variants[1]["faction_overrides"] = {}
+    exc = _expect_invalid(bundle)
+    messages = _messages(exc)
+    assert any("missing required field 'description'" in m for m in messages)
+    assert any("unknown seed-variant field 'faction_overrides'" in m
+               for m in messages)
+
+
+def test_reject_duplicate_variant_ids():
+    bundle = valid_bundle()
+    bundle.variants[1]["id"] = bundle.variants[0]["id"]
+    exc = _expect_invalid(bundle)
+    assert any("duplicate variant id" in m for m in _messages(exc))
+
+
+# ---------------------------------------------------------------------------
+# Ambient windows (scenario.json ambient_windows)
+# ---------------------------------------------------------------------------
+
+def _first_window(bundle):
+    return bundle.scenario["ambient_windows"][0]
+
+
+def test_reject_window_with_unknown_variable():
+    bundle = valid_bundle()
+    _first_window(bundle)["effects"] = {"powr_stability": -6}
+    exc = _expect_invalid(bundle)
+    assert any("unknown WorldState variable 'powr_stability'" in m
+               for m in _messages(exc))
+
+
+def test_reject_window_running_backwards_or_out_of_range():
+    bundle = valid_bundle()
+    _first_window(bundle)["from_turn"] = 8
+    _first_window(bundle)["to_turn"] = 3
+    exc = _expect_invalid(bundle)
+    assert any("runs backwards" in m for m in _messages(exc))
+
+    bundle = valid_bundle()
+    _first_window(bundle)["to_turn"] = 99
+    exc = _expect_invalid(bundle)
+    assert any("to_turn 99 is outside 1..10" in m for m in _messages(exc))
+
+
+def test_reject_window_with_empty_effects_or_blank_reason():
+    bundle = valid_bundle()
+    _first_window(bundle)["effects"] = {}
+    _first_window(bundle)["reason"] = "  "
+    exc = _expect_invalid(bundle)
+    messages = _messages(exc)
+    assert any("effects must not be empty" in m for m in messages)
+    assert any("reason must be a non-empty string" in m for m in messages)
+
+
+def test_reject_window_with_unknown_field_or_duplicate_id():
+    bundle = valid_bundle()
+    _first_window(bundle)["intensity"] = "severe"
+    bundle.scenario["ambient_windows"].append(
+        dict(_first_window(bundle), intensity=None) | {"intensity": "x"}
+    )
+    exc = _expect_invalid(bundle)
+    messages = _messages(exc)
+    assert any("unknown field 'intensity'" in m for m in messages)
+    assert any("duplicate ambient window id" in m for m in messages)
+
+
+def test_reject_out_of_range_window_delta():
+    bundle = valid_bundle()
+    _first_window(bundle)["effects"] = {"power_stability": -500}
+    exc = _expect_invalid(bundle)
+    assert any("within [-100, 100]" in m for m in _messages(exc))

@@ -1,0 +1,197 @@
+[
+ {
+  "id": "thread_concealment_narrative",
+  "title": "'Cover-up' concealment narrative",
+  "summary": "A delay posture under rising media pressure let a concealment frame take hold.",
+  "tags": [
+   "narrative",
+   "trust",
+   "media"
+  ],
+  "open_advice_tags": [
+   "delay"
+  ],
+  "open_decision_types": [
+   "DELAYED"
+  ],
+  "open_conditions_all": [
+   {
+    "variable": "media_pressure",
+    "op": ">=",
+    "threshold": 45
+   }
+  ],
+  "due_in": 2,
+  "repeat_every": 2,
+  "escalation_effects": {
+   "public_trust": -3,
+   "media_pressure": 3
+  },
+  "escalation_note": "The concealment frame hardened another cycle without a full public accounting.",
+  "resolve_tags": [
+   "disclosure"
+  ],
+  "resolution_note": "A full public accounting broke the concealment frame."
+ },
+ {
+  "id": "thread_oversight_designation",
+  "title": "State oversight designation threat",
+  "summary": "Late notification and sliding metrics put a formal oversight review in play.",
+  "tags": [
+   "state",
+   "oversight",
+   "intervention"
+  ],
+  "open_conditions_all": [
+   {
+    "variable": "state_oversight_risk",
+    "op": ">=",
+    "threshold": 60
+   }
+  ],
+  "due_in": 2,
+  "repeat_every": 2,
+  "escalation_effects": {
+   "state_oversight_risk": 4
+  },
+  "escalation_note": "The oversight review file thickened while local metrics kept sliding.",
+  "resolve_conditions": [
+   {
+    "variable": "state_oversight_risk",
+    "op": "<=",
+    "threshold": 45
+   }
+  ],
+  "resolution_note": "Oversight risk fell back below the designation threshold."
+ },
+ {
+  "id": "thread_contractor_precedent",
+  "title": "Sole-source contractor precedent",
+  "summary": "Conceded emergency terms are hardening into structural dependency.",
+  "tags": [
+   "contractor",
+   "procurement",
+   "dependency"
+  ],
+  "open_advice_tags": [
+   "contractor"
+  ],
+  "open_conditions_all": [
+   {
+    "variable": "contractor_dependency",
+    "op": ">=",
+    "threshold": 70
+   }
+  ],
+  "due_in": 2,
+  "repeat_every": 2,
+  "escalation_effects": {
+   "legal_exposure": 4,
+   "state_oversight_risk": 3
+  },
+  "escalation_note": "The sole-source emergency terms were cited as precedent again; procurement-law exposure and state attention both deepened.",
+  "resolve_conditions": [
+   {
+    "variable": "contractor_dependency",
+    "op": "<=",
+    "threshold": 50
+   }
+  ],
+  "resolution_note": "Dependency fell far enough to renegotiate on normal terms."
+ },
+ {
+  "id": "thread_school_standoff",
+  "title": "School closure standoff",
+  "summary": "Parents and the superintendent demand an on-the-record closure threshold.",
+  "tags": [
+   "school",
+   "parent_pressure"
+  ],
+  "open_conditions_any": [
+   {
+    "variable": "school_disruption",
+    "op": ">=",
+    "threshold": 55
+   },
+   {
+    "variable": "public_trust",
+    "op": "<=",
+    "threshold": 44
+   }
+  ],
+  "due_in": 2,
+  "repeat_every": 2,
+  "escalation_effects": {
+   "school_disruption": 3,
+   "public_trust": -2
+  },
+  "escalation_note": "Another cycle without a published closure threshold kept parents improvising and the superintendent exposed.",
+  "resolve_tags": [
+   "school_closure"
+  ],
+  "resolution_note": "A published closure protocol ended the standoff."
+ },
+ {
+  "id": "thread_trust_collapse",
+  "title": "Public-trust collapse",
+  "summary": "Trust has fallen far enough that emergency measures lose public consent.",
+  "tags": [
+   "trust",
+   "consent"
+  ],
+  "open_conditions_all": [
+   {
+    "variable": "public_trust",
+    "op": "<=",
+    "threshold": 39
+   }
+  ],
+  "due_in": 2,
+  "repeat_every": 2,
+  "escalation_effects": {
+   "public_order": -3
+  },
+  "escalation_note": "With consent eroded, compliance with emergency measures slipped further.",
+  "resolve_conditions": [
+   {
+    "variable": "public_trust",
+    "op": ">=",
+    "threshold": 45
+   }
+  ],
+  "resolution_note": "Trust recovered enough for emergency measures to hold."
+ },
+ {
+  "id": "thread_grid_stress",
+  "title": "Grid margin erosion",
+  "summary": "Peak load is eating the substation margin; without load management the desk's own infrastructure starts to brown out.",
+  "tags": [
+   "power",
+   "infrastructure"
+  ],
+  "open_conditions_all": [
+   {
+    "variable": "power_stability",
+    "op": "<=",
+    "threshold": 55
+   }
+  ],
+  "due_in": 2,
+  "repeat_every": 2,
+  "escalation_effects": {
+   "power_stability": -4
+  },
+  "escalation_note": "Another peak-load cycle passed without a load-management order; feeder trips are getting longer.",
+  "resolve_tags": [
+   "load_shedding"
+  ],
+  "resolve_conditions": [
+   {
+    "variable": "power_stability",
+    "op": ">=",
+    "threshold": 60
+   }
+  ],
+  "resolution_note": "Load management restored a defensible operating margin."
+ }
+]

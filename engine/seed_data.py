@@ -28,11 +28,15 @@ MAX_TURNS: int = _META["max_turns"]
 STARTING_VARIABLES: Dict[str, int] = dict(_META["starting_variables"])
 
 
-def create_northbridge_campaign(campaign_id: str = "", name: str = "") -> Campaign:
+def create_northbridge_campaign(
+    campaign_id: str = "", name: str = "", variant_id: str = ""
+) -> Campaign:
     """Construct a fresh, validated Northbridge campaign.
 
     Delegates to the content factory, which validates the complete scenario
-    before any authoritative state is created. Signature and behavior are
-    unchanged from the pre-extraction seed module.
+    before any authoritative state is created. ``variant_id`` selects an
+    authored starting-state perturbation ("" = baseline).
     """
-    return load_campaign(SCENARIO_ID, campaign_id=campaign_id, name=name)
+    return load_campaign(
+        SCENARIO_ID, campaign_id=campaign_id, name=name, variant_id=variant_id
+    )

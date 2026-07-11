@@ -31,6 +31,11 @@ export default defineConfig({
     trace: "retain-on-failure",
     video: "off",
     screenshot: "off",
+    // Sandboxes with a pre-provisioned Chromium (and no network to download
+    // the pinned revision) point this at their binary; unset elsewhere.
+    ...(process.env.PW_CHROMIUM_EXECUTABLE
+      ? { launchOptions: { executablePath: process.env.PW_CHROMIUM_EXECUTABLE } }
+      : {}),
   },
 
   projects: [

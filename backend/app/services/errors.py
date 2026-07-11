@@ -73,6 +73,63 @@ class IdempotencyKeyConflict(TurnResolutionError):
         self.idempotency_key = idempotency_key
 
 
+class UnknownVariant(TurnResolutionError):
+    """The requested seed variant is not authored for this scenario."""
+
+    code = "unknown_variant"
+    status_code = 422
+
+    def __init__(self, variant_id: str, known: list) -> None:
+        authored = ", ".join(known) if known else "none"
+        super().__init__(
+            f"Unknown scenario variant: {variant_id}. Authored variants: {authored}."
+        )
+        self.variant_id = variant_id
+
+
+class PowerAllocationRequired(TurnResolutionError):
+    """The desk is CRITICAL: the turn needs an auxiliary-power allocation."""
+
+    code = "power_allocation_required"
+    status_code = 409
+
+    def __init__(self) -> None:
+        super().__init__(
+            "The workstation is critical: auxiliary power supports one "
+            "subsystem per turn. Allocate it (MODEL_ACCESS, COMMUNICATIONS, "
+            "or LIVE_DATA) and resubmit."
+        )
+
+
+class PowerAllocationUnavailable(TurnResolutionError):
+    """An allocation was sent while the desk is not CRITICAL."""
+
+    code = "power_allocation_not_available"
+    status_code = 409
+
+    def __init__(self, band: str) -> None:
+        super().__init__(
+            f"No auxiliary-power constraint applies at workstation band {band}. "
+            "Omit powered_subsystem and resubmit."
+        )
+        self.band = band
+
+
+class EvidenceUnverifiable(TurnResolutionError):
+    """Citations were submitted without the live-data circuit powered."""
+
+    code = "evidence_unverifiable"
+    status_code = 409
+
+    def __init__(self, powered_subsystem: str) -> None:
+        super().__init__(
+            "Cited evidence cannot be verified: auxiliary power is allocated "
+            f"to {powered_subsystem}, not LIVE_DATA. Drop the citations or "
+            "change the allocation."
+        )
+        self.powered_subsystem = powered_subsystem
+
+
 class UnknownAdvice(TurnResolutionError):
     code = "unknown_advice_option"
     status_code = 400

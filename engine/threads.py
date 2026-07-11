@@ -25,6 +25,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import List, Tuple
 
+from engine import conditions
 from engine.diffs import apply_diffs
 from engine.models import (
     AdviceOption,
@@ -52,16 +53,10 @@ class ThreadEvent:
     note: str
 
 
-def _conditions_hold(thread: OpenThread, variables) -> bool:
+def _conditions_hold(thread: OpenThread, variables, factions_by_id) -> bool:
     if not thread.resolve_conditions:
         return False
-    for condition in thread.resolve_conditions:
-        value = variables.get(condition.variable, 50)
-        if condition.op == "<=" and not value <= condition.threshold:
-            return False
-        if condition.op == ">=" and not value >= condition.threshold:
-            return False
-    return True
+    return conditions.all_hold(thread.resolve_conditions, variables, factions_by_id)
 
 
 def _resolved_by_advice(
@@ -88,6 +83,7 @@ def process_threads(
     yet, so a new thread never escalates on the turn it opens.
     """
     variables = campaign.world_state.variables
+    factions_by_id = {f.id: f for f in campaign.world_state.factions}
     diffs: List[AppliedDiff] = []
     events: List[ThreadEvent] = []
 
@@ -96,7 +92,7 @@ def process_threads(
             continue
 
         if _resolved_by_advice(thread, advice, decision) or _conditions_hold(
-            thread, variables
+            thread, variables, factions_by_id
         ):
             thread.status = ThreadStatus.RESOLVED
             thread.turn_resolved = resolving_turn

@@ -86,6 +86,22 @@ class ThreadStatus:
     RESOLVED = "resolved"
 
 
+class PowerAllocation:
+    """Which subsystem auxiliary power supports during a CRITICAL turn.
+
+    At the CRITICAL degradation band (engine/degradation.py) the desk runs on
+    auxiliary power that sustains exactly ONE subsystem per turn; the player
+    allocates it with each advice submission. A per-turn constraint, not a
+    twitch mechanic -- the choice joins the idempotency fingerprint and is
+    recorded on the resolved turn.
+    """
+    MODEL_ACCESS = "MODEL_ACCESS"        # the drafting/model stack
+    COMMUNICATIONS = "COMMUNICATIONS"    # caller history and disposition
+    LIVE_DATA = "LIVE_DATA"              # evidence verification (citations)
+
+    ALL = (MODEL_ACCESS, COMMUNICATIONS, LIVE_DATA)
+
+
 # ---------------------------------------------------------------------------
 # Core entities
 # ---------------------------------------------------------------------------
@@ -194,6 +210,27 @@ class ClientCall:
 
 
 @dataclass
+class CallVariant:
+    """An authored alternate opening for one turn's client call.
+
+    A call slot may carry variants selected by deterministic conditions over
+    world state and faction fields (the same ``ThreadCondition`` shape threads
+    use). The first variant in authored order whose ``conditions`` ALL hold at
+    the moment the call is resolved replaces the base call entirely -- its own
+    ask, primary options, and decision profile flow into the NPC decision seam
+    unchanged. Selection lives in ``engine/calls.py`` and is evaluated once per
+    turn, before any of the turn's mutations.
+
+    ``call`` is a complete ``ClientCall`` body: its ``turn`` must equal the
+    slot's turn and its ``id`` must equal the variant ``id`` (one name for the
+    thing on the record). Variants cannot nest.
+    """
+    id: str
+    conditions: List[ThreadCondition]
+    call: "ClientCall"
+
+
+@dataclass
 class Document:
     """An in-world artifact on the Evidence Board.
 
@@ -216,10 +253,17 @@ class Document:
 
 @dataclass
 class ThreadCondition:
-    """A legible resolution threshold, mirroring the FAILURE_THRESHOLDS shape."""
+    """A legible deterministic threshold, mirroring the FAILURE_THRESHOLDS shape.
+
+    By default ``variable`` names a WorldState variable. When ``faction_id`` is
+    set, the condition is faction-scoped instead: ``variable`` names a numeric
+    faction field (one of ``engine.conditions.FACTION_CONDITION_FIELDS``)
+    evaluated against that faction. Evaluation lives in ``engine/conditions.py``.
+    """
     variable: str
     op: str                 # "<=" / ">="
     threshold: int
+    faction_id: Optional[str] = None
 
 
 @dataclass
@@ -250,6 +294,61 @@ class OpenThread:
     # --- Runtime lifecycle record (never authored in content) ---
     turn_resolved: Optional[int] = None
     escalation_count: int = 0
+
+
+@dataclass
+class ThreadSpec:
+    """An authored dynamic-thread specification.
+
+    Where ``OpenThread`` is a live risk on the record, a ``ThreadSpec`` is the
+    authored rule for *when the engine opens one*: a deterministic trigger
+    evaluated after each resolved turn, plus the schedule the resulting thread
+    carries. Specs are scenario content (``thread_specs.json``), not engine
+    constants, so a scenario can author its own consequence threads.
+
+    Trigger semantics (all deterministic, evaluated against the post-advice
+    world state): the spec opens its thread when every ``open_conditions_all``
+    holds, AND at least one ``open_conditions_any`` holds (when that list is
+    non-empty), AND — when either ``open_advice_tags`` or
+    ``open_decision_types`` is non-empty — the resolved advice's primary
+    decision tag is in ``open_advice_tags`` OR the client's decision type is
+    in ``open_decision_types``. A spec never re-opens a thread id that is
+    already on the record.
+    """
+    id: str
+    title: str
+    summary: str
+    tags: List[str] = field(default_factory=list)
+    # --- Opening trigger ---
+    open_conditions_all: List[ThreadCondition] = field(default_factory=list)
+    open_conditions_any: List[ThreadCondition] = field(default_factory=list)
+    open_advice_tags: List[str] = field(default_factory=list)
+    open_decision_types: List[str] = field(default_factory=list)
+    # --- Schedule carried by the OpenThread this spec creates ---
+    due_in: Optional[int] = None            # turns until first escalation
+    repeat_every: int = 0
+    escalation_effects: Dict[str, int] = field(default_factory=dict)
+    escalation_note: str = ""
+    resolve_tags: List[str] = field(default_factory=list)
+    resolve_conditions: List[ThreadCondition] = field(default_factory=list)
+    resolution_note: str = ""
+
+
+@dataclass
+class AmbientWindow:
+    """A content-authored ambient pressure active over a span of turns.
+
+    Where ``rules.AMBIENT_DRIFT`` is the scenario-wide baseline pressure,
+    an ambient window is an authored episode -- a regional heat event, a
+    cold snap -- whose ``effects`` are applied as their own diff batch
+    (source ``ambient``) with the authored ``reason`` on every turn in
+    ``[from_turn, to_turn]``. Deterministic: same turns, same effects.
+    """
+    id: str
+    from_turn: int
+    to_turn: int
+    effects: Dict[str, int]
+    reason: str
 
 
 @dataclass
@@ -528,6 +627,13 @@ class TurnResult:
     # Faction relationship moves this turn (trust / influence / pressure),
     # recorded like diffs: old -> new with a legible reason.
     faction_shifts: List["FactionShift"] = field(default_factory=list)
+    # When an authored call variant (not the base call) was on the line this
+    # turn, its id -- so the record always shows which opening the caller used.
+    call_variant_id: Optional[str] = None
+    # The auxiliary-power allocation this turn resolved under (PowerAllocation),
+    # None outside the CRITICAL band. On the record: capability gating is part
+    # of what the desk could and could not do when the advice went out.
+    powered_subsystem: Optional[str] = None
 
 
 @dataclass
@@ -584,12 +690,38 @@ class Campaign:
     created_at: str = ""
     advice_memos: List[AdviceMemo] = field(default_factory=list)
     debt_ledger: List[PrecedentEntry] = field(default_factory=list)
+    # The deterministic-rules version this campaign is resolved under
+    # (engine.rules.CURRENT_RULESET_VERSION at creation). Defaults to "1"
+    # because every snapshot persisted before this field existed was resolved
+    # under the Wave-1 rules -- the persistence default-fill labels old rows
+    # correctly with no migration.
+    ruleset_version: str = "1"
+    # Authored dynamic-thread rules (see ThreadSpec). Defaults to empty for
+    # snapshots persisted before the field existed: such campaigns keep their
+    # already-open threads but stop opening NEW dynamic threads mid-campaign.
+    thread_specs: List[ThreadSpec] = field(default_factory=list)
+    # Authored call variants per turn (see CallVariant). Engine-internal: the
+    # API always presents the RESOLVED call, never the variant table.
+    call_variants: Dict[int, List[CallVariant]] = field(default_factory=dict)
+    # The authored seed variant this campaign started from ("" = the baseline
+    # starting state). Persisted so an exact replay is scenario + variant +
+    # advice sequence -- replayability without randomness.
+    variant_id: str = ""
+    # Content-authored ambient episodes (see AmbientWindow). Defaults to empty
+    # for snapshots persisted before the field existed: such campaigns simply
+    # have no authored episodes mid-flight.
+    ambient_windows: List[AmbientWindow] = field(default_factory=list)
 
     def is_terminal(self) -> bool:
         return self.status in (CampaignStatus.COMPLETED, CampaignStatus.FAILED)
 
     def current_call(self) -> Optional[ClientCall]:
-        return self.client_calls.get(self.turn_number)
+        """The call on the line this turn -- variant-aware (engine/calls.py)."""
+        # Local import: engine.calls imports these models, so a module-level
+        # import here would be circular. First-party, so the stdlib AST scan
+        # is unaffected.
+        from engine.calls import resolve_call
+        return resolve_call(self, self.turn_number)
 
     def available_advice(self) -> List[AdviceOption]:
         """Global options plus any advice specific to the current turn's call."""

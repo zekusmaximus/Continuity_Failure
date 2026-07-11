@@ -92,6 +92,9 @@ def render_dossier_markdown(campaign: Campaign) -> str:
     lines.append("")
     lines.append(f"- **Campaign ID:** `{campaign.id}`")
     lines.append(f"- **Scenario:** `{campaign.scenario_id}`")
+    if campaign.variant_id:
+        lines.append(f"- **Variant:** `{campaign.variant_id}`")
+    lines.append(f"- **Ruleset:** `{campaign.ruleset_version}`")
     lines.append(f"- **Status:** {status}")
     lines.append(f"- **Turns resolved:** {len(campaign.turn_history)} / {campaign.max_turns}")
     if campaign.failure_reason:

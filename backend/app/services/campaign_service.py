@@ -21,6 +21,8 @@ from datetime import datetime, timezone
 from typing import Optional
 import uuid
 
+from engine import content
+from engine import degradation as degradation_engine
 from engine import dossier as dossier_engine
 from engine import endings as endings_engine
 from engine import seed_data, turn as turn_engine
@@ -31,6 +33,7 @@ from engine.models import (
     MemoProvenance,
     MemoRevision,
     MemoStatus,
+    PowerAllocation,
     SentMemoSnapshot,
 )
 from app.ai import fallbacks
@@ -57,6 +60,30 @@ def _require_campaign(campaign_id: str) -> Campaign:
     return campaign
 
 
+def _ai_offline_reason(
+    campaign: Campaign, powered_subsystem: Optional[str] = None
+) -> Optional[str]:
+    """The diegetic gate on the model stack, if any (engine.degradation).
+
+    Non-None means the drafter must take the deterministic fallback path
+    regardless of deployment configuration -- below the degraded threshold
+    the desk cannot sustain model access at all. Exception: at CRITICAL the
+    auxiliary switchover engages, and a drafting request that provisionally
+    routes it to MODEL_ACCESS lifts the gate for that request. (Provisional:
+    drafting is advisory-only and never mutates state; the binding allocation
+    is the one submitted with the advice.)
+    """
+    status = degradation_engine.assess_degradation(campaign)
+    if status.ai_operational:
+        return None
+    if (
+        status.requires_power_allocation
+        and powered_subsystem == PowerAllocation.MODEL_ACCESS
+    ):
+        return None
+    return f"grid power {status.power} below sustaining threshold"
+
+
 def _summary(campaign: Campaign) -> schemas.CampaignSummaryModel:
     return schemas.CampaignSummaryModel(
         id=campaign.id,
@@ -67,6 +94,8 @@ def _summary(campaign: Campaign) -> schemas.CampaignSummaryModel:
         max_turns=campaign.max_turns,
         failure_reason=campaign.failure_reason,
         created_at=campaign.created_at,
+        ruleset_version=campaign.ruleset_version,
+        variant_id=campaign.variant_id,
     )
 
 
@@ -98,41 +127,59 @@ def _debt_ledger(campaign: Campaign) -> list[schemas.PrecedentEntryModel]:
 def _system_status(campaign: Campaign) -> schemas.SystemStatusModel:
     """Derive diegetic infrastructure status from world state (deterministic).
 
-    ``ai_available`` reflects whether a live model provider is actually
-    configured, so the workstation indicator stays honest: when AI is off (the
-    default), the memo drafter still works but returns a deterministic fallback.
+    ``ai_available`` is honest twice over: it requires a live model provider
+    (deployment state) AND enough grid margin for the model stack
+    (``engine.degradation``). Either way the memo drafter keeps working -- it
+    just returns deterministic system drafts.
     """
     settings = get_settings()
     v = campaign.world_state.variables
-    power = v.get("power_stability", 50)
+    status = degradation_engine.assess_degradation(campaign)
+    power = status.power
     staff = v.get("staff_capacity", 50)
     info = v.get("information_integrity", 50)
     # Data freshness degrades as staff/information capacity drops -- a strained
     # operations floor stops keeping feeds current. Kept as a simple blend.
     data_freshness = (info + staff) // 2
     comms = min(power, info + 10)
-    # AI assist is present and reachable; it is "available" only when a live
-    # provider is configured. Otherwise the layer stays dormant and the memo
-    # drafter returns a deterministic fallback.
     ai_live = settings.ai_live
     provider = get_provider(settings) if ai_live else None
-    model_status = (
-        f"Live AI assist active ({getattr(provider, 'name', 'unknown')} provider)"
-        if ai_live and provider is not None
-        else "AI assist present — off by default (returns system drafts)"
-    )
+    if not status.ai_operational:
+        # The diegetic gate outranks deployment state: below the degraded
+        # threshold the desk cannot sustain the model stack at all.
+        model_status = (
+            "Model access offline — grid power below sustaining threshold "
+            "(deterministic system drafts only)"
+        )
+    elif ai_live and provider is not None:
+        model_status = (
+            f"Live AI assist active ({getattr(provider, 'name', 'unknown')} provider)"
+        )
+    else:
+        model_status = "AI assist present — off by default (returns system drafts)"
     return schemas.SystemStatusModel(
         power=power,
         comms=comms,
         data_freshness=data_freshness,
         staff_capacity=staff,
-        ai_available=ai_live,
+        ai_available=ai_live and status.ai_operational,
         model_status=model_status,
+        degradation_band=status.band,
+        live_feeds=status.live_feeds,
+        last_live_turn=status.last_live_turn,
+        requires_power_allocation=status.requires_power_allocation,
     )
 
 
-def create_campaign(name: Optional[str] = None) -> schemas.CampaignCreatedModel:
-    campaign = seed_data.create_northbridge_campaign(name=name or "")
+def create_campaign(
+    name: Optional[str] = None, variant: Optional[str] = None
+) -> schemas.CampaignCreatedModel:
+    try:
+        campaign = seed_data.create_northbridge_campaign(
+            name=name or "", variant_id=variant or ""
+        )
+    except content.UnknownVariant as exc:
+        raise errors.UnknownVariant(variant or "", exc.known) from exc
     get_repository().put(campaign)
     return schemas.CampaignCreatedModel(
         id=campaign.id,
@@ -141,6 +188,16 @@ def create_campaign(name: Optional[str] = None) -> schemas.CampaignCreatedModel:
         turn_number=campaign.turn_number,
         max_turns=campaign.max_turns,
     )
+
+
+def list_scenario_variants(scenario_id: str) -> list[schemas.ScenarioVariantModel]:
+    """The authored seed variants for a scenario, for the intake screen."""
+    if scenario_id != seed_data.SCENARIO_ID:
+        raise KeyError(scenario_id)
+    return [
+        schemas.ScenarioVariantModel.model_validate(v)
+        for v in content.scenario_variants(scenario_id)
+    ]
 
 
 def get_campaign(campaign_id: str) -> Optional[schemas.CampaignModel]:
@@ -162,7 +219,17 @@ def list_recent_campaigns(limit: int = 5) -> list[schemas.RecentCampaignModel]:
 
 
 def _caller_disposition(campaign: Campaign) -> str:
-    """How the caller opens the line, from live trust. Presentation-only."""
+    """How the caller opens the line, from live trust. Presentation-only.
+
+    At CRITICAL the communications circuit is dark until the player allocates
+    auxiliary power -- and the binding allocation only arrives with the advice
+    submission, so at presentation time the disposition is always unreadable.
+    """
+    if degradation_engine.assess_degradation(campaign).requires_power_allocation:
+        return (
+            "Communications dark — the caller's disposition cannot be read. "
+            "Auxiliary power must be allocated with this turn's advice."
+        )
     call = campaign.current_call()
     if call is None:
         return ""
@@ -198,15 +265,31 @@ def _current_model(campaign: Campaign) -> schemas.CurrentTurnModel:
             asdict(campaign.turn_history[-1])
         )
 
+    system_status = _system_status(campaign)
+    world_state = _world_state(campaign)
+    if not system_status.live_feeds:
+        # Live feeds are down: the freshness label carries the stale stamp.
+        # Presentation-only -- the engine's own last_verified is untouched.
+        anchor = (
+            f"turn {system_status.last_live_turn} close-out"
+            if system_status.last_live_turn > 0
+            else "engagement intake"
+        )
+        world_state = world_state.model_copy(update={
+            "last_verified": (
+                f"LAST VERIFIED — {anchor} · live feed lost (deterministic)"
+            )
+        })
+
     return schemas.CurrentTurnModel(
         summary=_summary(campaign),
-        world_state=_world_state(campaign),
+        world_state=world_state,
         client_call=client_call,
         advice_options=advice_options,
         documents=_documents(campaign),
         open_threads=_open_threads(campaign),
         debt_ledger=_debt_ledger(campaign),
-        system_status=_system_status(campaign),
+        system_status=system_status,
         last_turn=last_turn,
         caller_disposition=_caller_disposition(campaign),
     )
@@ -250,11 +333,17 @@ def request_fingerprint(
     memo_id: Optional[str] = None,
     memo_revision: Optional[int] = None,
     cited_document_ids: Optional[list[str]] = None,
+    powered_subsystem: Optional[str] = None,
 ) -> str:
     """Stable digest of everything a submission asks the engine to do.
 
     Reusing an idempotency key with a different fingerprint is a client bug, so
     it must be a conflict rather than a silent replay of the wrong turn.
+    ``powered_subsystem`` joins the digest like ``cited_document_ids`` did: the
+    same key with a different allocation is a conflict, an identical retry
+    replays. (Adding the field changes fingerprints of NEW requests; a stored
+    pre-upgrade record retried byte-identically after an upgrade conflicts
+    instead of replaying -- accepted for a local single-player deployment.)
     """
     canonical = json.dumps(
         {
@@ -263,6 +352,7 @@ def request_fingerprint(
             "memo_id": memo_id,
             "memo_revision": memo_revision,
             "cited_document_ids": sorted(cited_document_ids or []),
+            "powered_subsystem": powered_subsystem,
         },
         sort_keys=True,
         separators=(",", ":"),
@@ -374,6 +464,7 @@ def submit_advice(
     memo_id: Optional[str] = None,
     memo_revision: Optional[int] = None,
     cited_document_ids: Optional[list[str]] = None,
+    powered_subsystem: Optional[str] = None,
 ) -> ResolvedTurn:
     """Resolve one turn atomically, at most once per (campaign, key).
 
@@ -383,7 +474,8 @@ def submit_advice(
     resolved reaches the terminal and revision guards.
     """
     fingerprint = request_fingerprint(
-        advice_id, expected_turn, memo_id, memo_revision, cited_document_ids
+        advice_id, expected_turn, memo_id, memo_revision, cited_document_ids,
+        powered_subsystem,
     )
 
     with get_repository().transaction() as active:
@@ -431,6 +523,21 @@ def submit_advice(
             if doc_id not in available_docs:
                 bind_log_fields(idempotency=IdempotencyOutcome.REJECTED)
                 raise errors.UnknownDocument(doc_id)
+
+        # Auxiliary-power constraint (CRITICAL band): mirror the engine's rule
+        # with typed, player-safe errors before the engine call. The engine
+        # enforces it again -- defense in depth, one semantics.
+        degradation = degradation_engine.assess_degradation(campaign)
+        if degradation.requires_power_allocation:
+            if powered_subsystem is None:
+                bind_log_fields(idempotency=IdempotencyOutcome.REJECTED)
+                raise errors.PowerAllocationRequired()
+            if cited_document_ids and powered_subsystem != PowerAllocation.LIVE_DATA:
+                bind_log_fields(idempotency=IdempotencyOutcome.REJECTED)
+                raise errors.EvidenceUnverifiable(powered_subsystem)
+        elif powered_subsystem is not None:
+            bind_log_fields(idempotency=IdempotencyOutcome.REJECTED)
+            raise errors.PowerAllocationUnavailable(degradation.band)
 
         # Public API callers always attach an explicit memo. The optional
         # branch preserves direct service compatibility by materializing the
@@ -482,7 +589,8 @@ def submit_advice(
 
         try:
             result = turn_engine.advance_turn(
-                campaign, advice_id, cited_document_ids
+                campaign, advice_id, cited_document_ids,
+                powered_subsystem=powered_subsystem,
             )
         except turn_engine.UnknownAdviceOption as exc:
             bind_log_fields(idempotency=IdempotencyOutcome.REJECTED)
@@ -490,6 +598,17 @@ def submit_advice(
         except turn_engine.UnknownDocument as exc:
             bind_log_fields(idempotency=IdempotencyOutcome.REJECTED)
             raise errors.UnknownDocument(str(exc)) from exc
+        # Defense in depth: the pre-engine guard above mirrors these rules, so
+        # the engine variants should be unreachable -- but never a 500.
+        except turn_engine.PowerAllocationRequired as exc:
+            bind_log_fields(idempotency=IdempotencyOutcome.REJECTED)
+            raise errors.PowerAllocationRequired() from exc
+        except turn_engine.PowerAllocationUnavailable as exc:
+            bind_log_fields(idempotency=IdempotencyOutcome.REJECTED)
+            raise errors.PowerAllocationUnavailable(degradation.band) from exc
+        except turn_engine.EvidenceUnverifiable as exc:
+            bind_log_fields(idempotency=IdempotencyOutcome.REJECTED)
+            raise errors.EvidenceUnverifiable(powered_subsystem or "") from exc
 
         # Attach audit references only after deterministic resolution. Memo
         # prose is never visible to rules, diffs, decision type, or canon text.
@@ -500,7 +619,9 @@ def submit_advice(
 
         memo.status = MemoStatus.SENT
         memo.turn_number = result.turn_number
-        memo.call_id = memo.call_id or (
+        # The memo links to the call that was actually on the line: a variant's
+        # id when one fired (recorded on the result), else the base call's.
+        memo.call_id = memo.call_id or result.call_variant_id or (
             campaign.client_calls.get(result.turn_number).id
             if campaign.client_calls.get(result.turn_number)
             else None
@@ -585,8 +706,13 @@ def create_memo(
     advice_id: str,
     name: str,
     content: Optional[str] = None,
+    powered_subsystem: Optional[str] = None,
 ) -> schemas.AdviceMemoModel:
-    """Create a persistent proposed memo without touching WorldState."""
+    """Create a persistent proposed memo without touching WorldState.
+
+    ``powered_subsystem`` is the provisional auxiliary-power routing for this
+    drafting request (CRITICAL band only; see ``_ai_offline_reason``).
+    """
     artifact = None
     if creation_mode in ("template", "ai"):
         campaign = _require_campaign(campaign_id)
@@ -611,6 +737,7 @@ def create_memo(
                 input_summary=f"turn {campaign.turn_number}: {option.label}",
                 campaign_id=campaign.id,
                 turn_number=campaign.turn_number,
+                unavailable_reason=_ai_offline_reason(campaign, powered_subsystem),
             )
             content = _memo_content_text(artifact.content)
 
@@ -700,7 +827,7 @@ def update_memo(
 
 
 def draft_memo(
-    campaign_id: str, advice_id: str
+    campaign_id: str, advice_id: str, powered_subsystem: Optional[str] = None
 ) -> Optional[schemas.MemoDraftModel]:
     """Draft a consultant memo for a selected advice option.
 
@@ -733,6 +860,7 @@ def draft_memo(
         input_summary=f"turn {campaign.turn_number}: {option.label}",
         campaign_id=campaign.id,
         turn_number=campaign.turn_number,
+        unavailable_reason=_ai_offline_reason(campaign, powered_subsystem),
     )
     return schemas.MemoDraftModel(
         status=artifact.status,

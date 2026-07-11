@@ -19,17 +19,22 @@ from dataclasses import MISSING, fields
 from typing import Dict, Set
 
 from engine import rules
+from engine.conditions import FACTION_CONDITION_FIELDS
 from engine.models import (
     AdviceOption,
+    AmbientWindow,
     CallDecisionProfile,
+    CallVariant,
     ClientCall,
     Crisis,
+    DecisionType,
     Document,
     Faction,
     OpenThread,
     PublicStatus,
     Reliability,
     ThreadCondition,
+    ThreadSpec,
     Urgency,
 )
 from engine.state import STATE_VARIABLE_LABELS
@@ -66,6 +71,7 @@ def _string_values(cls) -> Set[str]:
 URGENCY_VALUES: Set[str] = _string_values(Urgency)
 PUBLIC_STATUS_VALUES: Set[str] = _string_values(PublicStatus)
 RELIABILITY_VALUES: Set[str] = _string_values(Reliability)
+DECISION_TYPE_VALUES: Set[str] = _string_values(DecisionType)
 
 # Coarser controlled vocabularies (authored in docs/state-schema.md).
 FACTION_ALIGNMENTS: Set[str] = {"authority", "opposition", "neutral", "service"}
@@ -83,6 +89,7 @@ ADVICE_TYPES: Set[str] = {
     "INDEPENDENT_REVIEW", "BACKCHANNEL",
     # As-built per-turn advice types (see engine content).
     "SCHOOL_CLOSURE_PROTOCOL", "HOSPITAL_PRIORITY", "BUSINESS_COMPENSATION",
+    "LOAD_SHEDDING_PROTOCOL",
 }
 
 DOCUMENT_TYPES: Set[str] = {
@@ -137,8 +144,15 @@ FIELD_SPECS: Dict[str, FieldSpec] = {
     "document": FieldSpec(Document),
     "thread": FieldSpec(OpenThread),
     "thread_condition": FieldSpec(ThreadCondition),
+    "thread_spec": FieldSpec(ThreadSpec),
+    "call_variant": FieldSpec(CallVariant),
+    "ambient_window": FieldSpec(AmbientWindow),
     "crisis": FieldSpec(Crisis),
 }
+
+# FACTION_CONDITION_FIELDS (imported above from engine/conditions.py, the
+# single evaluator) is part of this module's public schema surface so the
+# validator and runtime can never disagree on the allowed faction fields.
 
 # Thread lifecycle fields the engine owns at runtime. Authored content must not
 # set them: a scenario that ships a pre-escalated or pre-resolved thread would
@@ -157,4 +171,12 @@ SCENARIO_REQUIRED_KEYS: Set[str] = {
     "schema_version", "scenario_id", "name", "max_turns",
     "starting_variables", "crisis",
 }
-SCENARIO_ALLOWED_KEYS: Set[str] = SCENARIO_REQUIRED_KEYS | {"description"}
+SCENARIO_ALLOWED_KEYS: Set[str] = SCENARIO_REQUIRED_KEYS | {
+    "description", "ambient_windows",
+}
+
+# Seed variants (variants.json) are metadata like the scenario header, not a
+# runtime dataclass: every key is required -- a variant without overrides is
+# pointless, and one without a name/description cannot be presented.
+VARIANT_REQUIRED_KEYS: Set[str] = {"id", "name", "description", "variable_overrides"}
+VARIANT_ALLOWED_KEYS: Set[str] = VARIANT_REQUIRED_KEYS

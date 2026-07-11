@@ -133,6 +133,38 @@ body {
   color: var(--text-dim);
 }
 .cd-intro-engagement-v { color: var(--text-bright); font-weight: 600; font-size: 15px; }
+.cd-intro-variant {
+  max-width: 460px;
+  margin: 0 auto 22px;
+  text-align: left;
+  display: grid;
+  gap: 6px;
+}
+.cd-intro-variant-label {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+.cd-intro-variant-select {
+  padding: 8px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  background: var(--bg-panel-2);
+  color: var(--text-bright);
+  font: inherit;
+}
+.cd-intro-variant-select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.cd-intro-variant-desc {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 13px;
+  line-height: 1.5;
+}
 .cd-intro-begin { width: min(280px, 100%); margin: 0 auto; }
 .cd-intro-recent {
   max-width: 460px;
@@ -1319,3 +1351,90 @@ body {
 .cd-band-holding { color: var(--info); }
 .cd-band-compromised { color: var(--warn); }
 .cd-band-failed { color: var(--crit); }
+
+/* ============================ Workstation degradation (Wave 2b) ============================ */
+/* The strip under the header: always visible while the desk is not NOMINAL. */
+.cd-degradation-strip {
+  margin: 0;
+  padding: 7px 24px;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  border-bottom: 1px solid var(--border-strong);
+}
+.cd-degradation-strip strong { letter-spacing: 0.1em; text-transform: uppercase; }
+.cd-degradation-strained {
+  color: var(--warn);
+  background: color-mix(in srgb, var(--warn) 9%, var(--bg-panel-2));
+  border-bottom-color: var(--warn);
+}
+.cd-degradation-degraded,
+.cd-degradation-critical {
+  color: var(--crit);
+  background: color-mix(in srgb, var(--crit) 10%, var(--bg-panel-2));
+  border-bottom-color: var(--crit);
+}
+
+/* Per-band treatment on the app root: sober, static, no animation. */
+.cd-degraded-strained .cd-header { border-bottom: 2px solid var(--warn); }
+.cd-degraded-degraded .cd-header,
+.cd-degraded-critical .cd-header { border-bottom: 2px solid var(--crit); }
+.cd-degraded-degraded .cd-panel,
+.cd-degraded-critical .cd-panel { filter: saturate(0.82); }
+.cd-degraded-critical .cd-panel { filter: saturate(0.65) brightness(0.96); }
+
+/* Stale freshness stamps (state readout, evidence board). */
+.cd-verified-stale { color: var(--warn); font-weight: 600; }
+.cd-readout-stale .cd-panel-head { border-bottom: 1px dashed var(--warn); }
+.cd-evidence-stale {
+  margin: 8px 0 10px;
+  padding: 6px 10px;
+  border: 1px dashed var(--warn);
+  border-radius: 4px;
+  color: var(--warn);
+  font-family: var(--mono);
+  font-size: 11px;
+}
+
+/* Workstation status panel (Case File · Full State). */
+.cd-system-status { margin-bottom: 14px; }
+.cd-band-tag {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 3px;
+  border: 1px solid var(--border-strong);
+  color: var(--text-dim);
+}
+.cd-band-nominal { color: var(--good); border-color: currentColor; }
+.cd-band-strained { color: var(--warn); border-color: currentColor; }
+.cd-band-degraded, .cd-band-critical { color: var(--crit); border-color: currentColor; }
+.cd-system-model { margin: 10px 0 0; font-size: 12px; }
+.cd-system-ok { color: var(--text-dim); }
+.cd-system-off { color: var(--crit); font-weight: 600; }
+.cd-system-stale { margin: 6px 0 0; color: var(--warn); font-size: 12px; }
+
+/* Auxiliary-power allocation (CRITICAL band, Wave 2b B4). */
+.cd-power-allocation {
+  border: 1px solid var(--crit);
+  border-radius: 4px;
+  padding: 10px 12px;
+  margin: 0 0 12px;
+  display: grid;
+  gap: 8px;
+  background: color-mix(in srgb, var(--crit) 7%, var(--bg-panel-2));
+}
+.cd-power-allocation legend {
+  color: var(--crit);
+  padding: 0 4px;
+}
+.cd-power-option {
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  gap: 8px;
+  align-items: baseline;
+  cursor: pointer;
+}
+.cd-power-label { color: var(--text-bright); font-weight: 600; }

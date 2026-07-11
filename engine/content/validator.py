@@ -174,6 +174,10 @@ def _validate_scenario(c: _Collector, file: str, scenario: Any) -> Optional[int]
 
     _validate_starting_variables(c, file, scenario.get("starting_variables"))
 
+    windows = scenario.get("ambient_windows")
+    if windows is not None:
+        _validate_ambient_windows(c, file, windows, max_turns)
+
     crisis = scenario.get("crisis")
     if crisis is not None and c.is_mapping(file, "crisis", crisis, "crisis"):
         c.check_fields(file, "crisis", crisis, schema.FIELD_SPECS["crisis"], "crisis")
@@ -185,6 +189,60 @@ def _validate_scenario(c: _Collector, file: str, scenario: Any) -> Optional[int]
             c.check_enum(file, "crisis.type", crisis["type"], schema.CRISIS_TYPES, "crisis type")
 
     return max_turns
+
+
+def _validate_ambient_windows(
+    c: _Collector, file: str, windows: Any, max_turns: Optional[int]
+) -> None:
+    """Validate authored ambient episodes (scenario.json `ambient_windows`)."""
+    if not c.is_list(file, "ambient_windows", windows, "ambient_windows"):
+        return
+    _collect_ids(c, file, windows, "ambient window")
+    for i, window in enumerate(windows):
+        path = f"ambient_windows[{i}]"
+        if not c.is_mapping(file, path, window, "ambient window"):
+            continue
+        c.check_fields(file, path, window,
+                       schema.FIELD_SPECS["ambient_window"], "ambient window")
+        if "id" in window:
+            c.check_nonempty_str(file, f"{path}.id", window["id"], "id")
+        # An authored episode that moves state must say why, on the record.
+        if "reason" in window:
+            c.check_nonempty_str(file, f"{path}.reason", window["reason"], "reason")
+
+        from_turn = window.get("from_turn")
+        to_turn = window.get("to_turn")
+        for key, value in (("from_turn", from_turn), ("to_turn", to_turn)):
+            if value is None:
+                continue
+            if isinstance(value, bool) or not isinstance(value, int):
+                c.add(file, f"{path}.{key}", f"{key} must be an integer")
+            elif max_turns is not None and not (1 <= value <= max_turns):
+                c.add(file, f"{path}.{key}",
+                      f"{key} {value} is outside 1..{max_turns}")
+        if (
+            isinstance(from_turn, int) and isinstance(to_turn, int)
+            and not isinstance(from_turn, bool) and not isinstance(to_turn, bool)
+            and from_turn > to_turn
+        ):
+            c.add(file, path,
+                  f"ambient window runs backwards (from_turn {from_turn} > "
+                  f"to_turn {to_turn})")
+
+        effects = window.get("effects")
+        if effects is not None and c.is_mapping(
+            file, f"{path}.effects", effects, "effects"
+        ):
+            if not effects:
+                c.add(file, f"{path}.effects",
+                      "ambient window effects must not be empty")
+            for var, delta in effects.items():
+                if var not in schema.KNOWN_VARIABLES:
+                    c.add(file, f"{path}.effects.{var}",
+                          f"unknown WorldState variable '{var}' in ambient window")
+                    continue
+                c.check_int_range(file, f"{path}.effects.{var}", delta,
+                                  schema.MIN_EFFECT_DELTA, schema.MAX_EFFECT_DELTA)
 
 
 def _validate_starting_variables(c: _Collector, file: str, variables: Any) -> None:
@@ -287,8 +345,14 @@ def _validate_call(
     faction_ids: Set[str], document_ids: Set[str], crisis_id: Optional[str],
     max_turns: Optional[int], global_advice_ids: Set[str],
     per_turn_advice_ids: Dict[int, Set[str]], advice_tags_by_id: Dict[str, Set[str]],
+    all_call_ids: Optional[Set[str]] = None, allow_variants: bool = True,
 ) -> None:
-    c.check_fields(file, path, call, schema.FIELD_SPECS["call"], "client call")
+    # ``variants`` is authored alongside the call but is not a ClientCall
+    # field; extract it before the field check. A nested variant call may not
+    # carry variants of its own -- there, the key is simply unknown.
+    body = dict(call)
+    raw_variants = body.pop("variants", None) if allow_variants else None
+    c.check_fields(file, path, body, schema.FIELD_SPECS["call"], "client call")
     if "id" in call:
         c.check_nonempty_str(file, f"{path}.id", call["id"], "call id")
     if "caller" in call:
@@ -343,6 +407,66 @@ def _validate_call(
         c, file, path, call, turn, available, advice_tags_by_id, red_line_tags
     )
     _validate_decision_profile(c, file, path, profile)
+
+    if raw_variants is not None:
+        _validate_call_variants(
+            c, file, path, raw_variants, call, faction_ids, document_ids,
+            crisis_id, max_turns, global_advice_ids, per_turn_advice_ids,
+            advice_tags_by_id, all_call_ids,
+        )
+
+
+def _validate_call_variants(
+    c: _Collector, file: str, path: str, variants: Any, parent_call: Dict[str, Any],
+    faction_ids: Set[str], document_ids: Set[str], crisis_id: Optional[str],
+    max_turns: Optional[int], global_advice_ids: Set[str],
+    per_turn_advice_ids: Dict[int, Set[str]], advice_tags_by_id: Dict[str, Set[str]],
+    all_call_ids: Optional[Set[str]],
+) -> None:
+    vroot = f"{path}.variants"
+    if not c.is_list(file, vroot, variants, "call variants"):
+        return
+    parent_turn = parent_call.get("turn")
+    for i, variant in enumerate(variants):
+        vpath = f"{vroot}[{i}]"
+        if not c.is_mapping(file, vpath, variant, "call variant"):
+            continue
+        c.check_fields(file, vpath, variant,
+                       schema.FIELD_SPECS["call_variant"], "call variant")
+        vid = variant.get("id")
+        if "id" in variant:
+            c.check_nonempty_str(file, f"{vpath}.id", vid, "variant id")
+        if isinstance(vid, str) and vid.strip() and all_call_ids is not None:
+            if vid in all_call_ids:
+                c.add(file, f"{vpath}.id",
+                      f"duplicate call/variant id '{vid}' (call and variant "
+                      "ids share one namespace so the record stays unambiguous)")
+            all_call_ids.add(vid)
+
+        conditions = variant.get("conditions")
+        if isinstance(conditions, list) and not conditions:
+            c.add(file, f"{vpath}.conditions",
+                  "a call variant must declare at least one condition; an "
+                  "unconditioned variant would always shadow the base call")
+        elif conditions is not None:
+            _validate_conditions(c, file, f"{vpath}.conditions", conditions,
+                                 "variant condition", faction_ids)
+
+        vcall = variant.get("call")
+        if vcall is not None and c.is_mapping(file, f"{vpath}.call", vcall, "variant call"):
+            _validate_call(
+                c, file, f"{vpath}.call", vcall, faction_ids, document_ids,
+                crisis_id, max_turns, global_advice_ids, per_turn_advice_ids,
+                advice_tags_by_id, all_call_ids=None, allow_variants=False,
+            )
+            if parent_turn is not None and vcall.get("turn") != parent_turn:
+                c.add(file, f"{vpath}.call.turn",
+                      f"variant call turn {vcall.get('turn')} must equal the "
+                      f"base call's turn {parent_turn}")
+            if isinstance(vid, str) and vid.strip() and vcall.get("id") != vid:
+                c.add(file, f"{vpath}.call.id",
+                      f"variant call id '{vcall.get('id')}' must equal the "
+                      f"variant id '{vid}' (one name for the thing on the record)")
 
 
 def _validate_primary_advice(
@@ -442,8 +566,156 @@ def _validate_document(
         c.check_str_list(file, f"{path}.tags", doc["tags"], "tags", require_nonempty=True)
 
 
+def _validate_seed_variant(
+    c: _Collector, file: str, path: str, variant: Dict[str, Any]
+) -> None:
+    for key in variant:
+        if key not in schema.VARIANT_ALLOWED_KEYS:
+            c.add(file, f"{path}.{key}", f"unknown seed-variant field '{key}'")
+    for key in sorted(schema.VARIANT_REQUIRED_KEYS):
+        if key not in variant:
+            c.add(file, path, f"seed variant is missing required field '{key}'")
+    for key in ("id", "name", "description"):
+        if key in variant:
+            c.check_nonempty_str(file, f"{path}.{key}", variant[key], key)
+
+    overrides = variant.get("variable_overrides")
+    if overrides is None:
+        return
+    if not c.is_mapping(file, f"{path}.variable_overrides", overrides,
+                        "variable_overrides"):
+        return
+    if not overrides:
+        c.add(file, f"{path}.variable_overrides",
+              "variable_overrides must not be empty (a variant that changes "
+              "nothing is indistinguishable from the baseline)")
+    for name, value in overrides.items():
+        if name not in schema.KNOWN_VARIABLES:
+            c.add(file, f"{path}.variable_overrides.{name}",
+                  f"unknown WorldState variable '{name}' in variant overrides")
+            continue
+        c.check_int_range(file, f"{path}.variable_overrides.{name}", value, 0, 100)
+
+
+def _validate_conditions(
+    c: _Collector, file: str, path: str, conditions: Any, label: str,
+    faction_ids: Set[str],
+) -> None:
+    """Validate a list of ThreadCondition-shaped mappings.
+
+    A condition is world-scoped by default; with ``faction_id`` set it is
+    faction-scoped and ``variable`` must name an allowed faction field.
+    """
+    if not c.is_list(file, path, conditions, label):
+        return
+    for i, cond in enumerate(conditions):
+        cpath = f"{path}[{i}]"
+        if not c.is_mapping(file, cpath, cond, label):
+            continue
+        c.check_fields(file, cpath, cond,
+                       schema.FIELD_SPECS["thread_condition"], label)
+        variable = cond.get("variable")
+        faction_id = cond.get("faction_id")
+        if faction_id is not None:
+            if not isinstance(faction_id, str) or faction_id not in faction_ids:
+                c.add(file, f"{cpath}.faction_id",
+                      f"references unknown faction '{faction_id}'")
+            if variable is not None and variable not in schema.FACTION_CONDITION_FIELDS:
+                c.add(file, f"{cpath}.variable",
+                      f"'{variable}' is not a faction condition field "
+                      f"(allowed: {', '.join(sorted(schema.FACTION_CONDITION_FIELDS))})")
+        elif variable is not None and variable not in schema.KNOWN_VARIABLES:
+            c.add(file, f"{cpath}.variable",
+                  f"unknown WorldState variable '{variable}' in {label}")
+        op = cond.get("op")
+        if op is not None and op not in schema.THREAD_CONDITION_OPS:
+            c.add(file, f"{cpath}.op",
+                  f"{label} op must be one of "
+                  f"{', '.join(sorted(schema.THREAD_CONDITION_OPS))}")
+        if "threshold" in cond:
+            c.check_int_range(file, f"{cpath}.threshold", cond["threshold"], 0, 100)
+
+
+def _validate_thread_spec(
+    c: _Collector, file: str, path: str, spec: Dict[str, Any],
+    faction_ids: Set[str],
+) -> None:
+    c.check_fields(file, path, spec, schema.FIELD_SPECS["thread_spec"], "thread spec")
+    for key in ("id", "title", "summary"):
+        if key in spec:
+            c.check_nonempty_str(file, f"{path}.{key}", spec[key], key)
+    if "tags" in spec:
+        c.check_str_list(file, f"{path}.tags", spec["tags"], "tags", require_nonempty=False)
+
+    # --- Opening trigger: at least one criterion, every part legible ---
+    trigger_keys = ("open_conditions_all", "open_conditions_any",
+                    "open_advice_tags", "open_decision_types")
+    if not any(spec.get(key) for key in trigger_keys):
+        c.add(file, path,
+              "thread spec has no opening trigger (one of "
+              f"{', '.join(trigger_keys)}); it would open unconditionally on "
+              "the first resolved turn")
+    for key in ("open_conditions_all", "open_conditions_any"):
+        if key in spec:
+            _validate_conditions(c, file, f"{path}.{key}", spec[key],
+                                 "open condition", faction_ids)
+    for i, tag in enumerate(spec.get("open_advice_tags", []) or []):
+        if not isinstance(tag, str) or tag not in schema.KNOWN_DECISION_TAGS:
+            c.add(file, f"{path}.open_advice_tags[{i}]",
+                  f"open advice tag '{tag}' is not a recognized decision tag "
+                  f"(one of {', '.join(sorted(schema.KNOWN_DECISION_TAGS))})")
+    for i, dtype in enumerate(spec.get("open_decision_types", []) or []):
+        if not isinstance(dtype, str) or dtype not in schema.DECISION_TYPE_VALUES:
+            c.add(file, f"{path}.open_decision_types[{i}]",
+                  f"unknown decision type '{dtype}' "
+                  f"(allowed: {', '.join(sorted(schema.DECISION_TYPE_VALUES))})")
+
+    # --- Schedule carried by the thread the spec opens ---
+    due_in = spec.get("due_in")
+    if due_in is not None:
+        if isinstance(due_in, bool) or not isinstance(due_in, int) or due_in < 1:
+            c.add(file, f"{path}.due_in",
+                  "thread spec due_in must be an integer >= 1 (turns until "
+                  "first escalation)")
+    repeat = spec.get("repeat_every")
+    if repeat is not None:
+        if isinstance(repeat, bool) or not isinstance(repeat, int) or repeat < 0:
+            c.add(file, f"{path}.repeat_every",
+                  "thread spec repeat_every must be a non-negative integer")
+
+    effects = spec.get("escalation_effects")
+    if effects is not None and c.is_mapping(
+        file, f"{path}.escalation_effects", effects, "escalation_effects"
+    ):
+        for var, delta in effects.items():
+            if var not in schema.KNOWN_VARIABLES:
+                c.add(file, f"{path}.escalation_effects.{var}",
+                      f"unknown WorldState variable '{var}' in escalation map")
+                continue
+            c.check_int_range(file, f"{path}.escalation_effects.{var}", delta,
+                              schema.MIN_EFFECT_DELTA, schema.MAX_EFFECT_DELTA)
+        if effects and not (
+            isinstance(spec.get("escalation_note"), str)
+            and spec.get("escalation_note", "").strip()
+        ):
+            c.add(file, f"{path}.escalation_note",
+                  "a thread spec with escalation_effects must carry a non-empty "
+                  "escalation_note so the applied diff stays legible")
+
+    if "resolve_conditions" in spec:
+        _validate_conditions(c, file, f"{path}.resolve_conditions",
+                             spec["resolve_conditions"], "resolve condition",
+                             faction_ids)
+    for i, rtag in enumerate(spec.get("resolve_tags", []) or []):
+        if not isinstance(rtag, str) or rtag not in schema.KNOWN_DECISION_TAGS:
+            c.add(file, f"{path}.resolve_tags[{i}]",
+                  f"resolve tag '{rtag}' is not a recognized decision tag "
+                  f"(one of {', '.join(sorted(schema.KNOWN_DECISION_TAGS))})")
+
+
 def _validate_thread(
-    c: _Collector, file: str, path: str, thread: Dict[str, Any], max_turns: Optional[int]
+    c: _Collector, file: str, path: str, thread: Dict[str, Any],
+    max_turns: Optional[int], faction_ids: Set[str],
 ) -> None:
     c.check_fields(file, path, thread, schema.FIELD_SPECS["thread"], "open thread")
     for key in ("id", "title", "summary"):
@@ -498,26 +770,9 @@ def _validate_thread(
                   "thread repeat_every must be a non-negative integer")
 
     conditions = thread.get("resolve_conditions")
-    if conditions is not None and c.is_list(
-        file, f"{path}.resolve_conditions", conditions, "resolve_conditions"
-    ):
-        for i, cond in enumerate(conditions):
-            cpath = f"{path}.resolve_conditions[{i}]"
-            if not c.is_mapping(file, cpath, cond, "resolve condition"):
-                continue
-            c.check_fields(file, cpath, cond,
-                           schema.FIELD_SPECS["thread_condition"], "resolve condition")
-            variable = cond.get("variable")
-            if variable is not None and variable not in schema.KNOWN_VARIABLES:
-                c.add(file, f"{cpath}.variable",
-                      f"unknown WorldState variable '{variable}' in resolve condition")
-            op = cond.get("op")
-            if op is not None and op not in schema.THREAD_CONDITION_OPS:
-                c.add(file, f"{cpath}.op",
-                      f"resolve condition op must be one of "
-                      f"{', '.join(sorted(schema.THREAD_CONDITION_OPS))}")
-            if "threshold" in cond:
-                c.check_int_range(file, f"{cpath}.threshold", cond["threshold"], 0, 100)
+    if conditions is not None:
+        _validate_conditions(c, file, f"{path}.resolve_conditions", conditions,
+                             "resolve condition", faction_ids)
 
     resolve_tags = thread.get("resolve_tags")
     if resolve_tags is not None and c.is_list(
@@ -612,14 +867,17 @@ def validate_bundle(bundle) -> None:
 
     # --- calls (coverage + references) ---
     if c.is_list(f["calls"], "", bundle.calls, "calls"):
-        _collect_ids(c, f["calls"], bundle.calls, "call")
+        # Base call ids and variant ids share one namespace: the record must
+        # never show two different calls under the same id.
+        all_call_ids = _collect_ids(c, f["calls"], bundle.calls, "call")
         turns_seen: Dict[int, int] = {}
         for i, call in enumerate(bundle.calls):
             if not c.is_mapping(f["calls"], f"[{i}]", call, "client call"):
                 continue
             _validate_call(c, f["calls"], f"[{i}]", call, faction_ids,
                            document_ids, crisis_id, max_turns,
-                           global_advice_ids, per_turn_advice_ids, advice_tags_by_id)
+                           global_advice_ids, per_turn_advice_ids,
+                           advice_tags_by_id, all_call_ids=all_call_ids)
             turn = call.get("turn")
             if isinstance(turn, int) and not isinstance(turn, bool):
                 if turn in turns_seen:
@@ -633,11 +891,34 @@ def validate_bundle(bundle) -> None:
                     c.add(f["calls"], "", f"no client call defined for turn {turn}")
 
     # --- threads ---
+    thread_ids: Set[str] = set()
     if c.is_list(f["threads"], "", bundle.threads, "threads"):
-        _collect_ids(c, f["threads"], bundle.threads, "thread")
+        thread_ids = _collect_ids(c, f["threads"], bundle.threads, "thread")
         for i, thread in enumerate(bundle.threads):
             if c.is_mapping(f["threads"], f"[{i}]", thread, "open thread"):
-                _validate_thread(c, f["threads"], f"[{i}]", thread, max_turns)
+                _validate_thread(c, f["threads"], f"[{i}]", thread, max_turns,
+                                 faction_ids)
+
+    # --- seed variants (authored starting-state perturbations) ---
+    if c.is_list(f["variants"], "", bundle.variants, "variants"):
+        _collect_ids(c, f["variants"], bundle.variants, "variant")
+        for i, variant in enumerate(bundle.variants):
+            if c.is_mapping(f["variants"], f"[{i}]", variant, "seed variant"):
+                _validate_seed_variant(c, f["variants"], f"[{i}]", variant)
+
+    # --- thread specs (dynamic-thread opening rules) ---
+    if c.is_list(f["thread_specs"], "", bundle.thread_specs, "thread_specs"):
+        spec_ids = _collect_ids(c, f["thread_specs"], bundle.thread_specs, "thread spec")
+        # A spec never re-opens an id already on the record, so a spec that
+        # shares an id with a seeded thread could never fire.
+        for shared in sorted(spec_ids & thread_ids):
+            c.add(f["thread_specs"], "",
+                  f"thread spec id '{shared}' collides with a seeded thread in "
+                  "threads.json; the spec could never open")
+        for i, spec in enumerate(bundle.thread_specs):
+            if c.is_mapping(f["thread_specs"], f"[{i}]", spec, "thread spec"):
+                _validate_thread_spec(c, f["thread_specs"], f"[{i}]", spec,
+                                      faction_ids)
 
     if c.errors:
         raise ContentValidationError(bundle.root, c.errors)

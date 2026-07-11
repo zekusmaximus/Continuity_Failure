@@ -94,6 +94,7 @@ export interface ThreadCondition {
   variable: string;
   op: string;
   threshold: number;
+  faction_id: string | null;
 }
 
 export interface OpenThread {
@@ -131,10 +132,23 @@ export interface CampaignSummary {
   max_turns: number;
   failure_reason: string | null;
   created_at: string;
+  ruleset_version: string;
+  variant_id: string;
 }
 
-export interface RecentCampaign extends CampaignSummary {
+// The resume-screen projection is built from denormalized SQL columns and
+// does not carry ruleset_version / variant_id (only the full payload does).
+export interface RecentCampaign
+  extends Omit<CampaignSummary, "ruleset_version" | "variant_id"> {
   updated_at: string;
+}
+
+// An authored seed variant for the intake screen: a deterministic
+// starting-state perturbation, selected by id at campaign creation.
+export interface ScenarioVariant {
+  id: string;
+  name: string;
+  description: string;
 }
 
 export interface AdherenceFactor {
@@ -345,7 +359,12 @@ export interface TurnResult {
   sent_memo: SentMemoSnapshot | null;
   consequence_report: ConsequenceReport;
   faction_shifts: FactionShift[];
+  call_variant_id: string | null;
+  powered_subsystem: PowerAllocation | null;
 }
+
+// Which subsystem auxiliary power supports during a CRITICAL turn (Wave 2b).
+export type PowerAllocation = "MODEL_ACCESS" | "COMMUNICATIONS" | "LIVE_DATA";
 
 export interface SystemStatus {
   power: number;
@@ -354,6 +373,10 @@ export interface SystemStatus {
   staff_capacity: number;
   ai_available: boolean;
   model_status: string;
+  degradation_band: "NOMINAL" | "STRAINED" | "DEGRADED" | "CRITICAL";
+  live_feeds: boolean;
+  last_live_turn: number;
+  requires_power_allocation: boolean;
 }
 
 export interface CurrentTurn {
@@ -617,11 +640,16 @@ async function requestWithRetry<T>(path: string, init: RequestInit): Promise<T> 
 
 export const api = {
   health: () => request<Health>("/health"),
-  createCampaign: (name?: string) =>
+  createCampaign: (name?: string, variant?: string) =>
     request<CampaignCreated>("/api/campaigns", {
       method: "POST",
-      body: JSON.stringify(name ? { name } : {}),
+      body: JSON.stringify({
+        ...(name ? { name } : {}),
+        ...(variant ? { variant } : {}),
+      }),
     }),
+  listScenarioVariants: (scenarioId: string) =>
+    request<ScenarioVariant[]>(`/api/scenarios/${scenarioId}/variants`),
   listRecentCampaigns: (limit = 5) =>
     request<RecentCampaign[]>(`/api/campaigns?limit=${limit}`),
   getCampaign: (id: string) =>
@@ -653,6 +681,7 @@ export const api = {
     memoId: string,
     memoRevision: number,
     citedDocumentIds: string[] = [],
+    poweredSubsystem: PowerAllocation | null = null,
   ) =>
     requestWithRetry<TurnResult>(`/api/campaigns/${id}/advice`, {
       method: "POST",
@@ -663,6 +692,7 @@ export const api = {
         memo_id: memoId,
         memo_revision: memoRevision,
         cited_document_ids: citedDocumentIds,
+        ...(poweredSubsystem ? { powered_subsystem: poweredSubsystem } : {}),
       }),
     }),
   getTurns: (id: string) =>
@@ -678,6 +708,7 @@ export const api = {
       advice_id: string;
       name: string;
       content?: string;
+      powered_subsystem?: PowerAllocation;
     },
   ) =>
     request<AdviceMemo>(`/api/campaigns/${id}/memos`, {
@@ -695,10 +726,13 @@ export const api = {
     }),
   // Advisory only: drafts a memo without advancing the turn or changing state.
   // With AI off (the default) this returns a deterministic fallback memo.
-  draftMemo: (id: string, adviceId: string) =>
+  draftMemo: (id: string, adviceId: string, poweredSubsystem: PowerAllocation | null = null) =>
     request<MemoDraft>(`/api/campaigns/${id}/memo`, {
       method: "POST",
-      body: JSON.stringify({ advice_id: adviceId }),
+      body: JSON.stringify({
+        advice_id: adviceId,
+        ...(poweredSubsystem ? { powered_subsystem: poweredSubsystem } : {}),
+      }),
     }),
   // Read-only log of AI model runs recorded for this campaign.
   getModelRuns: (id: string) =>

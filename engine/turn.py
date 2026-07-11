@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import List, Optional
 
-from engine import factions, rules
+from engine import calls, degradation, factions, rules
 from engine.consequences import build_consequence_report, build_consequence_stack
 from engine.diffs import apply_diffs
 from engine.ledger import record_precedents
@@ -23,6 +23,7 @@ from engine.models import (
     CampaignStatus,
     DecisionType,
     FactClassification,
+    PowerAllocation,
     PublicStatus,
     SourceType,
     TurnResult,
@@ -35,6 +36,25 @@ class UnknownAdviceOption(Exception):
 
 class UnknownDocument(Exception):
     """Raised when a cited document id is unknown or not yet available."""
+
+
+class PowerAllocationRequired(Exception):
+    """The desk is CRITICAL: a turn cannot resolve without allocating
+    auxiliary power to exactly one subsystem."""
+
+
+class PowerAllocationUnavailable(Exception):
+    """An allocation was submitted while the desk is not CRITICAL -- there is
+    no auxiliary constraint to satisfy, so the request is malformed."""
+
+
+class UnknownPowerAllocation(Exception):
+    """The submitted allocation is not a recognized subsystem."""
+
+
+class EvidenceUnverifiable(Exception):
+    """Citations were submitted while the live-data circuit is unpowered:
+    the desk cannot verify evidence it cannot reach."""
 
 
 def find_advice(campaign: Campaign, advice_id: str) -> AdviceOption:
@@ -69,6 +89,7 @@ def advance_turn(
     campaign: Campaign,
     advice_id: str,
     cited_document_ids: Optional[List[str]] = None,
+    powered_subsystem: Optional[str] = None,
 ) -> TurnResult:
     """Resolve the current turn against ``advice_id`` and advance the campaign.
 
@@ -81,6 +102,13 @@ def advance_turn(
       6. Build an aftermath summary and canon entry.
       7. Check failure / completion.
       8. Increment the turn counter and record history.
+
+    ``powered_subsystem`` is the auxiliary-power allocation (PowerAllocation):
+    REQUIRED when the desk is CRITICAL, rejected otherwise. First-cut effects
+    are capability gates, never diffs -- LIVE_DATA unpowered refuses citations,
+    COMMUNICATIONS unpowered means the caller's history never reached the desk
+    (recorded in the explanation), MODEL_ACCESS matters upstream at the
+    drafting seam. Balance is untouched by design.
     """
     if campaign.is_terminal():
         raise RuntimeError(
@@ -88,13 +116,54 @@ def advance_turn(
             "no further turns can be advanced."
         )
 
+    # The auxiliary-power constraint is assessed against the pre-turn record,
+    # exactly what the player saw when composing the submission.
+    status = degradation.assess_degradation(campaign)
+    if status.requires_power_allocation:
+        if powered_subsystem is None:
+            raise PowerAllocationRequired(
+                "the desk is CRITICAL; allocate auxiliary power to one subsystem"
+            )
+        if powered_subsystem not in PowerAllocation.ALL:
+            raise UnknownPowerAllocation(powered_subsystem)
+        if cited_document_ids and powered_subsystem != PowerAllocation.LIVE_DATA:
+            raise EvidenceUnverifiable(
+                "citations require the live-data circuit; auxiliary power "
+                f"is allocated to {powered_subsystem}"
+            )
+    elif powered_subsystem is not None:
+        raise PowerAllocationUnavailable(
+            f"no auxiliary constraint at band {status.band}; "
+            "omit powered_subsystem"
+        )
+
     advice = find_advice(campaign, advice_id)
     resolving_turn = campaign.turn_number
     world_state = campaign.world_state
     variables = world_state.variables
 
+    # Resolve the call on the line exactly ONCE, before any mutation, and pass
+    # it down. Variant selection reads world/faction state; re-selecting after
+    # diffs apply could name a different call than the one that decided.
+    call, call_variant_id = calls.resolve_call_with_variant(campaign, resolving_turn)
+
     citations = _resolve_citations(campaign, cited_document_ids, resolving_turn)
-    decision = rules.decide(campaign, advice, citations)
+    decision = rules.decide(campaign, advice, citations, call=call)
+
+    # Communications unpowered: the caller still remembers, but none of it
+    # reached the desk this cycle. Display-only -- adherence inputs are
+    # untouched -- and deterministic: the allocation is part of the turn's
+    # input, so a replay reproduces the same recorded explanation.
+    if (
+        status.requires_power_allocation
+        and powered_subsystem != PowerAllocation.COMMUNICATIONS
+        and decision.explanation is not None
+    ):
+        decision.explanation.memory = [
+            "Communications dark — the caller's history did not reach the "
+            "desk this cycle (auxiliary power allocated to "
+            f"{powered_subsystem})."
+        ]
 
     # Snapshot the pre-turn values so the consequence report can reconcile
     # start -> attributed deltas -> final for every touched variable.
@@ -147,6 +216,17 @@ def advance_turn(
         reason="Ambient crisis pressure",
         source_type=SourceType.AMBIENT,
     )
+    # Content-authored ambient episodes (heat events, cold snaps): each window
+    # covering this turn lands as its own diff batch with its authored reason,
+    # so the causal waterfall names the episode, not a generic drift.
+    for window in campaign.ambient_windows:
+        if window.from_turn <= resolving_turn <= window.to_turn:
+            diffs += apply_diffs(
+                variables,
+                window.effects,
+                reason=window.reason,
+                source_type=SourceType.AMBIENT,
+            )
 
     # Open threads resolve or escalate before the failure check, so an
     # unaddressed standing risk can itself end the engagement.
@@ -159,7 +239,7 @@ def advance_turn(
     # served the caller, influence follows sustained pressure, and a faction
     # out of trust and under pressure may leak a private record this turn.
     faction_shifts = factions.update_faction_relations(
-        campaign, advice, decision, diffs
+        campaign, advice, decision, diffs, call=call
     )
     leak_diffs, leak_media_lines, leak_canon = factions.process_leaks(
         campaign, resolving_turn
@@ -190,7 +270,7 @@ def advance_turn(
 
     # Build the deterministic consequence stack and any threads it opens.
     consequence_stack, new_threads = build_consequence_stack(
-        campaign, advice, decision, diffs, resolving_turn,
+        campaign, advice, decision, diffs, resolving_turn, call=call,
     )
     campaign.open_threads.extend(new_threads)
     consequence_stack.escalated_threads = [
@@ -253,6 +333,8 @@ def advance_turn(
             start_values, diffs, advice, decision
         ),
         faction_shifts=faction_shifts,
+        call_variant_id=call_variant_id,
+        powered_subsystem=powered_subsystem,
     )
     campaign.turn_history.append(turn_result)
     return turn_result

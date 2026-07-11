@@ -103,3 +103,4 @@ def health():
 
 
 app.include_router(campaigns_api.router)
+app.include_router(campaigns_api.scenarios_router)

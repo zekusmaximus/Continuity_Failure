@@ -19,13 +19,15 @@ One coherent file per authored domain:
 
 | File                   | Contents                                                        |
 | ---------------------- | -------------------------------------------------------------- |
-| `scenario.json`        | `schema_version`, `scenario_id`, `name`, `max_turns`, `starting_variables`, `crisis` |
+| `scenario.json`        | `schema_version`, `scenario_id`, `name`, `max_turns`, `starting_variables`, `crisis`, optional `ambient_windows` (authored ambient episodes over a turn span) |
 | `factions.json`        | list of factions                                               |
 | `advice.json`          | the global advice options (available every turn)               |
 | `per_turn_advice.json` | `{ "<turn>": [advice, ...] }` options that only fit that call  |
-| `calls.json`           | one client call per turn (`1..max_turns`), any order           |
+| `calls.json`           | one client call per turn (`1..max_turns`), any order; a call may carry `variants` (branchable/faction-gated openings) |
 | `documents.json`       | evidence-board documents; `turn_number` is the freshness/available-from turn |
 | `threads.json`         | open threads seeded at engagement start                        |
+| `thread_specs.json`    | dynamic-thread rules: when the engine opens a consequence thread mid-game, and the schedule it carries |
+| `variants.json`        | seed variants: authored starting-state perturbations selectable at campaign creation |
 
 Field names match the engine dataclasses in `engine/models.py`. Any field that
 equals its dataclass default may be omitted; required fields (those without a
@@ -91,6 +93,46 @@ one pass):
 - **Document tags** — non-empty; **freshness** (`turn_number`) in range.
 - **Threshold coverage** — every variable the failure thresholds and ambient
   drift reference has a starting value.
+- **Ambient windows** — each `scenario.json` `ambient_windows` entry needs
+  `id` (unique), `from_turn <= to_turn` within `1..max_turns`, a non-empty
+  `effects` map of known variables with bounded deltas, and a non-empty
+  `reason` (it becomes the AppliedDiff reason, so the causal waterfall names
+  the episode). Effects apply as their own `ambient` diff batch on every turn
+  in the span.
+- **Seed variants** — each `variants.json` entry needs `id`, `name`,
+  `description`, and a non-empty `variable_overrides` map of known WorldState
+  variables within 0–100; ids are unique; no other fields. A variant is a
+  deterministic perturbation of `starting_variables` selected by id at
+  campaign creation (`POST /api/campaigns` `{"variant": "hot_summer"}`); the
+  campaign persists `variant_id` so exact replay is scenario + variant +
+  advice sequence. Balance obligation: before shipping a variant, run
+  `python tests/support/balance_trace.py <variant_id>` — some documented
+  advice sequence must complete it, and both spam strategies must still fail
+  (see `tests/test_seed_variants.py`, which pins both facts per variant).
+- **Call variants** — a call's `variants` list holds authored alternate
+  openings: `{id, conditions, call}`. Each variant `call` is a complete call
+  body validated by every base-call rule (same `turn` as its slot, `id` equal
+  to the variant id, 3–5 valid `primary_advice_ids`, a `decision_profile`, no
+  nested `variants`); `conditions` must be non-empty (an unconditioned variant
+  would always shadow the base call) and use the `ThreadCondition` shape —
+  world-scoped by default, or faction-scoped with `faction_id` set, where
+  `variable` must be one of `trust_in_player` / `influence` /
+  `current_pressure` / `risk_tolerance`. Call and variant ids share one
+  namespace. Selection is deterministic: first variant in authored order whose
+  conditions ALL hold, evaluated once per turn before the decision seam
+  (`engine/calls.py`); the resolved turn records `call_variant_id`.
+- **Thread specs** — every spec has a non-empty opening trigger (at least one
+  of `open_conditions_all`, `open_conditions_any`, `open_advice_tags`,
+  `open_decision_types`); conditions reference known variables with `<=`/`>=`
+  ops and 0–100 thresholds; `open_advice_tags`/`resolve_tags` are recognized
+  decision tags; `open_decision_types` are known decision types; `due_in >= 1`;
+  `repeat_every >= 0`; `escalation_effects` require an `escalation_note`; spec
+  ids are unique and must not collide with seeded `threads.json` ids (a spec
+  never re-opens an id already on the record). Trigger semantics: all
+  `open_conditions_all` AND (any `open_conditions_any`, when present) AND — when
+  either tag/type list is present — the advice's primary tag is in
+  `open_advice_tags` OR the decision type is in `open_decision_types`. See the
+  `ThreadSpec` dataclass in `engine/models.py`.
 
 ## Schema version and migrations
 

@@ -190,6 +190,8 @@ describe("ClientDecisionPhase explanation payload", () => {
     sent_memo: null,
     consequence_report: { variables: [] },
     faction_shifts: [],
+    call_variant_id: null,
+    powered_subsystem: null,
   };
 
   test("renders human-labeled adherence factors, conflicts, and outcome reason", () => {
@@ -201,5 +203,79 @@ describe("ClientDecisionPhase explanation payload", () => {
       screen.getByText(/rejected the advice because it crossed a red line/),
     ).toBeInTheDocument();
     expect(screen.getByText(/On-brief for this call/)).toBeInTheDocument();
+  });
+});
+
+describe("auxiliary-power allocation (CRITICAL band)", () => {
+  const CRITICAL_STATUS = {
+    power: 10,
+    comms: 10,
+    data_freshness: 40,
+    staff_capacity: 50,
+    ai_available: false,
+    model_status:
+      "Model access offline — grid power below sustaining threshold (deterministic system drafts only)",
+    degradation_band: "CRITICAL" as const,
+    live_feeds: false,
+    last_live_turn: 2,
+    requires_power_allocation: true,
+  };
+
+  function renderCritical(poweredSubsystem: "MODEL_ACCESS" | "LIVE_DATA" | null) {
+    const onAllocatePower = vi.fn();
+    render(
+      <AdvicePhase
+        options={OPTIONS}
+        call={CALL}
+        factions={[]}
+        selected={"hospital_priority"}
+        onSelect={vi.fn()}
+        memo={null}
+        memoLoading={false}
+        memoSaving={false}
+        memoError={null}
+        onDraftMemo={vi.fn()}
+        onCreateManualMemo={vi.fn()}
+        onSaveMemo={vi.fn()}
+        documents={[]}
+        citedDocs={[]}
+        onToggleCite={vi.fn()}
+        systemStatus={CRITICAL_STATUS}
+        poweredSubsystem={poweredSubsystem}
+        onAllocatePower={onAllocatePower}
+      />,
+    );
+    return { onAllocatePower };
+  }
+
+  test("the chooser presents the three subsystems and reports the pick", async () => {
+    const user = userEvent.setup();
+    const { onAllocatePower } = renderCritical(null);
+    expect(
+      screen.getByText(/Auxiliary power · one subsystem this turn/),
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole("radio", { name: /Live data/ }));
+    expect(onAllocatePower).toHaveBeenCalledWith("LIVE_DATA");
+  });
+
+  test("assisted drafting is dark unless MODEL_ACCESS is powered", () => {
+    renderCritical("LIVE_DATA");
+    expect(
+      screen.getByRole("button", { name: /Request assisted draft/ }),
+    ).toBeDisabled();
+  });
+
+  test("assisted drafting is available when MODEL_ACCESS is powered", () => {
+    renderCritical("MODEL_ACCESS");
+    expect(
+      screen.getByRole("button", { name: /Request assisted draft/ }),
+    ).toBeEnabled();
+  });
+
+  test("no chooser renders outside the critical band", () => {
+    renderAdvice();
+    expect(
+      screen.queryByText(/Auxiliary power · one subsystem this turn/),
+    ).not.toBeInTheDocument();
   });
 });

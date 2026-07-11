@@ -124,6 +124,9 @@ class ThreadConditionModel(BaseModel):
     variable: str
     op: str = Field(pattern=r"^(<=|>=)$")
     threshold: int = Field(ge=0, le=100)
+    # When set, the condition is faction-scoped: ``variable`` names a numeric
+    # faction field evaluated against this faction (engine/conditions.py).
+    faction_id: Optional[str] = None
 
 
 class OpenThreadModel(BaseModel):
@@ -168,6 +171,8 @@ class CampaignSummaryModel(BaseModel):
     max_turns: int = Field(ge=1)
     failure_reason: Optional[str] = None
     created_at: str
+    ruleset_version: str
+    variant_id: str = ""
 
 
 class CampaignModel(BaseModel):
@@ -189,6 +194,9 @@ class RecentCampaignModel(BaseModel):
     updated_at: str
 
 
+POWER_ALLOCATION_PATTERN = r"^(MODEL_ACCESS|COMMUNICATIONS|LIVE_DATA)$"
+
+
 class AdviceRequest(StrictRequestModel):
     """Advisory, non-mutating requests (memo drafting)."""
 
@@ -196,6 +204,11 @@ class AdviceRequest(StrictRequestModel):
         min_length=1,
         max_length=64,
         pattern=r"^[a-z0-9_]+$",
+    )
+    # Provisional auxiliary-power routing for this drafting request (CRITICAL
+    # band only). Advisory: the binding allocation ships with the advice.
+    powered_subsystem: Optional[str] = Field(
+        default=None, pattern=POWER_ALLOCATION_PATTERN
     )
 
 
@@ -226,6 +239,12 @@ class AdviceSubmissionRequest(StrictRequestModel):
     cited_document_ids: List[str] = Field(
         default_factory=list,
         max_length=3,
+    )
+    # The binding auxiliary-power allocation for this turn. Required by the
+    # service when the desk is CRITICAL, rejected otherwise; joins the
+    # idempotency request fingerprint like cited_document_ids.
+    powered_subsystem: Optional[str] = Field(
+        default=None, pattern=POWER_ALLOCATION_PATTERN
     )
 
     @field_validator("cited_document_ids")
@@ -259,12 +278,30 @@ class ApiErrorModel(BaseModel):
     detail: ApiErrorDetail
 
 
+class ScenarioVariantModel(BaseModel):
+    """One authored seed variant, as presented on the intake screen.
+
+    ``variable_overrides`` stays content-internal: the client picks a variant
+    by id; only the engine applies its perturbation.
+    """
+    id: str
+    name: str
+    description: str
+
+
 class CreateCampaignRequest(StrictRequestModel):
     name: Optional[str] = Field(
         default=None,
         min_length=1,
         max_length=80,
         pattern=r"^.*\S.*$",
+    )
+    # An authored seed-variant id ("" / omitted = the baseline starting state).
+    variant: Optional[str] = Field(
+        default=None,
+        min_length=1,
+        max_length=64,
+        pattern=r"^[a-z0-9_]+$",
     )
 
     @field_validator("name")
@@ -431,6 +468,11 @@ class CreateMemoRequest(StrictRequestModel):
     advice_id: str = Field(min_length=1, max_length=64, pattern=r"^[a-z0-9_]+$")
     name: str = Field(min_length=1, max_length=120, pattern=r"^.*\S.*$")
     content: Optional[str] = Field(default=None, min_length=1, max_length=12000)
+    # Provisional auxiliary-power routing for an "ai" drafting request
+    # (CRITICAL band only). See AdviceRequest.powered_subsystem.
+    powered_subsystem: Optional[str] = Field(
+        default=None, pattern=POWER_ALLOCATION_PATTERN
+    )
 
     @field_validator("name")
     @classmethod
@@ -525,6 +567,12 @@ class TurnResultModel(BaseModel):
     # validate; every freshly resolved turn carries the populated report.
     consequence_report: ConsequenceReportModel = Field(default_factory=ConsequenceReportModel)
     faction_shifts: List[FactionShiftModel] = Field(default_factory=list)
+    # The authored call variant that was on the line this turn, when one fired
+    # (None = the base call). Defaulted so pre-variant replays still validate.
+    call_variant_id: Optional[str] = None
+    # The auxiliary-power allocation the turn resolved under (CRITICAL band
+    # only; None otherwise). Defaulted so earlier replays still validate.
+    powered_subsystem: Optional[str] = None
 
 
 class SystemStatusModel(BaseModel):
@@ -543,6 +591,13 @@ class SystemStatusModel(BaseModel):
     staff_capacity: int = Field(ge=0, le=100)
     ai_available: bool = False
     model_status: str = "AI assist present — off by default (returns system drafts)"
+    # --- Deterministic degradation (engine/degradation.py) ---
+    degradation_band: str = Field(
+        default="NOMINAL", pattern=r"^(NOMINAL|STRAINED|DEGRADED|CRITICAL)$"
+    )
+    live_feeds: bool = True
+    last_live_turn: int = Field(default=0, ge=0)
+    requires_power_allocation: bool = False
 
 
 class CurrentTurnModel(BaseModel):

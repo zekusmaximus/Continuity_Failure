@@ -27,6 +27,25 @@ from engine.models import (
 from engine.state import clamp, humanize_variable
 
 
+# ---------------------------------------------------------------------------
+# Ruleset version. Campaigns are stamped with the version of the deterministic
+# rules that resolve them, so replayed history can always be matched to the
+# balance that produced it. Bump this string with ANY change that alters the
+# authoritative diff stream (thresholds, drift, decision constants, thread or
+# ledger pricing) and add a matching golden entry in
+# tests/test_ruleset_version.py -- the golden-trace test fails loudly until
+# both move together, so balance tuning can never silently rewrite history.
+# ---------------------------------------------------------------------------
+
+# Version history:
+#   "1" -- the Wave-1 rules (power_stability had no driver).
+#   "2" -- Wave 2b batch B1: power_stability gains deterministic drivers
+#          (authored ambient windows, the grid-stress thread spec, and the
+#          load-shedding advice handler below). Threshold variables are
+#          untouched: the "2" goldens differ from "1" ONLY in power_stability.
+CURRENT_RULESET_VERSION = "2"
+
+
 # An internal working draft of an NPC decision, before the public NpcDecision
 # is assembled. The first three fields (decision_type, adherence, modifications)
 # are authoritative and determinism-tested; the descriptive fields only surface
@@ -109,14 +128,13 @@ AMBIENT_DRIFT: Dict[str, int] = {
 DECIDER = "Town Manager's Office"
 
 
-def _resolve_decider(campaign: Campaign) -> str:
+def _resolve_decider(call) -> str:
     """The NPC client that acts on the advice this turn.
 
     Every turn is anchored to a client call, so the decider is the caller's
     display name (Hospital, Contractor, State Liaison, ...). Falls back to the
     Town Manager's Office only if a turn has no call on the line.
     """
-    call = campaign.current_call()
     if call is not None and call.caller:
         return call.caller
     return DECIDER
@@ -365,6 +383,50 @@ def _decide_business_compensation(campaign: Campaign) -> _DecisionDraft:
     )
 
 
+def _decide_load_shedding(campaign: Campaign) -> _DecisionDraft:
+    v = campaign.world_state.variables
+    power = v.get("power_stability", 50)
+    order = v.get("public_order", 50)
+
+    if power <= 35:
+        # The grid margin is thin enough that refusing a published schedule
+        # would be indefensible after the first uncontrolled outage.
+        return _DecisionDraft(
+            DecisionType.FOLLOWED, 0.9, {},
+            deviation="None — the grid margin left no room to hedge.",
+            public_explanation=(
+                "A published rotating-outage schedule is in force, with hospital "
+                "and water operations exempted as critical loads."
+            ),
+            private_motive="An uncontrolled failure would be blamed on whoever refused the schedule.",
+            resulting_risk="A published schedule is an admission the grid is in trouble.",
+        )
+    if order <= 45:
+        # Compliance is already frail; the utility trims the schedule to the
+        # least visible hours rather than test public patience.
+        return _DecisionDraft(
+            DecisionType.PARTIALLY_FOLLOWED, 0.6,
+            {"media_pressure": 2},
+            deviation="Trimmed the outage windows to overnight hours only.",
+            public_explanation=(
+                "Limited overnight load management is in effect to protect "
+                "critical operations."
+            ),
+            private_motive="Daytime outages on top of water restrictions risked open defiance.",
+            resulting_risk="Overnight-only shedding buys less margin than the protocol assumed.",
+        )
+    return _DecisionDraft(
+        DecisionType.FOLLOWED, 0.8, {},
+        deviation="None — the load-shedding protocol was adopted on the planned scope.",
+        public_explanation=(
+            "A rotating load-management schedule has been published, with "
+            "critical facilities exempted."
+        ),
+        private_motive="A controlled, scheduled cost beat an uncontrolled failure.",
+        resulting_risk="Visible rationing feeds the narrative that the crisis is widening.",
+    )
+
+
 _ADVICE_TAG_DISPATCH = {
     "disclosure": _decide_disclosure,
     "delay": _decide_delay,
@@ -374,6 +436,7 @@ _ADVICE_TAG_DISPATCH = {
     "school_closure": _decide_school_closure,
     "hospital_priority": _decide_hospital_priority,
     "business_compensation": _decide_business_compensation,
+    "load_shedding": _decide_load_shedding,
 }
 
 
@@ -820,6 +883,7 @@ def decide(
     campaign: Campaign,
     advice: AdviceOption,
     citations: Optional[List] = None,
+    call: Optional[ClientCall] = None,
 ) -> NpcDecision:
     """Resolve how the NPC client uses the player's chosen advice.
 
@@ -831,6 +895,11 @@ def decide(
     ``modifications`` are extra deltas the NPC imposed; ``off_brief_adjustments``
     are the deterministic off-brief/red-line cost (applied as their own diffs);
     ``explanation`` is the human-labeled account for the aftermath.
+
+    ``call`` is the resolved call on the line. The turn resolver passes it
+    explicitly (resolved once, before any mutation -- see ``engine/calls.py``);
+    direct callers may omit it and get the campaign's current (variant-aware)
+    call.
     """
     draft: _DecisionDraft
     handler = None
@@ -854,8 +923,9 @@ def decide(
     media = v.get("media_pressure", 0)
     trust = v.get("public_trust", 50)
 
-    call = campaign.current_call()
-    decider = _resolve_decider(campaign)
+    if call is None:
+        call = campaign.current_call()
+    decider = _resolve_decider(call)
 
     (decision_type, adherence, modifications, off_brief,
      adjustments, cost_reason, citation_weight, explanation) = _modulate(

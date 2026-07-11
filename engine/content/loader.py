@@ -18,6 +18,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Callable, Dict, List
 
+from engine import rules
 from engine.content import schema
 from engine.content.validator import (
     ContentError,
@@ -26,7 +27,9 @@ from engine.content.validator import (
 )
 from engine.models import (
     AdviceOption,
+    AmbientWindow,
     CallDecisionProfile,
+    CallVariant,
     Campaign,
     CampaignStatus,
     ClientCall,
@@ -35,6 +38,7 @@ from engine.models import (
     Faction,
     OpenThread,
     ThreadCondition,
+    ThreadSpec,
     WorldState,
 )
 
@@ -49,11 +53,27 @@ _FILES: Dict[str, str] = {
     "calls": "calls.json",
     "documents": "documents.json",
     "threads": "threads.json",
+    "thread_specs": "thread_specs.json",
+    "variants": "variants.json",
 }
 
 
 class IncompatibleSchemaVersion(Exception):
     """Raised when content declares a schema version the loader cannot read."""
+
+
+class UnknownVariant(Exception):
+    """Raised when a campaign is requested with a variant id the scenario
+    does not author."""
+
+    def __init__(self, scenario_id: str, variant_id: str, known) -> None:
+        self.scenario_id = scenario_id
+        self.variant_id = variant_id
+        self.known = sorted(known)
+        super().__init__(
+            f"scenario '{scenario_id}' has no variant '{variant_id}' "
+            f"(authored: {', '.join(self.known) or 'none'})"
+        )
 
 
 @dataclass
@@ -69,6 +89,8 @@ class RawContent:
     calls: Any = field(default_factory=list)
     documents: Any = field(default_factory=list)
     threads: Any = field(default_factory=list)
+    thread_specs: Any = field(default_factory=list)
+    variants: Any = field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
@@ -171,15 +193,35 @@ def _build_per_turn_advice(raw: Dict[str, list]) -> Dict[int, List[AdviceOption]
     return {int(turn): _build_advice(options) for turn, options in raw.items()}
 
 
-def _build_calls(raw: List[dict]) -> Dict[int, ClientCall]:
-    calls = []
+def _build_call(data: dict) -> ClientCall:
+    data = dict(data)
+    profile = data.get("decision_profile")
+    if isinstance(profile, dict):
+        data["decision_profile"] = CallDecisionProfile(**profile)
+    return ClientCall(**data)
+
+
+def _build_calls(
+    raw: List[dict],
+) -> tuple[Dict[int, ClientCall], Dict[int, List[CallVariant]]]:
+    """Build the base call per turn plus any authored variants for that turn."""
+    calls: Dict[int, ClientCall] = {}
+    variants: Dict[int, List[CallVariant]] = {}
     for c in raw:
         data = dict(c)
-        profile = data.get("decision_profile")
-        if isinstance(profile, dict):
-            data["decision_profile"] = CallDecisionProfile(**profile)
-        calls.append(ClientCall(**data))
-    return {call.turn: call for call in calls}
+        raw_variants = data.pop("variants", None) or []
+        call = _build_call(data)
+        calls[call.turn] = call
+        if raw_variants:
+            variants[call.turn] = [
+                CallVariant(
+                    id=v["id"],
+                    conditions=[ThreadCondition(**cond) for cond in v["conditions"]],
+                    call=_build_call(v["call"]),
+                )
+                for v in raw_variants
+            ]
+    return calls, variants
 
 
 def _build_documents(raw: List[dict]) -> List[Document]:
@@ -199,12 +241,33 @@ def _build_threads(raw: List[dict]) -> List[OpenThread]:
     return threads
 
 
+def _build_thread_specs(raw: List[dict]) -> List[ThreadSpec]:
+    specs = []
+    for s in raw:
+        data = dict(s)
+        for key in ("open_conditions_all", "open_conditions_any", "resolve_conditions"):
+            conditions = data.get(key)
+            if isinstance(conditions, list):
+                data[key] = [ThreadCondition(**cond) for cond in conditions]
+        specs.append(ThreadSpec(**data))
+    return specs
+
+
 def _last_verified(turn: int) -> str:
     return f"Turn {turn} · Operational snapshot (deterministic)"
 
 
-def build_campaign(bundle: RawContent, campaign_id: str = "", name: str = "") -> Campaign:
-    """Construct a campaign from an already-loaded bundle (validates first)."""
+def build_campaign(
+    bundle: RawContent, campaign_id: str = "", name: str = "",
+    variant_id: str = "",
+) -> Campaign:
+    """Construct a campaign from an already-loaded bundle (validates first).
+
+    ``variant_id`` selects an authored starting-state perturbation from
+    ``variants.json`` -- deterministic replayability without randomness. The
+    empty string is the baseline starting state; an unknown id raises
+    ``UnknownVariant`` before any authoritative state is created.
+    """
     bundle = _apply_schema_version(bundle)
     validate_bundle(bundle)
 
@@ -212,10 +275,19 @@ def build_campaign(bundle: RawContent, campaign_id: str = "", name: str = "") ->
     campaign_id = campaign_id or uuid.uuid4().hex[:8]
     name = name or scenario["name"]
 
+    starting_variables = dict(scenario["starting_variables"])
+    if variant_id:
+        by_id = {v["id"]: v for v in bundle.variants}
+        variant = by_id.get(variant_id)
+        if variant is None:
+            raise UnknownVariant(bundle.root, variant_id, by_id)
+        starting_variables.update(variant["variable_overrides"])
+
+    client_calls, call_variants = _build_calls(bundle.calls)
     crisis_raw = scenario["crisis"]
     world_state = WorldState(
         turn_number=1,
-        variables=dict(scenario["starting_variables"]),
+        variables=starting_variables,
         factions=_build_factions(bundle.factions),
         active_crisis=Crisis(**crisis_raw),
         last_verified=_last_verified(1),
@@ -230,15 +302,22 @@ def build_campaign(bundle: RawContent, campaign_id: str = "", name: str = "") ->
         world_state=world_state,
         advice_options=_build_advice(bundle.advice),
         per_turn_advice=_build_per_turn_advice(bundle.per_turn_advice),
-        client_calls=_build_calls(bundle.calls),
+        client_calls=client_calls,
+        call_variants=call_variants,
         documents=_build_documents(bundle.documents),
         open_threads=_build_threads(bundle.threads),
+        thread_specs=_build_thread_specs(bundle.thread_specs),
+        ambient_windows=[
+            AmbientWindow(**w) for w in scenario.get("ambient_windows", [])
+        ],
         created_at=datetime.now(timezone.utc).isoformat(),
+        ruleset_version=rules.CURRENT_RULESET_VERSION,
+        variant_id=variant_id,
     )
 
 
 def load_campaign(
-    scenario_id: str, campaign_id: str = "", name: str = ""
+    scenario_id: str, campaign_id: str = "", name: str = "", variant_id: str = ""
 ) -> Campaign:
     """The single content factory: validate ``scenario_id`` and build a campaign.
 
@@ -246,7 +325,24 @@ def load_campaign(
     campaign is never partially seeded from invalid content.
     """
     bundle = load_raw(scenario_id)
-    return build_campaign(bundle, campaign_id=campaign_id, name=name)
+    return build_campaign(
+        bundle, campaign_id=campaign_id, name=name, variant_id=variant_id
+    )
+
+
+def scenario_variants(scenario_id: str) -> List[Dict[str, Any]]:
+    """Return the validated seed variants for a scenario: id, name, description.
+
+    ``variable_overrides`` stays content-internal -- callers present the
+    variant, the loader applies it.
+    """
+    bundle = load_raw(scenario_id)
+    bundle = _apply_schema_version(bundle)
+    validate_bundle(bundle)
+    return [
+        {"id": v["id"], "name": v["name"], "description": v["description"]}
+        for v in bundle.variants
+    ]
 
 
 def scenario_metadata(scenario_id: str) -> Dict[str, Any]:

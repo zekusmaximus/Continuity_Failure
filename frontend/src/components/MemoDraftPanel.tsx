@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { AdviceMemo } from "../api/client";
+import type { AdviceMemo, SystemStatus } from "../api/client";
 
 interface Props {
   memo: AdviceMemo | null;
@@ -7,9 +7,12 @@ interface Props {
   saving: boolean;
   error: string | null;
   onSave: (name: string, content: string) => void;
+  systemStatus?: SystemStatus | null;
 }
 
-export default function MemoDraftPanel({ memo, loading, saving, error, onSave }: Props) {
+export default function MemoDraftPanel({
+  memo, loading, saving, error, onSave, systemStatus = null,
+}: Props) {
   const [name, setName] = useState("");
   const [content, setContent] = useState("");
 
@@ -57,7 +60,11 @@ export default function MemoDraftPanel({ memo, loading, saving, error, onSave }:
 
       {memo.provenance.fallback_used && (
         <div className="cd-alert cd-alert-warn" role="status">
-          Live AI is unavailable or did not validate. This draft uses the deterministic fallback.
+          {systemStatus &&
+          (systemStatus.degradation_band === "DEGRADED" ||
+            systemStatus.degradation_band === "CRITICAL")
+            ? `${systemStatus.model_status}. This draft is a deterministic system template.`
+            : "Live AI is unavailable or did not validate. This draft uses the deterministic fallback."}
         </div>
       )}
       {memo.source === "player" && memo.provenance.workflow !== "manual" && (

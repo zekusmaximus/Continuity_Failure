@@ -495,3 +495,49 @@ def test_same_key_with_different_citations_is_an_idempotency_conflict(client, ca
     )
     assert retry.status_code == 409
     assert retry.json()["detail"]["error"] == "idempotency_key_conflict"
+
+
+# ---------------------------------------------------------------------------
+# Seed variants (Wave 2a, Batch A4)
+# ---------------------------------------------------------------------------
+
+def test_list_scenario_variants(client):
+    response = client.get("/api/scenarios/northbridge_water_failure/variants")
+    assert response.status_code == 200
+    variants = response.json()
+    assert [v["id"] for v in variants] == ["hot_summer", "strained_finances"]
+    assert all(set(v) == {"id", "name", "description"} for v in variants)
+
+
+def test_list_variants_for_unknown_scenario_is_404(client):
+    response = client.get("/api/scenarios/no_such_scenario/variants")
+    assert response.status_code == 404
+    assert response.json()["detail"]["error"] == "scenario_not_found"
+
+
+def test_create_campaign_with_variant(client):
+    created = client.post("/api/campaigns", json={"variant": "hot_summer"})
+    assert created.status_code == 201
+    campaign_id = created.json()["id"]
+
+    current = client.get(f"/api/campaigns/{campaign_id}/current").json()
+    assert current["summary"]["variant_id"] == "hot_summer"
+    assert current["world_state"]["variables"]["power_stability"] == 64
+    assert current["world_state"]["variables"]["water_security"] == 40
+
+
+def test_create_campaign_without_variant_is_baseline(client):
+    created = client.post("/api/campaigns", json={})
+    campaign_id = created.json()["id"]
+    current = client.get(f"/api/campaigns/{campaign_id}/current").json()
+    assert current["summary"]["variant_id"] == ""
+    assert current["world_state"]["variables"]["power_stability"] == 72
+
+
+def test_create_campaign_with_unknown_variant_is_422(client):
+    response = client.post("/api/campaigns", json={"variant": "mild_spring"})
+    assert response.status_code == 422
+    detail = response.json()["detail"]
+    assert detail["error"] == "unknown_variant"
+    assert "hot_summer" in detail["message"]
+    assert "request_id" in detail
