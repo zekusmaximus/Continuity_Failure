@@ -34,6 +34,11 @@ with a legible reason, AI never mutates state, snapshots stay append-only.
 | 4e | Deadline budget (HO#6) | Wave 1 citations |
 | 5 | Additional read-only AI tools (ME#7) | everything above (per the review) |
 
+> **Wave 2 implementation plan:** `docs/wave-2-implementation-plan.md`
+> (2026-07-11) — verified current-state check, batch sequencing (2a → 2b),
+> exact schemas/contract ripples, balance traces, and the scope trims that
+> return here (§7 of the plan) if approved.
+
 ## Wave 2a — Versioned scenario/rules engine completion (ME#4 remainder)
 
 The content pipeline (versioned JSON packages, schema, validator, loader)
