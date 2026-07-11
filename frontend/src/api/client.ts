@@ -153,6 +153,17 @@ export interface DecisionExplanation {
   off_brief_note: string;
   outcome_reason: string;
   on_brief_options: string[];
+  memory: string[];
+}
+
+/** One emergency precedent on the institutional debt ledger. */
+export interface PrecedentEntry {
+  id: string;
+  kind: string;
+  label: string;
+  turn_recorded: number;
+  detail: string;
+  canon_id: string;
 }
 
 export interface NpcDecision {
@@ -169,6 +180,8 @@ export interface NpcDecision {
   off_brief: boolean;
   off_brief_adjustments: Record<string, number>;
   cost_reason: string;
+  precedent_adjustments: Record<string, number>;
+  precedent_reason: string;
   explanation: DecisionExplanation | null;
   memo_id: string | null;
   memo_revision: number | null;
@@ -335,6 +348,7 @@ export interface CurrentTurn {
   advice_options: AdviceOption[];
   documents: DocumentRecord[];
   open_threads: OpenThread[];
+  debt_ledger: PrecedentEntry[];
   system_status: SystemStatus;
   last_turn: TurnResult | null;
 }
@@ -351,6 +365,7 @@ export interface TurnHistory {
   turns: TurnResult[];
   canon: CanonEntry[];
   open_threads: OpenThread[];
+  debt_ledger: PrecedentEntry[];
 }
 
 export interface CampaignCreated {

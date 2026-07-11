@@ -272,6 +272,17 @@ class DecisionExplanationModel(BaseModel):
     off_brief_note: str = ""
     outcome_reason: str = ""
     on_brief_options: List[str] = Field(default_factory=list)
+    memory: List[str] = Field(default_factory=list)
+
+
+class PrecedentEntryModel(BaseModel):
+    """One emergency precedent on the institutional debt ledger."""
+    id: str
+    kind: str
+    label: str
+    turn_recorded: int = Field(ge=1)
+    detail: str
+    canon_id: str
 
 
 class NpcDecisionModel(BaseModel):
@@ -288,11 +299,13 @@ class NpcDecisionModel(BaseModel):
     off_brief: bool = False
     off_brief_adjustments: Dict[str, int] = Field(default_factory=dict)
     cost_reason: str = ""
+    precedent_adjustments: Dict[str, int] = Field(default_factory=dict)
+    precedent_reason: str = ""
     explanation: Optional[DecisionExplanationModel] = None
     memo_id: Optional[str] = Field(default=None, pattern=MEMO_ID_PATTERN)
     memo_revision: Optional[int] = Field(default=None, ge=1)
 
-    @field_validator("modifications", "off_brief_adjustments")
+    @field_validator("modifications", "off_brief_adjustments", "precedent_adjustments")
     @classmethod
     def validate_modification_ranges(
         cls, modifications: Dict[str, int]
@@ -508,6 +521,7 @@ class CurrentTurnModel(BaseModel):
     advice_options: List[AdviceOptionModel]
     documents: List[DocumentModel] = Field(default_factory=list)
     open_threads: List[OpenThreadModel] = Field(default_factory=list)
+    debt_ledger: List[PrecedentEntryModel] = Field(default_factory=list)
     system_status: SystemStatusModel
     last_turn: Optional[TurnResultModel] = None
 
@@ -535,6 +549,7 @@ class TurnHistoryModel(BaseModel):
     turns: List[TurnResultModel]
     canon: List[CanonEntryModel]
     open_threads: List[OpenThreadModel] = Field(default_factory=list)
+    debt_ledger: List[PrecedentEntryModel] = Field(default_factory=list)
 
 
 class CampaignCreatedModel(BaseModel):

@@ -1013,6 +1013,8 @@ body {
 .cd-thread-item.cd-thread-resolved { border-left-color: var(--good); }
 .cd-thread-item.cd-thread-resolved .cd-thread-deadline { color: var(--good); }
 .cd-thread-esc-note { color: var(--crit); }
+.cd-ledger-item { border-left-color: var(--info); }
+.cd-memory-list li { font-style: italic; }
 .cd-stack-thread-escalated .cd-subhead { color: var(--crit); }
 .cd-stack-thread-resolved .cd-subhead { color: var(--good); }
 

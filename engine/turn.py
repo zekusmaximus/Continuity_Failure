@@ -13,6 +13,7 @@ from typing import List
 from engine import rules
 from engine.consequences import build_consequence_report, build_consequence_stack
 from engine.diffs import apply_diffs
+from engine.ledger import record_precedents
 from engine.threads import process_threads
 from engine.models import (
     AdviceOption,
@@ -100,6 +101,15 @@ def advance_turn(campaign: Campaign, advice_id: str) -> TurnResult:
             reason=decision.cost_reason or "Off-brief advice",
             source_type=SourceType.DECISION,
         )
+    # Repeating an emergency precedent already on the institutional ledger
+    # compounds: the repetition is priced as its own legible diff batch.
+    if decision.precedent_adjustments:
+        diffs += apply_diffs(
+            variables,
+            decision.precedent_adjustments,
+            reason=decision.precedent_reason or "Precedent repeated",
+            source_type=SourceType.DECISION,
+        )
     diffs += apply_diffs(
         variables,
         rules.AMBIENT_DRIFT,
@@ -162,6 +172,15 @@ def advance_turn(campaign: Campaign, advice_id: str) -> TurnResult:
     )
     consequence_stack.canonized_events = [canon_entry.title]
     campaign.canon.append(canon_entry)
+
+    # Record any emergency precedent this decision set on the debt ledger and
+    # surface it in the turn's legal fallout so the cost is visible at once.
+    for precedent in record_precedents(
+        campaign, advice, decision, resolving_turn, canon_entry.id
+    ):
+        consequence_stack.legal_fallout.append(
+            f"Precedent recorded — {precedent.label}: {precedent.detail}"
+        )
     if campaign.is_terminal():
         world_state.last_verified = (
             f"Turn {resolving_turn} \u00b7 Final operational snapshot (deterministic)"

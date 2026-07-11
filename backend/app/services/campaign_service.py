@@ -87,6 +87,13 @@ def _open_threads(campaign: Campaign) -> list[schemas.OpenThreadModel]:
     ]
 
 
+def _debt_ledger(campaign: Campaign) -> list[schemas.PrecedentEntryModel]:
+    return [
+        schemas.PrecedentEntryModel.model_validate(asdict(entry))
+        for entry in campaign.debt_ledger
+    ]
+
+
 def _system_status(campaign: Campaign) -> schemas.SystemStatusModel:
     """Derive diegetic infrastructure status from world state (deterministic).
 
@@ -174,6 +181,7 @@ def _current_model(campaign: Campaign) -> schemas.CurrentTurnModel:
         advice_options=advice_options,
         documents=_documents(campaign),
         open_threads=_open_threads(campaign),
+        debt_ledger=_debt_ledger(campaign),
         system_status=_system_status(campaign),
         last_turn=last_turn,
     )
@@ -497,6 +505,7 @@ def get_turns(campaign_id: str) -> Optional[schemas.TurnHistoryModel]:
         turns=turns,
         canon=canon,
         open_threads=_open_threads(campaign),
+        debt_ledger=_debt_ledger(campaign),
     )
 
 

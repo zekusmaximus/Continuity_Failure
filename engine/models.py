@@ -356,6 +356,9 @@ class DecisionExplanation:
     off_brief_note: str = ""
     outcome_reason: str = ""
     on_brief_options: List[str] = field(default_factory=list)   # labels the caller asked for
+    # Deterministic client memory: what this decider remembers of the prior
+    # engagement record (advice given, how it was used, red lines crossed).
+    memory: List[str] = field(default_factory=list)
 
 
 @dataclass
@@ -375,6 +378,12 @@ class NpcDecision:
     off_brief: bool = False        # advice was not among the call's primary options
     off_brief_adjustments: Dict[str, int] = field(default_factory=dict)  # deterministic cost deltas
     cost_reason: str = ""          # AppliedDiff reason for the off-brief/red-line cost
+    # --- Institutional-debt mediation ---
+    # When this decision repeats an emergency precedent already on the ledger,
+    # the repetition carries its own deterministic cost, applied as a diff
+    # batch with ``precedent_reason`` as the legible AppliedDiff reason.
+    precedent_adjustments: Dict[str, int] = field(default_factory=dict)
+    precedent_reason: str = ""
     explanation: Optional["DecisionExplanation"] = None
     memo_id: Optional[str] = None
     memo_revision: Optional[int] = None
@@ -511,6 +520,24 @@ class TurnResult:
 
 
 @dataclass
+class PrecedentEntry:
+    """One emergency precedent on the institutional debt ledger.
+
+    Precedents are the durable cost of expedient decisions: sole-source
+    procurement, informal hospital priority, delayed public notice. Each entry
+    links back to the canon entry that recorded the turn, and repeating a kind
+    already on the ledger carries a deterministic cost and lowers the client's
+    resistance to doing it again.
+    """
+    id: str
+    kind: str               # PrecedentKind vocabulary (engine/ledger.py)
+    label: str
+    turn_recorded: int
+    detail: str             # one legible sentence for the UI and dossier
+    canon_id: str
+
+
+@dataclass
 class Campaign:
     id: str
     name: str
@@ -532,6 +559,7 @@ class Campaign:
     failure_reason: Optional[str] = None
     created_at: str = ""
     advice_memos: List[AdviceMemo] = field(default_factory=list)
+    debt_ledger: List[PrecedentEntry] = field(default_factory=list)
 
     def is_terminal(self) -> bool:
         return self.status in (CampaignStatus.COMPLETED, CampaignStatus.FAILED)

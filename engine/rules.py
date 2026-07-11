@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from typing import Dict, List, Optional, Tuple
 
+from engine import ledger
 from engine.models import (
     AdherenceFactor,
     AdviceOption,
@@ -488,6 +489,14 @@ def _modulate(
     red_line_hit = bool(crossed)
     off_brief_tolerance = profile.off_brief_tolerance if profile is not None else 50
 
+    # A standing precedent of the matching kind lowers resistance: the
+    # institution has signed off on this kind of measure before.
+    precedent_kind = ledger.kind_for_advice(advice)
+    precedent_count = (
+        ledger.kinds_on_ledger(campaign).get(precedent_kind, 0)
+        if precedent_kind is not None else 0
+    )
+
     decision_type = draft.decision_type
     adherence = draft.adherence
     modifications = dict(draft.modifications)
@@ -517,8 +526,11 @@ def _modulate(
         adjustments = dict(OFF_BRIEF_COST)
         cost_reason = f"Off-brief advice — not what the {decider} called about ({advice.label})"
         # Discomfort = how far the advice outruns their appetite + how little
-        # slack they have for unsolicited advice.
+        # slack they have for unsolicited advice, less any standing precedent
+        # of the same kind (they've done this before).
         discomfort = max(0, risk_gap) + (50 - off_brief_tolerance)
+        if precedent_count > 0:
+            discomfort -= ledger.PRECEDENT_FAMILIARITY_RELIEF
         conflicts.append(
             f"This is not what the {decider} called about — they asked: “{call.ask}”."
             if call is not None else
@@ -556,6 +568,7 @@ def _modulate(
         off_brief=off_brief, risk_tol=risk_tol, pressure=pressure,
         advice_risk=advice_risk, risk_gap=risk_gap, red_line_hit=red_line_hit,
         conflicts=conflicts, outcome_reason=outcome_reason, primary=primary,
+        precedent_kind=precedent_kind, precedent_count=precedent_count,
     )
     return (
         decision_type, adherence, modifications, off_brief,
@@ -563,10 +576,49 @@ def _modulate(
     )
 
 
+def _client_memory(campaign: Campaign, decider: str) -> List[str]:
+    """What this decider remembers of the engagement record. Deterministic.
+
+    Quotes the two most recent turns where this same client acted on the
+    consultant's advice, plus a sharper line for any red line the consultant
+    crossed with them. Pure reads of turn history; no model call.
+    """
+    memory: List[str] = []
+    own_turns = [t for t in campaign.turn_history if t.decision.decider == decider]
+    for past in own_turns[-2:]:
+        phrasing = _DECISION_PHRASING.get(
+            past.decision.decision_type, "responded to your advice"
+        )
+        top = max(
+            (d for d in past.diffs
+             if d.source_type in (SourceType.ADVICE, SourceType.NPC_MODIFICATION)),
+            key=lambda d: abs(d.delta),
+            default=None,
+        )
+        move = (
+            f" — {humanize_variable(top.variable)} moved "
+            f"{top.old_value}→{top.new_value}"
+            if top is not None and top.delta != 0 else ""
+        )
+        memory.append(
+            f"Turn {past.turn_number}: you advised {past.advice_label}; "
+            f"we {phrasing}{move}."
+        )
+    for past in own_turns:
+        if past.decision.cost_reason.startswith("Red line"):
+            memory.append(
+                f"Turn {past.turn_number}: you proposed {past.advice_label} across "
+                f"a line we had already drawn. That is not forgotten."
+            )
+            break
+    return memory
+
+
 def _build_explanation(
     campaign, advice, call, faction, profile, decider, *,
     off_brief, risk_tol, pressure, advice_risk, risk_gap, red_line_hit,
     conflicts, outcome_reason, primary,
+    precedent_kind=None, precedent_count=0,
 ) -> DecisionExplanation:
     incentives: list = []
     if faction is not None:
@@ -608,6 +660,16 @@ def _build_explanation(
                 "decrease",
             )
         )
+    if precedent_count > 0 and precedent_kind is not None:
+        factors.append(
+            AdherenceFactor(
+                "Standing precedent",
+                f"{ledger.PRECEDENT_LABELS[precedent_kind]} is already on the "
+                f"institutional ledger (×{precedent_count}); resistance to "
+                f"repeating it is lower, and so is the cost of saying yes again.",
+                "increase",
+            )
+        )
 
     off_brief_note = ""
     if off_brief and not red_line_hit and call is not None:
@@ -628,6 +690,7 @@ def _build_explanation(
         off_brief_note=off_brief_note,
         outcome_reason=outcome_reason,
         on_brief_options=on_brief_options,
+        memory=_client_memory(campaign, decider),
     )
 
 
@@ -676,7 +739,7 @@ def decide(campaign: Campaign, advice: AdviceOption) -> NpcDecision:
     rationale = _build_rationale(
         advice, decision_type, media, trust, campaign.turn_number, decider
     )
-    return NpcDecision(
+    decision = NpcDecision(
         advice_id=advice.id,
         decision_type=decision_type,
         decider=decider,
@@ -692,6 +755,11 @@ def decide(campaign: Campaign, advice: AdviceOption) -> NpcDecision:
         cost_reason=cost_reason,
         explanation=explanation,
     )
+    # Repeating a precedent already on the ledger carries its own visible cost.
+    decision.precedent_adjustments, decision.precedent_reason = (
+        ledger.evaluate_repeat(campaign, advice, decision)
+    )
+    return decision
 
 
 def _build_rationale(

@@ -1,4 +1,4 @@
-import type { CanonEntry, OpenThread } from "../api/client";
+import type { CanonEntry, OpenThread, PrecedentEntry } from "../api/client";
 import StatusTag from "./StatusTag";
 import {
   PUBLIC_STATUS_LABEL,
@@ -10,9 +10,11 @@ import {
 export default function CanonPanel({
   canon,
   threads,
+  ledger = [],
 }: {
   canon: CanonEntry[];
   threads: OpenThread[];
+  ledger?: PrecedentEntry[];
 }) {
   const ordered = [...canon].sort((a, b) => a.turn_number - b.turn_number);
   const openThreads = threads.filter((t) => t.status !== "resolved");
@@ -78,6 +80,23 @@ export default function CanonPanel({
             );
           })}
         </ul>
+      )}
+
+      {ledger.length > 0 && (
+        <>
+          <div className="cd-subhead">Institutional Debt Ledger ({ledger.length})</div>
+          <ul className="cd-thread-list cd-ledger-list">
+            {ledger.map((p) => (
+              <li key={p.id} className="cd-thread-item cd-ledger-item">
+                <div className="cd-thread-top">
+                  <span className="cd-thread-title">{p.label}</span>
+                  <span className="cd-canon-turn">Turn {p.turn_recorded}</span>
+                </div>
+                <p className="cd-thread-summary">{p.detail}</p>
+              </li>
+            ))}
+          </ul>
+        </>
       )}
 
       {resolvedThreads.length > 0 && (

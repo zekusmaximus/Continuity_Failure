@@ -30,6 +30,8 @@ function baseResult(report: ConsequenceReport, diffs: TurnResult["diffs"] = []):
       off_brief: false,
       off_brief_adjustments: {},
       cost_reason: "",
+      precedent_adjustments: {},
+      precedent_reason: "",
       explanation: {
         caller: "Northbridge Utilities Authority",
         institutional_mandate: "Keep the system running.",
@@ -41,6 +43,7 @@ function baseResult(report: ConsequenceReport, diffs: TurnResult["diffs"] = []):
         outcome_reason:
           "The Authority modified the advice to protect contractor relations.",
         on_brief_options: [],
+        memory: [],
       },
       memo_id: "memo_1",
       memo_revision: 2,
