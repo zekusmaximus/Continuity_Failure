@@ -26,7 +26,7 @@ with a legible reason, AI never mutates state, snapshots stay append-only.
 | 2a | Versioned-engine completion: branchable/faction-gated calls, seed variants, ruleset_version (ME#4 remainder) | Wave 1 |
 | 2b | Diegetic degradation + playable degraded workstation (ME#6, HO#8) | Wave 1 |
 | 3a | Identity/security layer for shared deployment (ME#5) | none (schedule when launch is real) |
-| 3b | Comprehension-focused playtest telemetry (HO#10) | 3a for shared deployments |
+| 3b | Local comprehension telemetry + consequence/onboarding polish (HO#10) | Wave-2 integrity pass; 3a only for shared aggregation |
 | 4a | The record as a playable object (HO#1) | Wave 1 (memo artifacts, canon) |
 | 4b | Counterfactual dossier (HO#3) | 2a (replayable variants) |
 | 4c | Consultant ethics profile (HO#4) | Wave 1 endings + ledger |
@@ -155,6 +155,12 @@ CORS/CSP hardening. The review's §11 checklist is the source of truth.
 Track evidence opened, option comparison, time-to-choice, Case File use,
 abandon phase, and "why did this change" expansions. Never log memo content.
 Local-first storage; export is explicit.
+
+Implementation plan: `docs/wave-3-implementation-plan.md`. Because no shared
+deployment is scheduled, this wave also takes the smallest player-facing actions
+supported by that measurement: a deterministic causal lead/future hook,
+progressive first-engagement teaching, optional expedited review after turn 2,
+and clearer replay framing. Hosted collection remains blocked on 3a.
 
 ## Wave 4 — Record-centered play
 
