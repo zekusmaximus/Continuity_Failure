@@ -192,6 +192,7 @@ describe("ClientDecisionPhase explanation payload", () => {
     faction_shifts: [],
     call_variant_id: null,
     powered_subsystem: null,
+    consequence_lead: { headline: "", future_hook: "", references: [] },
   };
 
   test("renders human-labeled adherence factors, conflicts, and outcome reason", () => {

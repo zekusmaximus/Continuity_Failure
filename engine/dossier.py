@@ -186,6 +186,15 @@ def render_dossier_markdown(campaign: Campaign) -> str:
                     f"- **Memo of record:** `{t.sent_memo.memo_id}` revision "
                     f"{t.sent_memo.revision} (`{t.sent_memo.content_digest}`)"
                 )
+            # Wave 3 B2: the causal lead supplements the audit, immediately
+            # before the reconciliation it summarizes. It never replaces the
+            # memo, decision, diff, or allocation facts above.
+            if t.consequence_lead.headline:
+                lines.append(f"- **Causal lead:** {t.consequence_lead.headline}")
+            if t.consequence_lead.future_hook:
+                lines.append(
+                    f"- **On the record next:** {t.consequence_lead.future_hook}"
+                )
             lines.extend(_reconciliation_lines(t))
             if t.consequence_stack.opened_threads:
                 lines.append("- **Threads opened:** "

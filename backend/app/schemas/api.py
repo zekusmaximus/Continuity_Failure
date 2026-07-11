@@ -579,6 +579,23 @@ class ConsequenceReportModel(BaseModel):
     variables: List[VariableConsequenceModel] = Field(default_factory=list)
 
 
+class ConsequenceReferenceModel(BaseModel):
+    kind: str = Field(pattern=r"^(diff|thread|precedent|failure|decision)$")
+    id: str
+    label: str
+
+
+class ConsequenceLeadModel(BaseModel):
+    """Deterministic causal headline + future hook (Wave 3 B1).
+
+    Defaulted empty so idempotent replays and presentations recorded before
+    the field existed still validate; freshly resolved turns populate it.
+    """
+    headline: str = ""
+    future_hook: str = ""
+    references: List[ConsequenceReferenceModel] = Field(default_factory=list)
+
+
 class TurnResultModel(BaseModel):
     turn_number: int = Field(ge=1)
     advice_id: str
@@ -601,6 +618,9 @@ class TurnResultModel(BaseModel):
     # The auxiliary-power allocation the turn resolved under (CRITICAL band
     # only; None otherwise). Defaulted so earlier replays still validate.
     powered_subsystem: Optional[str] = None
+    # Causal headline + future hook (Wave 3 B1). Defaulted so earlier replays
+    # and stored presentations still validate with an empty lead.
+    consequence_lead: ConsequenceLeadModel = Field(default_factory=ConsequenceLeadModel)
 
 
 class SystemStatusModel(BaseModel):

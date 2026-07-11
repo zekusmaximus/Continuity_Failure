@@ -103,6 +103,7 @@ function baseResult(report: ConsequenceReport, diffs: TurnResult["diffs"] = []):
     faction_shifts: [],
     call_variant_id: null,
     powered_subsystem: null,
+    consequence_lead: { headline: "", future_hook: "", references: [] },
   };
 }
 
@@ -291,6 +292,131 @@ describe("ConsequencesPhase causal waterfall", () => {
     );
     expect(
       screen.getByRole("button", { name: /Authoritative applied-diff record/ }),
+    ).toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Wave 3 B2: consequence hierarchy — hook first, headline context, then the
+// complete audit behind one "Show the full record" action.
+// ---------------------------------------------------------------------------
+
+import userEvent from "@testing-library/user-event";
+import { vi } from "vitest";
+import { TelemetryProvider, type TelemetryApi } from "../src/telemetry/TelemetryProvider";
+
+function withLead(turnNumber: number, hook = "Contractor warning is now open on the record.") {
+  const result = baseResult({ variables: [TRUST] });
+  result.turn_number = turnNumber;
+  result.consequence_lead = {
+    headline:
+      "You advised Controlled disclosure; the Northbridge Utilities Authority acted, but changed the terms. This turn's largest recorded move: Public Trust rose 3 under the recorded decision.",
+    future_hook: hook,
+    references: [
+      { kind: "decision", id: "controlled_disclosure", label: "Controlled disclosure" },
+      { kind: "diff", id: "public_trust", label: "Public Trust" },
+      { kind: "thread", id: "th_contractor", label: "Contractor warning" },
+    ],
+  };
+  return result;
+}
+
+describe("ConsequencesPhase consequence hierarchy (Wave 3 B2)", () => {
+  test("reads hook → headline → disclosure, in that DOM order", () => {
+    const { container } = render(<ConsequencesPhase result={withLead(2)} />);
+    const hook = screen.getByText(/Contractor warning is now open/);
+    const headline = screen.getByText(/You advised Controlled disclosure/);
+    const disclosure = screen.getByRole("button", { name: /Show the full record/ });
+    expect(
+      hook.compareDocumentPosition(headline) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      headline.compareDocumentPosition(disclosure) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    // The headline context carries the decision receipt.
+    expect(container.querySelector(".cd-causal-receipt")).toHaveTextContent(
+      /MODIFIED.*Northbridge Utilities Authority.*adherence 60%/i,
+    );
+  });
+
+  test("defaults the full record open on turns 1–2 and closed from turn 3", () => {
+    const { unmount } = render(<ConsequencesPhase result={withLead(2)} />);
+    expect(
+      screen.getByRole("button", { name: /Show the full record/ }),
+    ).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByText("How the state moved")).toBeInTheDocument();
+    unmount();
+
+    render(<ConsequencesPhase result={withLead(3)} />);
+    expect(
+      screen.getByRole("button", { name: /Show the full record/ }),
+    ).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText("How the state moved")).not.toBeInTheDocument();
+  });
+
+  test("expanding from turn 3 restores the complete audit and reports telemetry", async () => {
+    const user = userEvent.setup();
+    const reportSpy = vi.fn();
+    const api: TelemetryApi = {
+      report: reportSpy,
+      enabled: true,
+      setEnabled: () => undefined,
+      storage: null,
+    };
+    const result = withLead(3);
+    result.consequence_stack.immediate = ["The order narrowed overnight."];
+    result.diffs = [
+      {
+        variable: "public_trust",
+        old_value: 50,
+        new_value: 55,
+        delta: 5,
+        reason: "Advice — Controlled disclosure",
+        source_type: "advice",
+      },
+    ];
+    render(
+      <TelemetryProvider value={api}>
+        <ConsequencesPhase result={result} />
+      </TelemetryProvider>,
+    );
+
+    await user.click(screen.getByRole("button", { name: /Show the full record/ }));
+    expect(screen.getByText("How the state moved")).toBeInTheDocument();
+    expect(screen.getByText("Immediate consequences")).toBeInTheDocument();
+    expect(screen.getByText("The order narrowed overnight.")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /Authoritative applied-diff record/ }),
+    ).toBeInTheDocument();
+    expect(reportSpy).toHaveBeenCalledWith({
+      event_type: "record_detail_toggled",
+      detail_kind: "full_record",
+      expanded: true,
+    });
+  });
+
+  test("renders the audit unchanged when the lead is the empty default", () => {
+    const result = baseResult({ variables: [TRUST] });
+    render(<ConsequencesPhase result={result} />);
+    expect(screen.queryByText(/You advised/)).not.toBeInTheDocument();
+    expect(document.querySelector(".cd-future-hook")).toBeNull();
+    // turn 2 → record open; the waterfall is right there.
+    expect(screen.getByText("How the state moved")).toBeInTheDocument();
+  });
+
+  test("omits the hook block when the record offers none", () => {
+    render(<ConsequencesPhase result={withLead(2, "")} />);
+    expect(document.querySelector(".cd-future-hook")).toBeNull();
+    expect(screen.getByText(/You advised Controlled disclosure/)).toBeInTheDocument();
+  });
+
+  test("passes delayed/rejected headlines through verbatim", () => {
+    const result = withLead(2);
+    result.consequence_lead.headline =
+      "You advised Delay disclosure; the Town Manager's Office refused it — none of its proposed effects landed this turn.";
+    render(<ConsequencesPhase result={result} />);
+    expect(
+      screen.getByText(/none of its proposed effects landed this turn/),
     ).toBeInTheDocument();
   });
 });

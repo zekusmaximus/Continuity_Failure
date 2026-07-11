@@ -356,6 +356,24 @@ export interface ConsequenceReport {
   variables: VariableConsequence[];
 }
 
+/** One pointer from a causal-lead sentence back to the record it summarizes. */
+export interface ConsequenceReference {
+  kind: string; // "diff" | "thread" | "precedent" | "failure" | "decision"
+  id: string; // the record's stable id, or a deterministic key
+  label: string; // short record label, never generated prose
+}
+
+/**
+ * Deterministic causal headline + future hook (Wave 3 B1), built once by the
+ * engine and frozen with the presentation. Empty on turns resolved before the
+ * field existed; the UI must render sensibly without it.
+ */
+export interface ConsequenceLead {
+  headline: string;
+  future_hook: string;
+  references: ConsequenceReference[];
+}
+
 export interface TurnResult {
   turn_number: number;
   advice_id: string;
@@ -372,6 +390,7 @@ export interface TurnResult {
   faction_shifts: FactionShift[];
   call_variant_id: string | null;
   powered_subsystem: PowerAllocation | null;
+  consequence_lead: ConsequenceLead;
 }
 
 // Which subsystem auxiliary power supports during a CRITICAL turn (Wave 2b).

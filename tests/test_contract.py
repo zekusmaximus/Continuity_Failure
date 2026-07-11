@@ -70,6 +70,8 @@ FULL_ASDICT_PAIRS = [
     (engine_models.AdviceMediation, schemas.AdviceMediationModel),
     (engine_models.VariableConsequence, schemas.VariableConsequenceModel),
     (engine_models.ConsequenceReport, schemas.ConsequenceReportModel),
+    (engine_models.ConsequenceReference, schemas.ConsequenceReferenceModel),
+    (engine_models.ConsequenceLead, schemas.ConsequenceLeadModel),
     (engine_models.TurnResult, schemas.TurnResultModel),
 ]
 
@@ -249,6 +251,8 @@ TS_INTERFACE_TO_MODEL = {
     "AdviceMediation": schemas.AdviceMediationModel,
     "VariableConsequence": schemas.VariableConsequenceModel,
     "ConsequenceReport": schemas.ConsequenceReportModel,
+    "ConsequenceReference": schemas.ConsequenceReferenceModel,
+    "ConsequenceLead": schemas.ConsequenceLeadModel,
     "TurnResult": schemas.TurnResultModel,
     "ScenarioVariant": schemas.ScenarioVariantModel,
     "SystemStatus": schemas.SystemStatusModel,

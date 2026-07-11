@@ -13,6 +13,7 @@ from typing import List, Optional
 from engine import calls, degradation, factions, rules
 from engine.consequences import build_consequence_report, build_consequence_stack
 from engine.diffs import apply_diffs
+from engine.experience import build_consequence_lead
 from engine.ledger import record_precedents
 from engine.threads import process_threads
 from engine.models import (
@@ -324,9 +325,10 @@ def advance_turn(
 
     # Record any emergency precedent this decision set on the debt ledger and
     # surface it in the turn's legal fallout so the cost is visible at once.
-    for precedent in record_precedents(
+    new_precedents = record_precedents(
         campaign, advice, decision, resolving_turn, canon_entry.id
-    ):
+    )
+    for precedent in new_precedents:
         consequence_stack.legal_fallout.append(
             f"Precedent recorded — {precedent.label}: {precedent.detail}"
         )
@@ -356,6 +358,21 @@ def advance_turn(
         faction_shifts=faction_shifts,
         call_variant_id=call_variant_id,
         powered_subsystem=powered_subsystem,
+        # Built last, from already-produced values only: diffs, decision,
+        # thread events, new precedents, and the terminal status all exist by
+        # this point, and the builder mutates nothing (Wave 3 B1).
+        consequence_lead=build_consequence_lead(
+            resolving_turn=resolving_turn,
+            advice=advice,
+            decision=decision,
+            diffs=diffs,
+            thread_events=thread_events,
+            new_threads=new_threads,
+            new_precedents=new_precedents,
+            consequence_stack=consequence_stack,
+            status_after=campaign.status,
+            failure_reason=failure_reason,
+        ),
     )
     campaign.turn_history.append(turn_result)
     return turn_result

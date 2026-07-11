@@ -447,6 +447,36 @@ class ConsequenceReport:
 
 
 @dataclass
+class ConsequenceReference:
+    """One pointer from a causal-lead sentence back to the record it summarizes.
+
+    ``id`` is the referenced record's own stable id when one exists (advice id,
+    thread id, precedent id, variable name); otherwise a deterministic key.
+    ``label`` is a short record label already present on the result -- never
+    generated prose.
+    """
+    kind: str               # "diff" / "thread" / "precedent" / "failure" / "decision"
+    id: str
+    label: str
+
+
+@dataclass
+class ConsequenceLead:
+    """Deterministic one-glance orientation for a resolved turn (Wave 3 B1).
+
+    A derived summary of values already produced by resolution -- the advice
+    label, NPC decision, applied diffs, thread/precedent events, and terminal
+    status. It invents no motive, forecasts no outcome, and never becomes a
+    CanonEntry; the applied diffs and consequence report remain the authority.
+    Defaulted empty so snapshots and idempotency responses recorded before
+    this field existed still decode; every newly resolved turn populates it.
+    """
+    headline: str = ""
+    future_hook: str = ""
+    references: List[ConsequenceReference] = field(default_factory=list)
+
+
+@dataclass
 class AdherenceFactor:
     """One human-labeled input into how the NPC weighed the advice.
 
@@ -655,6 +685,10 @@ class TurnResult:
     # None outside the CRITICAL band. On the record: capability gating is part
     # of what the desk could and could not do when the advice went out.
     powered_subsystem: Optional[str] = None
+    # Deterministic causal headline + future hook (Wave 3 B1). Defaulted so
+    # older snapshots and idempotent replays decode without migration; every
+    # newly resolved turn carries the populated lead.
+    consequence_lead: "ConsequenceLead" = field(default_factory=ConsequenceLead)
 
 
 @dataclass
