@@ -221,6 +221,23 @@ class AdviceSubmissionRequest(StrictRequestModel):
     )
     memo_id: str = Field(pattern=MEMO_ID_PATTERN)
     memo_revision: int = Field(ge=1, le=1000, strict=True)
+    # Documents the consultant stakes the memo on (Evidence Board ids). Bounded
+    # and validated server-side against the campaign's available documents.
+    cited_document_ids: List[str] = Field(
+        default_factory=list,
+        max_length=3,
+    )
+
+    @field_validator("cited_document_ids")
+    @classmethod
+    def validate_cited_document_ids(cls, ids: List[str]) -> List[str]:
+        import re
+        for doc_id in ids:
+            if not re.fullmatch(r"[a-z0-9_]{1,64}", doc_id):
+                raise ValueError(f"invalid document id: {doc_id!r}")
+        if len(set(ids)) != len(ids):
+            raise ValueError("cited_document_ids must not repeat")
+        return ids
 
 
 class ApiErrorDetail(BaseModel):
@@ -301,6 +318,9 @@ class NpcDecisionModel(BaseModel):
     cost_reason: str = ""
     precedent_adjustments: Dict[str, int] = Field(default_factory=dict)
     precedent_reason: str = ""
+    cited_document_ids: List[str] = Field(default_factory=list)
+    citation_adjustments: Dict[str, int] = Field(default_factory=dict)
+    citation_reason: str = ""
     explanation: Optional[DecisionExplanationModel] = None
     memo_id: Optional[str] = Field(default=None, pattern=MEMO_ID_PATTERN)
     memo_revision: Optional[int] = Field(default=None, ge=1)

@@ -384,6 +384,13 @@ class NpcDecision:
     # batch with ``precedent_reason`` as the legible AppliedDiff reason.
     precedent_adjustments: Dict[str, int] = field(default_factory=dict)
     precedent_reason: str = ""
+    # --- Evidence citation mediation ---
+    # Documents the consultant staked the memo on. Relevant, reliable, public
+    # evidence strengthens adherence; contested evidence carries its own
+    # deterministic cost, applied with ``citation_reason`` as the diff reason.
+    cited_document_ids: List[str] = field(default_factory=list)
+    citation_adjustments: Dict[str, int] = field(default_factory=dict)
+    citation_reason: str = ""
     explanation: Optional["DecisionExplanation"] = None
     memo_id: Optional[str] = None
     memo_revision: Optional[int] = None

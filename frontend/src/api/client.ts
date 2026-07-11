@@ -182,6 +182,9 @@ export interface NpcDecision {
   cost_reason: string;
   precedent_adjustments: Record<string, number>;
   precedent_reason: string;
+  cited_document_ids: string[];
+  citation_adjustments: Record<string, number>;
+  citation_reason: string;
   explanation: DecisionExplanation | null;
   memo_id: string | null;
   memo_revision: number | null;
@@ -613,6 +616,7 @@ export const api = {
     idempotencyKey: string,
     memoId: string,
     memoRevision: number,
+    citedDocumentIds: string[] = [],
   ) =>
     requestWithRetry<TurnResult>(`/api/campaigns/${id}/advice`, {
       method: "POST",
@@ -622,6 +626,7 @@ export const api = {
         idempotency_key: idempotencyKey,
         memo_id: memoId,
         memo_revision: memoRevision,
+        cited_document_ids: citedDocumentIds,
       }),
     }),
   getTurns: (id: string) =>

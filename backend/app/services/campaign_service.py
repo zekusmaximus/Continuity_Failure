@@ -224,6 +224,7 @@ def request_fingerprint(
     expected_turn: int,
     memo_id: Optional[str] = None,
     memo_revision: Optional[int] = None,
+    cited_document_ids: Optional[list[str]] = None,
 ) -> str:
     """Stable digest of everything a submission asks the engine to do.
 
@@ -236,6 +237,7 @@ def request_fingerprint(
             "expected_turn": expected_turn,
             "memo_id": memo_id,
             "memo_revision": memo_revision,
+            "cited_document_ids": sorted(cited_document_ids or []),
         },
         sort_keys=True,
         separators=(",", ":"),
@@ -346,6 +348,7 @@ def submit_advice(
     idempotency_key: str,
     memo_id: Optional[str] = None,
     memo_revision: Optional[int] = None,
+    cited_document_ids: Optional[list[str]] = None,
 ) -> ResolvedTurn:
     """Resolve one turn atomically, at most once per (campaign, key).
 
@@ -355,7 +358,7 @@ def submit_advice(
     resolved reaches the terminal and revision guards.
     """
     fingerprint = request_fingerprint(
-        advice_id, expected_turn, memo_id, memo_revision
+        advice_id, expected_turn, memo_id, memo_revision, cited_document_ids
     )
 
     with get_repository().transaction() as active:
@@ -393,6 +396,16 @@ def submit_advice(
         if option is None:
             bind_log_fields(idempotency=IdempotencyOutcome.REJECTED)
             raise errors.UnknownAdvice(advice_id)
+
+        # Cited evidence must exist and already be on the board this turn.
+        available_docs = {
+            doc.id for doc in campaign.documents
+            if doc.turn_number <= campaign.turn_number
+        }
+        for doc_id in cited_document_ids or []:
+            if doc_id not in available_docs:
+                bind_log_fields(idempotency=IdempotencyOutcome.REJECTED)
+                raise errors.UnknownDocument(doc_id)
 
         # Public API callers always attach an explicit memo. The optional
         # branch preserves direct service compatibility by materializing the
@@ -443,10 +456,15 @@ def submit_advice(
         )
 
         try:
-            result = turn_engine.advance_turn(campaign, advice_id)
+            result = turn_engine.advance_turn(
+                campaign, advice_id, cited_document_ids
+            )
         except turn_engine.UnknownAdviceOption as exc:
             bind_log_fields(idempotency=IdempotencyOutcome.REJECTED)
             raise errors.UnknownAdvice(advice_id) from exc
+        except turn_engine.UnknownDocument as exc:
+            bind_log_fields(idempotency=IdempotencyOutcome.REJECTED)
+            raise errors.UnknownDocument(str(exc)) from exc
 
         # Attach audit references only after deterministic resolution. Memo
         # prose is never visible to rules, diffs, decision type, or canon text.

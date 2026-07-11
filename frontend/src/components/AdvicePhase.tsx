@@ -1,4 +1,10 @@
-import type { AdviceMemo, AdviceOption, ClientCall, Faction } from "../api/client";
+import type {
+  AdviceMemo,
+  AdviceOption,
+  ClientCall,
+  DocumentRecord,
+  Faction,
+} from "../api/client";
 import { levelClass, titleCase, VARIABLE_META } from "../domain";
 import MemoDraftPanel from "./MemoDraftPanel";
 
@@ -16,6 +22,44 @@ interface Props {
   onCreateManualMemo: () => void;
   onSaveMemo: (name: string, content: string) => void;
   readOnly?: boolean;
+  documents?: DocumentRecord[];
+  citedDocs?: string[];
+  onToggleCite?: (id: string) => void;
+}
+
+// Deterministic preview of how a citation will land — the same tag-overlap
+// rule the engine applies, phrased for the consultant before they commit.
+function citationPreview(
+  doc: DocumentRecord,
+  option: AdviceOption | null,
+  call: ClientCall | null,
+): { text: string; tone: "good" | "bad" | "neutral" } {
+  if (!option) return { text: "", tone: "neutral" };
+  const relevant =
+    doc.tags.some((t) => option.tags.includes(t)) ||
+    (call?.attached_document_ids ?? []).includes(doc.id);
+  if (!relevant) {
+    return {
+      text: "Does not bear on this recommendation.",
+      tone: "neutral",
+    };
+  }
+  if (doc.reliability === "low" || doc.reliability === "contested") {
+    return {
+      text: "Contested backing — citing this carries a recorded cost.",
+      tone: "bad",
+    };
+  }
+  if (doc.reliability === "high") {
+    return {
+      text:
+        doc.public_status === "public"
+          ? "Strong, already-public backing — strengthens adherence."
+          : "Strong backing — strengthens adherence.",
+      tone: "good",
+    };
+  }
+  return { text: "Relevant backing — helps the memo hold.", tone: "good" };
 }
 
 function RiskBar({ label, value }: { label: string; value: number }) {
@@ -207,7 +251,11 @@ export default function AdvicePhase({
   onCreateManualMemo,
   onSaveMemo,
   readOnly,
+  documents = [],
+  citedDocs = [],
+  onToggleCite,
 }: Props) {
+  const selectedOption = options.find((o) => o.id === selected) ?? null;
   const callerName = call?.caller ?? "client";
   const primaryIds = new Set(call?.primary_advice_ids ?? []);
   const redLineTags = new Set(call?.decision_profile?.red_line_tags ?? []);
@@ -321,6 +369,52 @@ export default function AdvicePhase({
             error={memoError}
             onSave={onSaveMemo}
           />
+
+          {onToggleCite && documents.length > 0 && (
+            <fieldset className="cd-cite-evidence">
+              <legend className="cd-field-k">
+                Cite supporting evidence · up to 3 documents
+              </legend>
+              <p className="cd-muted cd-small">
+                The client weighs what the memo is staked on. Relevant,
+                reliable records strengthen adherence; contested material
+                costs your standing.
+              </p>
+              <ul className="cd-cite-list">
+                {documents.map((doc) => {
+                  const checked = citedDocs.includes(doc.id);
+                  const preview = citationPreview(doc, selectedOption, call);
+                  const atCap = !checked && citedDocs.length >= 3;
+                  return (
+                    <li key={doc.id} className="cd-cite-row">
+                      <label className={atCap && !readOnly ? "cd-cite-capped" : ""}>
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          disabled={readOnly || atCap}
+                          onChange={() => onToggleCite(doc.id)}
+                        />
+                        <span className="cd-cite-title">{doc.title}</span>
+                        <span className="cd-cite-chips">
+                          <span className={`cd-tag cd-rel-${doc.reliability}`}>
+                            {titleCase(doc.reliability)}
+                          </span>
+                          <span className={`cd-tag cd-pub-${doc.public_status}`}>
+                            {titleCase(doc.public_status)}
+                          </span>
+                        </span>
+                      </label>
+                      {preview.text && (
+                        <span className={`cd-cite-preview cd-cite-${preview.tone}`}>
+                          {preview.text}
+                        </span>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            </fieldset>
+          )}
         </div>
       )}
     </section>

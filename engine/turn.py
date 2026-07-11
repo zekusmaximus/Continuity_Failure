@@ -8,7 +8,7 @@ engine package, never on FastAPI.
 
 from __future__ import annotations
 
-from typing import List
+from typing import List, Optional
 
 from engine import rules
 from engine.consequences import build_consequence_report, build_consequence_stack
@@ -33,6 +33,10 @@ class UnknownAdviceOption(Exception):
     """Raised when a submitted advice id is not in the campaign's option set."""
 
 
+class UnknownDocument(Exception):
+    """Raised when a cited document id is unknown or not yet available."""
+
+
 def find_advice(campaign: Campaign, advice_id: str) -> AdviceOption:
     # Search current-turn options too, so turn-specific advice is playable on
     # its turn (available_advice() = global options + this turn's options).
@@ -47,7 +51,25 @@ def _scale_effects(effects, adherence):
     return {var: int(round(delta * adherence)) for var, delta in effects.items()}
 
 
-def advance_turn(campaign: Campaign, advice_id: str) -> TurnResult:
+def _resolve_citations(campaign: Campaign, cited_document_ids, resolving_turn: int):
+    """Resolve cited document ids to Documents available on this turn."""
+    if not cited_document_ids:
+        return []
+    by_id = {doc.id: doc for doc in campaign.documents}
+    citations = []
+    for doc_id in cited_document_ids:
+        doc = by_id.get(doc_id)
+        if doc is None or doc.turn_number > resolving_turn:
+            raise UnknownDocument(doc_id)
+        citations.append(doc)
+    return citations
+
+
+def advance_turn(
+    campaign: Campaign,
+    advice_id: str,
+    cited_document_ids: Optional[List[str]] = None,
+) -> TurnResult:
     """Resolve the current turn against ``advice_id`` and advance the campaign.
 
     The sequence is:
@@ -71,7 +93,8 @@ def advance_turn(campaign: Campaign, advice_id: str) -> TurnResult:
     world_state = campaign.world_state
     variables = world_state.variables
 
-    decision = rules.decide(campaign, advice)
+    citations = _resolve_citations(campaign, cited_document_ids, resolving_turn)
+    decision = rules.decide(campaign, advice, citations)
 
     # Snapshot the pre-turn values so the consequence report can reconcile
     # start -> attributed deltas -> final for every touched variable.
@@ -108,6 +131,14 @@ def advance_turn(campaign: Campaign, advice_id: str) -> TurnResult:
             variables,
             decision.precedent_adjustments,
             reason=decision.precedent_reason or "Precedent repeated",
+            source_type=SourceType.DECISION,
+        )
+    # Staking the memo on contested material costs the consultant credibility.
+    if decision.citation_adjustments:
+        diffs += apply_diffs(
+            variables,
+            decision.citation_adjustments,
+            reason=decision.citation_reason or "Cited contested evidence",
             source_type=SourceType.DECISION,
         )
     diffs += apply_diffs(
@@ -168,7 +199,9 @@ def advance_turn(campaign: Campaign, advice_id: str) -> TurnResult:
         classification=FactClassification.CANON,
         public_status=PublicStatus.PUBLIC,
         involved_factions=[decision.decider],
-        tags=list(advice.tags) + [decision.decision_type.lower()],
+        tags=list(advice.tags)
+        + [decision.decision_type.lower()]
+        + (["evidence_cited"] if decision.cited_document_ids else []),
     )
     consequence_stack.canonized_events = [canon_entry.title]
     campaign.canon.append(canon_entry)

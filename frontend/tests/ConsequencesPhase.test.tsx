@@ -32,6 +32,9 @@ function baseResult(report: ConsequenceReport, diffs: TurnResult["diffs"] = []):
       cost_reason: "",
       precedent_adjustments: {},
       precedent_reason: "",
+      cited_document_ids: [],
+      citation_adjustments: {},
+      citation_reason: "",
       explanation: {
         caller: "Northbridge Utilities Authority",
         institutional_mandate: "Keep the system running.",

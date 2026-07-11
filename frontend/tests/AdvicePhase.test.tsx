@@ -139,6 +139,9 @@ describe("ClientDecisionPhase explanation payload", () => {
       cost_reason: "Red line crossed",
       precedent_adjustments: {},
       precedent_reason: "",
+      cited_document_ids: [],
+      citation_adjustments: {},
+      citation_reason: "",
       explanation: {
         caller: "Northbridge Hospital",
         institutional_mandate: "Protect clinical operations.",

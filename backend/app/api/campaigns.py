@@ -135,6 +135,7 @@ def submit_advice(
             idempotency_key=payload.idempotency_key,
             memo_id=payload.memo_id,
             memo_revision=payload.memo_revision,
+            cited_document_ids=payload.cited_document_ids,
         )
     except errors.TurnResolutionError as exc:
         raise _turn_error(campaign_id, exc) from None

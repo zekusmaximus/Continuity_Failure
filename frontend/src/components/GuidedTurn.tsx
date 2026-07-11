@@ -20,6 +20,8 @@ interface Props {
   history: TurnHistory | null;
   terminal: boolean;
   selected: string | null;
+  citedDocs: string[];
+  onToggleCite: (id: string) => void;
   submitting: boolean;
   onSelect: (id: string) => void;
   onGoto: (phase: Phase) => void;
@@ -51,6 +53,8 @@ export default function GuidedTurn(props: Props) {
     history,
     terminal,
     selected,
+    citedDocs,
+    onToggleCite,
     submitting,
     onSelect,
     onGoto,
@@ -143,6 +147,9 @@ export default function GuidedTurn(props: Props) {
           onCreateManualMemo={onCreateManualMemo}
           onSaveMemo={onSaveMemo}
           readOnly={lastResult !== null}
+          documents={current.documents}
+          citedDocs={citedDocs}
+          onToggleCite={onToggleCite}
         />
       ) : null;
       action = (

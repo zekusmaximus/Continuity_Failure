@@ -82,6 +82,17 @@ class UnknownAdvice(TurnResolutionError):
         self.advice_id = advice_id
 
 
+class UnknownDocument(TurnResolutionError):
+    code = "unknown_document"
+    status_code = 400
+
+    def __init__(self, document_id: str) -> None:
+        super().__init__(
+            f"Cited document is unknown or not yet on the board: {document_id}"
+        )
+        self.document_id = document_id
+
+
 class MemoNotFound(TurnResolutionError):
     code = "memo_not_found"
     status_code = 404

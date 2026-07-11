@@ -46,7 +46,8 @@ SURVIVAL_SEQUENCE = [
 _MEMOS_BY_KEY = {}
 
 
-def _submit(client, campaign_id, advice_id, *, expected_turn=None, key=None):
+def _submit(client, campaign_id, advice_id, *, expected_turn=None, key=None,
+            cited_document_ids=None):
     """Submit advice against the live revision with a fresh idempotency key.
 
     Mirrors an honest client: one new key per deliberate submission, and the
@@ -84,6 +85,11 @@ def _submit(client, campaign_id, advice_id, *, expected_turn=None, key=None):
             "idempotency_key": submission_key,
             "memo_id": memo["id"],
             "memo_revision": memo["revision"],
+            **(
+                {"cited_document_ids": cited_document_ids}
+                if cited_document_ids is not None
+                else {}
+            ),
         },
     )
 
@@ -429,3 +435,63 @@ def test_draft_memo_works_on_terminal_campaign(client, campaign):
     )
     assert res.status_code == 200
     assert res.json()["status"] == "fallback"
+
+
+# ---------------------------------------------------------------------------
+# Evidence citation over the API
+# ---------------------------------------------------------------------------
+
+def test_citing_available_documents_resolves_and_records_them(client, campaign):
+    res = _submit(
+        client, campaign, "controlled_disclosure",
+        cited_document_ids=["doc_town_manager_transcript"],
+    )
+    assert res.status_code == 200
+    assert res.json()["decision"]["cited_document_ids"] == [
+        "doc_town_manager_transcript"
+    ]
+
+
+def test_citing_an_unknown_document_is_a_typed_400(client, campaign):
+    res = _submit(
+        client, campaign, "controlled_disclosure",
+        cited_document_ids=["doc_that_does_not_exist"],
+    )
+    assert res.status_code == 400
+    assert res.json()["detail"]["error"] == "unknown_document"
+
+
+def test_citing_a_future_turn_document_is_a_typed_400(client, campaign):
+    res = _submit(
+        client, campaign, "controlled_disclosure",
+        cited_document_ids=["doc_school_closure_request"],  # turn 2 document
+    )
+    assert res.status_code == 400
+    assert res.json()["detail"]["error"] == "unknown_document"
+
+
+def test_more_than_three_citations_is_rejected_by_validation(client, campaign):
+    res = _submit(
+        client, campaign, "controlled_disclosure",
+        cited_document_ids=[
+            "doc_preliminary_lab_report", "doc_town_manager_transcript",
+            "doc_council_session_excerpt", "doc_school_closure_request",
+        ],
+    )
+    assert res.status_code == 422
+
+
+def test_same_key_with_different_citations_is_an_idempotency_conflict(client, campaign):
+    key = uuid.uuid4().hex
+    first = _submit(
+        client, campaign, "controlled_disclosure", key=key,
+        cited_document_ids=["doc_town_manager_transcript"],
+    )
+    assert first.status_code == 200
+
+    retry = _submit(
+        client, campaign, "controlled_disclosure", key=key, expected_turn=1,
+        cited_document_ids=["doc_preliminary_lab_report"],
+    )
+    assert retry.status_code == 409
+    assert retry.json()["detail"]["error"] == "idempotency_key_conflict"
