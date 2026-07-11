@@ -29,6 +29,7 @@ from engine.models import (
     OpenThread,
     PublicStatus,
     Reliability,
+    ThreadCondition,
     Urgency,
 )
 from engine.state import STATE_VARIABLE_LABELS
@@ -135,8 +136,16 @@ FIELD_SPECS: Dict[str, FieldSpec] = {
     "call_decision_profile": FieldSpec(CallDecisionProfile),
     "document": FieldSpec(Document),
     "thread": FieldSpec(OpenThread),
+    "thread_condition": FieldSpec(ThreadCondition),
     "crisis": FieldSpec(Crisis),
 }
+
+# Thread lifecycle fields the engine owns at runtime. Authored content must not
+# set them: a scenario that ships a pre-escalated or pre-resolved thread would
+# silently skew replay and the dossier record.
+THREAD_RUNTIME_ONLY_FIELDS: Set[str] = {"turn_resolved", "escalation_count", "status"}
+
+THREAD_CONDITION_OPS: Set[str] = {"<=", ">="}
 
 # A client call presents roughly 3-4 on-brief ("primary") options; any other
 # known option is a strategic alternative with a visible off-brief tradeoff.

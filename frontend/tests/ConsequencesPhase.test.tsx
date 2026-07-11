@@ -30,6 +30,11 @@ function baseResult(report: ConsequenceReport, diffs: TurnResult["diffs"] = []):
       off_brief: false,
       off_brief_adjustments: {},
       cost_reason: "",
+      precedent_adjustments: {},
+      precedent_reason: "",
+      cited_document_ids: [],
+      citation_adjustments: {},
+      citation_reason: "",
       explanation: {
         caller: "Northbridge Utilities Authority",
         institutional_mandate: "Keep the system running.",
@@ -41,6 +46,7 @@ function baseResult(report: ConsequenceReport, diffs: TurnResult["diffs"] = []):
         outcome_reason:
           "The Authority modified the advice to protect contractor relations.",
         on_brief_options: [],
+        memory: [],
       },
       memo_id: "memo_1",
       memo_revision: 2,
@@ -69,6 +75,8 @@ function baseResult(report: ConsequenceReport, diffs: TurnResult["diffs"] = []):
       legal_fallout: [],
       canonized_events: [],
       opened_threads: [],
+      escalated_threads: [],
+      resolved_threads: [],
     },
     failure_reason: null,
     sent_memo: {
@@ -92,6 +100,7 @@ function baseResult(report: ConsequenceReport, diffs: TurnResult["diffs"] = []):
       },
     },
     consequence_report: report,
+    faction_shifts: [],
   };
 }
 
@@ -248,6 +257,21 @@ describe("ConsequencesPhase causal waterfall", () => {
     expect(screen.getByText("State changes")).toBeInTheDocument();
     expect(screen.getByText("Public Trust")).toBeInTheDocument();
     expect(screen.getByText("+3")).toBeInTheDocument();
+  });
+
+  test("renders escalated and resolved thread sections when present", () => {
+    const result = baseResult({ variables: [TRUST] });
+    result.consequence_stack.escalated_threads = [
+      "Disclosure clock — The disclosure-timing record grew another cycle.",
+    ];
+    result.consequence_stack.resolved_threads = [
+      "Sole-source contractor leverage — A credible squeeze broke the assumption.",
+    ];
+    render(<ConsequencesPhase result={result} />);
+    expect(screen.getByText("Threads escalated")).toBeInTheDocument();
+    expect(screen.getByText(/disclosure-timing record grew/)).toBeInTheDocument();
+    expect(screen.getByText("Threads resolved")).toBeInTheDocument();
+    expect(screen.getByText(/credible squeeze broke/)).toBeInTheDocument();
   });
 
   test("keeps the authoritative applied-diff record reachable", () => {

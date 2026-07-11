@@ -1,6 +1,40 @@
 import { useEffect, useState } from "react";
 import { api } from "../api/client";
-import type { Dossier } from "../api/client";
+import type { Dossier, OutcomeAxis } from "../api/client";
+import { levelClass } from "../domain";
+
+function AxisRow({ axis }: { axis: OutcomeAxis }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <li className="cd-outcome-axis">
+      <button
+        className="cd-outcome-axis-head"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+      >
+        <span className="cd-outcome-axis-label">{axis.label}</span>
+        <span className="cd-risk-track">
+          <span
+            className={`cd-risk-fill ${levelClass(axis.score)}`}
+            style={{ width: `${axis.score}%` }}
+          />
+        </span>
+        <span className="cd-outcome-axis-score">{axis.score}</span>
+        <span className={`cd-outcome-band cd-band-${axis.band}`}>{axis.band}</span>
+      </button>
+      {open && (
+        <ul className="cd-factor-list">
+          {axis.factors.map((f, i) => (
+            <li key={i} className={`cd-factor-row cd-factor-${f.direction}`}>
+              <span className="cd-factor-label">{f.label}</span>
+              <span className="cd-factor-detail">{f.detail}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </li>
+  );
+}
 
 interface Props {
   campaignId: string | null;
@@ -87,7 +121,22 @@ export default function CampaignDossier({ campaignId, embedded }: Props) {
       {loading ? (
         <p className="cd-muted" role="status">Compiling case file…</p>
       ) : dossier ? (
-        <pre className="cd-dossier-md">{dossier.markdown}</pre>
+        <>
+          {dossier.assessment && (
+            <section className="cd-outcome" aria-label="Outcome assessment">
+              <h2 className="cd-outcome-title">{dossier.assessment.verdict_title}</h2>
+              {dossier.assessment.verdict_body.map((line, i) => (
+                <p key={i} className="cd-outcome-body">{line}</p>
+              ))}
+              <ul className="cd-outcome-axes">
+                {dossier.assessment.axes.map((axis) => (
+                  <AxisRow key={axis.id} axis={axis} />
+                ))}
+              </ul>
+            </section>
+          )}
+          <pre className="cd-dossier-md">{dossier.markdown}</pre>
+        </>
       ) : (
         <p className="cd-muted">No dossier available.</p>
       )}

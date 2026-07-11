@@ -458,6 +458,77 @@ def _validate_thread(
     if "tags" in thread:
         c.check_str_list(file, f"{path}.tags", thread["tags"], "tags", require_nonempty=False)
 
+    # --- Deterministic schedule fields ---
+    for key in sorted(schema.THREAD_RUNTIME_ONLY_FIELDS & set(thread)):
+        c.add(file, f"{path}.{key}",
+              f"thread field '{key}' is engine-owned runtime state and must not be authored")
+
+    due_turn = thread.get("due_turn")
+    if due_turn is not None:
+        if isinstance(due_turn, bool) or not isinstance(due_turn, int):
+            c.add(file, f"{path}.due_turn", "thread due_turn must be an integer")
+        elif max_turns is not None and not (1 <= due_turn <= max_turns):
+            c.add(file, f"{path}.due_turn",
+                  f"thread due_turn {due_turn} is outside 1..{max_turns}")
+
+    effects = thread.get("escalation_effects")
+    if effects is not None and c.is_mapping(
+        file, f"{path}.escalation_effects", effects, "escalation_effects"
+    ):
+        for var, delta in effects.items():
+            if var not in schema.KNOWN_VARIABLES:
+                c.add(file, f"{path}.escalation_effects.{var}",
+                      f"unknown WorldState variable '{var}' in escalation map")
+                continue
+            c.check_int_range(file, f"{path}.escalation_effects.{var}", delta,
+                              schema.MIN_EFFECT_DELTA, schema.MAX_EFFECT_DELTA)
+        # An escalation that moves state must say why, on the record.
+        if effects and not (
+            isinstance(thread.get("escalation_note"), str)
+            and thread.get("escalation_note", "").strip()
+        ):
+            c.add(file, f"{path}.escalation_note",
+                  "a thread with escalation_effects must carry a non-empty "
+                  "escalation_note so the applied diff stays legible")
+
+    repeat = thread.get("repeat_every")
+    if repeat is not None:
+        if isinstance(repeat, bool) or not isinstance(repeat, int) or repeat < 0:
+            c.add(file, f"{path}.repeat_every",
+                  "thread repeat_every must be a non-negative integer")
+
+    conditions = thread.get("resolve_conditions")
+    if conditions is not None and c.is_list(
+        file, f"{path}.resolve_conditions", conditions, "resolve_conditions"
+    ):
+        for i, cond in enumerate(conditions):
+            cpath = f"{path}.resolve_conditions[{i}]"
+            if not c.is_mapping(file, cpath, cond, "resolve condition"):
+                continue
+            c.check_fields(file, cpath, cond,
+                           schema.FIELD_SPECS["thread_condition"], "resolve condition")
+            variable = cond.get("variable")
+            if variable is not None and variable not in schema.KNOWN_VARIABLES:
+                c.add(file, f"{cpath}.variable",
+                      f"unknown WorldState variable '{variable}' in resolve condition")
+            op = cond.get("op")
+            if op is not None and op not in schema.THREAD_CONDITION_OPS:
+                c.add(file, f"{cpath}.op",
+                      f"resolve condition op must be one of "
+                      f"{', '.join(sorted(schema.THREAD_CONDITION_OPS))}")
+            if "threshold" in cond:
+                c.check_int_range(file, f"{cpath}.threshold", cond["threshold"], 0, 100)
+
+    resolve_tags = thread.get("resolve_tags")
+    if resolve_tags is not None and c.is_list(
+        file, f"{path}.resolve_tags", resolve_tags, "resolve_tags"
+    ):
+        for i, rtag in enumerate(resolve_tags):
+            if not isinstance(rtag, str) or rtag not in schema.KNOWN_DECISION_TAGS:
+                c.add(file, f"{path}.resolve_tags[{i}]",
+                      f"resolve tag '{rtag}' is not a recognized decision tag "
+                      f"(one of {', '.join(sorted(schema.KNOWN_DECISION_TAGS))})")
+
 
 # ---------------------------------------------------------------------------
 # Public entry point

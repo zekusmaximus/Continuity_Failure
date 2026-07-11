@@ -90,6 +90,12 @@ export interface DocumentRecord {
   tags: string[];
 }
 
+export interface ThreadCondition {
+  variable: string;
+  op: string;
+  threshold: number;
+}
+
 export interface OpenThread {
   id: string;
   title: string;
@@ -97,6 +103,15 @@ export interface OpenThread {
   turn_opened: number;
   status: string;
   tags: string[];
+  due_turn: number | null;
+  escalation_effects: Record<string, number>;
+  escalation_note: string;
+  repeat_every: number;
+  resolve_conditions: ThreadCondition[];
+  resolve_tags: string[];
+  resolution_note: string;
+  turn_resolved: number | null;
+  escalation_count: number;
 }
 
 export interface WorldState {
@@ -138,6 +153,28 @@ export interface DecisionExplanation {
   off_brief_note: string;
   outcome_reason: string;
   on_brief_options: string[];
+  memory: string[];
+}
+
+/** One faction-relationship move: which faction, which field, old → new, why. */
+export interface FactionShift {
+  faction_id: string;
+  faction_name: string;
+  field: string;
+  old_value: number;
+  new_value: number;
+  delta: number;
+  reason: string;
+}
+
+/** One emergency precedent on the institutional debt ledger. */
+export interface PrecedentEntry {
+  id: string;
+  kind: string;
+  label: string;
+  turn_recorded: number;
+  detail: string;
+  canon_id: string;
 }
 
 export interface NpcDecision {
@@ -154,6 +191,11 @@ export interface NpcDecision {
   off_brief: boolean;
   off_brief_adjustments: Record<string, number>;
   cost_reason: string;
+  precedent_adjustments: Record<string, number>;
+  precedent_reason: string;
+  cited_document_ids: string[];
+  citation_adjustments: Record<string, number>;
+  citation_reason: string;
   explanation: DecisionExplanation | null;
   memo_id: string | null;
   memo_revision: number | null;
@@ -249,11 +291,13 @@ export interface ConsequenceStack {
   legal_fallout: string[];
   canonized_events: string[];
   opened_threads: string[];
+  escalated_threads: string[];
+  resolved_threads: string[];
 }
 
 /** One attributed step in a variable's start → final reconciliation. */
 export interface ConsequenceDelta {
-  source_type: string; // "advice" | "npc_modification" | "ambient" | "decision"
+  source_type: string; // "advice" | "npc_modification" | "ambient" | "decision" | "thread" | "leak"
   delta: number; // effective (post-clamp) change, never zero
   reason: string;
   value_before: number;
@@ -300,6 +344,7 @@ export interface TurnResult {
   failure_reason: string | null;
   sent_memo: SentMemoSnapshot | null;
   consequence_report: ConsequenceReport;
+  faction_shifts: FactionShift[];
 }
 
 export interface SystemStatus {
@@ -318,8 +363,10 @@ export interface CurrentTurn {
   advice_options: AdviceOption[];
   documents: DocumentRecord[];
   open_threads: OpenThread[];
+  debt_ledger: PrecedentEntry[];
   system_status: SystemStatus;
   last_turn: TurnResult | null;
+  caller_disposition: string;
 }
 
 export interface TurnPresentation {
@@ -334,6 +381,7 @@ export interface TurnHistory {
   turns: TurnResult[];
   canon: CanonEntry[];
   open_threads: OpenThread[];
+  debt_ledger: PrecedentEntry[];
 }
 
 export interface CampaignCreated {
@@ -344,12 +392,35 @@ export interface CampaignCreated {
   max_turns: number;
 }
 
+export interface OutcomeFactor {
+  label: string;
+  detail: string;
+  direction: string;
+}
+
+export interface OutcomeAxis {
+  id: string;
+  label: string;
+  score: number;
+  band: string;
+  factors: OutcomeFactor[];
+}
+
+/** Structured multi-axis verdict; present on terminal campaigns only. */
+export interface OutcomeAssessment {
+  axes: OutcomeAxis[];
+  verdict_title: string;
+  verdict_body: string[];
+  campaign_status: string;
+}
+
 export interface Dossier {
   campaign_id: string;
   name: string;
   status: string;
   filename: string;
   markdown: string;
+  assessment: OutcomeAssessment | null;
 }
 
 export interface Health {
@@ -581,6 +652,7 @@ export const api = {
     idempotencyKey: string,
     memoId: string,
     memoRevision: number,
+    citedDocumentIds: string[] = [],
   ) =>
     requestWithRetry<TurnResult>(`/api/campaigns/${id}/advice`, {
       method: "POST",
@@ -590,6 +662,7 @@ export const api = {
         idempotency_key: idempotencyKey,
         memo_id: memoId,
         memo_revision: memoRevision,
+        cited_document_ids: citedDocumentIds,
       }),
     }),
   getTurns: (id: string) =>

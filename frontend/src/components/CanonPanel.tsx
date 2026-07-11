@@ -1,16 +1,24 @@
-import type { CanonEntry, OpenThread } from "../api/client";
+import type { CanonEntry, OpenThread, PrecedentEntry } from "../api/client";
 import StatusTag from "./StatusTag";
-import { PUBLIC_STATUS_LABEL, PUBLIC_STATUS_CLASS, titleCase } from "../domain";
+import {
+  PUBLIC_STATUS_LABEL,
+  PUBLIC_STATUS_CLASS,
+  threadDeadlineLabel,
+  titleCase,
+} from "../domain";
 
 export default function CanonPanel({
   canon,
   threads,
+  ledger = [],
 }: {
   canon: CanonEntry[];
   threads: OpenThread[];
+  ledger?: PrecedentEntry[];
 }) {
   const ordered = [...canon].sort((a, b) => a.turn_number - b.turn_number);
   const openThreads = threads.filter((t) => t.status !== "resolved");
+  const resolvedThreads = threads.filter((t) => t.status === "resolved");
   return (
     <section className="cd-panel">
       <header className="cd-panel-head">
@@ -48,19 +56,71 @@ export default function CanonPanel({
         <p className="cd-muted cd-small">No open threads.</p>
       ) : (
         <ul className="cd-thread-list">
-          {openThreads.map((t) => (
-            <li key={t.id} className="cd-thread-item">
-              <div className="cd-thread-top">
-                <span className="cd-thread-title">{t.title}</span>
-                <span className={`cd-thread-status cd-ts-${t.status}`}>
-                  {titleCase(t.status)}
-                </span>
-              </div>
-              <p className="cd-thread-summary">{t.summary}</p>
-              <span className="cd-canon-turn">Opened turn {t.turn_opened}</span>
-            </li>
-          ))}
+          {openThreads.map((t) => {
+            const deadline = threadDeadlineLabel(t);
+            return (
+              <li key={t.id} className="cd-thread-item">
+                <div className="cd-thread-top">
+                  <span className="cd-thread-title">{t.title}</span>
+                  <span className={`cd-thread-status cd-ts-${t.status}`}>
+                    {titleCase(t.status)}
+                  </span>
+                  {deadline && (
+                    <span className="cd-thread-deadline">{deadline}</span>
+                  )}
+                </div>
+                <p className="cd-thread-summary">{t.summary}</p>
+                {t.escalation_count > 0 && t.escalation_note && (
+                  <p className="cd-thread-summary cd-thread-esc-note">
+                    Last escalation: {t.escalation_note}
+                  </p>
+                )}
+                <span className="cd-canon-turn">Opened turn {t.turn_opened}</span>
+              </li>
+            );
+          })}
         </ul>
+      )}
+
+      {ledger.length > 0 && (
+        <>
+          <div className="cd-subhead">Institutional Debt Ledger ({ledger.length})</div>
+          <ul className="cd-thread-list cd-ledger-list">
+            {ledger.map((p) => (
+              <li key={p.id} className="cd-thread-item cd-ledger-item">
+                <div className="cd-thread-top">
+                  <span className="cd-thread-title">{p.label}</span>
+                  <span className="cd-canon-turn">Turn {p.turn_recorded}</span>
+                </div>
+                <p className="cd-thread-summary">{p.detail}</p>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+
+      {resolvedThreads.length > 0 && (
+        <>
+          <div className="cd-subhead">Resolved Threads ({resolvedThreads.length})</div>
+          <ul className="cd-thread-list">
+            {resolvedThreads.map((t) => (
+              <li key={t.id} className="cd-thread-item cd-thread-resolved">
+                <div className="cd-thread-top">
+                  <span className="cd-thread-title">{t.title}</span>
+                  <span className={`cd-thread-status cd-ts-${t.status}`}>
+                    {titleCase(t.status)}
+                  </span>
+                  <span className="cd-thread-deadline">
+                    {threadDeadlineLabel(t)}
+                  </span>
+                </div>
+                {t.resolution_note && (
+                  <p className="cd-thread-summary">{t.resolution_note}</p>
+                )}
+              </li>
+            ))}
+          </ul>
+        </>
       )}
     </section>
   );

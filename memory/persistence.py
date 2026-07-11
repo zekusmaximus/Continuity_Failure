@@ -24,7 +24,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Iterator, List, Mapping, Optional, Protocol, Union, get_args, get_origin, get_type_hints
 
-from engine.models import Campaign
+from engine.models import Campaign, CanonEntry, TurnResult
 
 
 SCHEMA_VERSION = 3
@@ -186,6 +186,16 @@ def _convert(value: Any, annotation: Any, path: str) -> Any:
     return value
 
 
+def _normalize_snapshot_dict(value: Any, annotation: Any, path: str) -> Any:
+    """Round-trip a stored snapshot dict through its typed dataclass.
+
+    Fields added to an engine model (always with defaults) are absent from
+    older stored snapshots; rebuilding and re-dumping fills those defaults so
+    the immutability comparison tests semantics, not dict-key sets.
+    """
+    return asdict(_convert(value, annotation, path))
+
+
 def encode_campaign(campaign: Campaign) -> str:
     return _json_document("campaign", asdict(campaign))
 
@@ -239,12 +249,24 @@ def _save_campaign(
             raise CorruptRecordError(
                 f"Turn {turn_number} snapshot for campaign {campaign.id} is corrupt"
             ) from exc
+        # Snapshots written before an additive engine-model change lack the new
+        # defaulted fields, which must not read as history tampering. Round-trip
+        # the stored dict through the typed rebuilder so defaults fill in on the
+        # stored side exactly as they do on the live side; a genuine value
+        # change still mismatches and stays fatal.
+        stored_result = _normalize_snapshot_dict(
+            stored_result, TurnResult, f"turn_snapshot[{turn_number}].turn_history[-1]"
+        )
         if results_by_turn.get(turn_number) != stored_result:
             raise ImmutableSnapshotError(
                 f"Turn {turn_number} history for campaign {campaign.id} is immutable"
             )
         for stored_entry in stored_campaign.get("canon", []):
-            if canon_by_id.get(stored_entry.get("id")) != stored_entry:
+            normalized_entry = _normalize_snapshot_dict(
+                stored_entry, CanonEntry,
+                f"turn_snapshot[{turn_number}].canon[{stored_entry.get('id')}]",
+            )
+            if canon_by_id.get(stored_entry.get("id")) != normalized_entry:
                 raise ImmutableSnapshotError(
                     f"Canon entry {stored_entry.get('id')} for campaign "
                     f"{campaign.id} is immutable"

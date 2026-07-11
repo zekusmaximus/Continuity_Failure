@@ -20,6 +20,7 @@ from engine.models import (
     TurnResult,
     VariableConsequence,
 )
+from engine.endings import build_outcome_assessment
 from engine.state import humanize_variable
 
 
@@ -97,6 +98,40 @@ def render_dossier_markdown(campaign: Campaign) -> str:
         lines.append(f"- **Failure reason:** {campaign.failure_reason}")
     lines.append(f"- **Created:** {campaign.created_at or 'unknown'}")
     lines.append("")
+
+    # Terminal campaigns lead with the multi-axis outcome assessment: not
+    # whether the water kept flowing, but what kind of institution survived.
+    if campaign.is_terminal():
+        assessment = build_outcome_assessment(campaign)
+        lines.append("## Outcome Assessment")
+        lines.append("")
+        lines.append(f"### {assessment.verdict_title}")
+        lines.append("")
+        for sentence in assessment.verdict_body:
+            lines.append(f"{sentence}")
+        lines.append("")
+        lines.append("| Axis | Score | Band |")
+        lines.append("| --- | --- | --- |")
+        for axis in assessment.axes:
+            lines.append(f"| {axis.label} | {axis.score}/100 | {axis.band} |")
+        lines.append("")
+        if campaign.debt_ledger:
+            lines.append("### Institutional Debt Ledger")
+            lines.append("")
+            for entry in campaign.debt_ledger:
+                lines.append(
+                    f"- Turn {entry.turn_recorded} — **{entry.label}**: {entry.detail}"
+                )
+            lines.append("")
+        unresolved = [
+            t for t in campaign.open_threads if t.status != "resolved"
+        ]
+        if unresolved:
+            lines.append(
+                f"_{len(unresolved)} open thread(s) were left unresolved at the end "
+                f"of the engagement._"
+            )
+            lines.append("")
 
     lines.append("## Final World State")
     lines.append("")

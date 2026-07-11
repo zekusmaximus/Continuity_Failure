@@ -108,7 +108,11 @@ export default function CaseFile({ open, onClose, campaignId, current, history }
             ))}
           {tab === "Canon" &&
             (history ? (
-              <CanonPanel canon={history.canon} threads={history.open_threads} />
+              <CanonPanel
+                canon={history.canon}
+                threads={history.open_threads}
+                ledger={history.debt_ledger ?? []}
+              />
             ) : (
               <p className="cd-muted">No canon on record.</p>
             ))}

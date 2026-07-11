@@ -137,6 +137,11 @@ describe("ClientDecisionPhase explanation payload", () => {
       off_brief: true,
       off_brief_adjustments: { player_reputation: -3 },
       cost_reason: "Red line crossed",
+      precedent_adjustments: {},
+      precedent_reason: "",
+      cited_document_ids: [],
+      citation_adjustments: {},
+      citation_reason: "",
       explanation: {
         caller: "Northbridge Hospital",
         institutional_mandate: "Protect clinical operations.",
@@ -149,6 +154,7 @@ describe("ClientDecisionPhase explanation payload", () => {
         off_brief_note: "",
         outcome_reason: "The Hospital rejected the advice because it crossed a red line.",
         on_brief_options: ["Priority water allocation", "Convene mutual aid"],
+        memory: [],
       },
       memo_id: null,
       memo_revision: null,
@@ -177,10 +183,13 @@ describe("ClientDecisionPhase explanation payload", () => {
       legal_fallout: [],
       canonized_events: [],
       opened_threads: [],
+      escalated_threads: [],
+      resolved_threads: [],
     },
     failure_reason: null,
     sent_memo: null,
     consequence_report: { variables: [] },
+    faction_shifts: [],
   };
 
   test("renders human-labeled adherence factors, conflicts, and outcome reason", () => {

@@ -18,7 +18,7 @@ PUBLIC_STATUS_PATTERN = r"^(public|private|leaked|sealed|disputed|unknown)$"
 RELIABILITY_PATTERN = r"^(high|medium|low|unknown|contested)$"
 CAMPAIGN_STATUS_PATTERN = r"^(ACTIVE|COMPLETED|FAILED)$"
 DECISION_TYPE_PATTERN = r"^(FOLLOWED|PARTIALLY_FOLLOWED|MODIFIED|DELAYED|REJECTED)$"
-SOURCE_TYPE_PATTERN = r"^(advice|npc_modification|ambient|decision)$"
+SOURCE_TYPE_PATTERN = r"^(advice|npc_modification|ambient|decision|thread|leak)$"
 FACT_CLASSIFICATION_PATTERN = r"^(canon|proposed|rejected|rumor|unverified|contradicted)$"
 MEMO_ID_PATTERN = r"^memo_[a-f0-9]{32}$"
 
@@ -120,6 +120,12 @@ class DocumentModel(BaseModel):
     tags: List[str] = Field(default_factory=list)
 
 
+class ThreadConditionModel(BaseModel):
+    variable: str
+    op: str = Field(pattern=r"^(<=|>=)$")
+    threshold: int = Field(ge=0, le=100)
+
+
 class OpenThreadModel(BaseModel):
     id: str
     title: str
@@ -127,6 +133,15 @@ class OpenThreadModel(BaseModel):
     turn_opened: int = Field(ge=1)
     status: str = Field(default="open", pattern=r"^(open|escalating|stabilizing|resolved)$")
     tags: List[str] = Field(default_factory=list)
+    due_turn: Optional[int] = Field(default=None, ge=1)
+    escalation_effects: Dict[str, int] = Field(default_factory=dict)
+    escalation_note: str = ""
+    repeat_every: int = Field(default=0, ge=0)
+    resolve_conditions: List[ThreadConditionModel] = Field(default_factory=list)
+    resolve_tags: List[str] = Field(default_factory=list)
+    resolution_note: str = ""
+    turn_resolved: Optional[int] = Field(default=None, ge=1)
+    escalation_count: int = Field(default=0, ge=0)
 
 
 class WorldStateModel(BaseModel):
@@ -206,6 +221,23 @@ class AdviceSubmissionRequest(StrictRequestModel):
     )
     memo_id: str = Field(pattern=MEMO_ID_PATTERN)
     memo_revision: int = Field(ge=1, le=1000, strict=True)
+    # Documents the consultant stakes the memo on (Evidence Board ids). Bounded
+    # and validated server-side against the campaign's available documents.
+    cited_document_ids: List[str] = Field(
+        default_factory=list,
+        max_length=3,
+    )
+
+    @field_validator("cited_document_ids")
+    @classmethod
+    def validate_cited_document_ids(cls, ids: List[str]) -> List[str]:
+        import re
+        for doc_id in ids:
+            if not re.fullmatch(r"[a-z0-9_]{1,64}", doc_id):
+                raise ValueError(f"invalid document id: {doc_id!r}")
+        if len(set(ids)) != len(ids):
+            raise ValueError("cited_document_ids must not repeat")
+        return ids
 
 
 class ApiErrorDetail(BaseModel):
@@ -257,6 +289,28 @@ class DecisionExplanationModel(BaseModel):
     off_brief_note: str = ""
     outcome_reason: str = ""
     on_brief_options: List[str] = Field(default_factory=list)
+    memory: List[str] = Field(default_factory=list)
+
+
+class FactionShiftModel(BaseModel):
+    """One faction-relationship move: which faction, which field, old -> new, why."""
+    faction_id: str
+    faction_name: str
+    field: str = Field(pattern=r"^(trust_in_player|influence|current_pressure)$")
+    old_value: int = Field(ge=0, le=100)
+    new_value: int = Field(ge=0, le=100)
+    delta: int
+    reason: str
+
+
+class PrecedentEntryModel(BaseModel):
+    """One emergency precedent on the institutional debt ledger."""
+    id: str
+    kind: str
+    label: str
+    turn_recorded: int = Field(ge=1)
+    detail: str
+    canon_id: str
 
 
 class NpcDecisionModel(BaseModel):
@@ -273,11 +327,16 @@ class NpcDecisionModel(BaseModel):
     off_brief: bool = False
     off_brief_adjustments: Dict[str, int] = Field(default_factory=dict)
     cost_reason: str = ""
+    precedent_adjustments: Dict[str, int] = Field(default_factory=dict)
+    precedent_reason: str = ""
+    cited_document_ids: List[str] = Field(default_factory=list)
+    citation_adjustments: Dict[str, int] = Field(default_factory=dict)
+    citation_reason: str = ""
     explanation: Optional[DecisionExplanationModel] = None
     memo_id: Optional[str] = Field(default=None, pattern=MEMO_ID_PATTERN)
     memo_revision: Optional[int] = Field(default=None, ge=1)
 
-    @field_validator("modifications", "off_brief_adjustments")
+    @field_validator("modifications", "off_brief_adjustments", "precedent_adjustments")
     @classmethod
     def validate_modification_ranges(
         cls, modifications: Dict[str, int]
@@ -414,6 +473,8 @@ class ConsequenceStackModel(BaseModel):
     legal_fallout: List[str] = Field(default_factory=list)
     canonized_events: List[str] = Field(default_factory=list)
     opened_threads: List[str] = Field(default_factory=list)
+    escalated_threads: List[str] = Field(default_factory=list)
+    resolved_threads: List[str] = Field(default_factory=list)
 
 
 class ConsequenceDeltaModel(BaseModel):
@@ -463,6 +524,7 @@ class TurnResultModel(BaseModel):
     # Defaulted so idempotent replays recorded before this field existed still
     # validate; every freshly resolved turn carries the populated report.
     consequence_report: ConsequenceReportModel = Field(default_factory=ConsequenceReportModel)
+    faction_shifts: List[FactionShiftModel] = Field(default_factory=list)
 
 
 class SystemStatusModel(BaseModel):
@@ -491,8 +553,11 @@ class CurrentTurnModel(BaseModel):
     advice_options: List[AdviceOptionModel]
     documents: List[DocumentModel] = Field(default_factory=list)
     open_threads: List[OpenThreadModel] = Field(default_factory=list)
+    debt_ledger: List[PrecedentEntryModel] = Field(default_factory=list)
     system_status: SystemStatusModel
     last_turn: Optional[TurnResultModel] = None
+    # Computed presentation line: how the caller opens, from live faction trust.
+    caller_disposition: str = ""
 
 
 class TurnPresentationModel(BaseModel):
@@ -518,6 +583,7 @@ class TurnHistoryModel(BaseModel):
     turns: List[TurnResultModel]
     canon: List[CanonEntryModel]
     open_threads: List[OpenThreadModel] = Field(default_factory=list)
+    debt_ledger: List[PrecedentEntryModel] = Field(default_factory=list)
 
 
 class CampaignCreatedModel(BaseModel):
@@ -528,12 +594,35 @@ class CampaignCreatedModel(BaseModel):
     max_turns: int = Field(ge=1)
 
 
+class OutcomeFactorModel(BaseModel):
+    label: str
+    detail: str
+    direction: str = Field(pattern=r"^(increase|decrease|neutral)$")
+
+
+class OutcomeAxisModel(BaseModel):
+    id: str
+    label: str
+    score: int = Field(ge=0, le=100)
+    band: str = Field(pattern=r"^(strong|holding|compromised|failed)$")
+    factors: List[OutcomeFactorModel] = Field(default_factory=list)
+
+
+class OutcomeAssessmentModel(BaseModel):
+    axes: List[OutcomeAxisModel]
+    verdict_title: str
+    verdict_body: List[str] = Field(default_factory=list)
+    campaign_status: str = Field(pattern=CAMPAIGN_STATUS_PATTERN)
+
+
 class DossierModel(BaseModel):
     campaign_id: str
     name: str
     status: str = Field(pattern=CAMPAIGN_STATUS_PATTERN)
     filename: str
     markdown: str
+    # Structured multi-axis verdict; populated for terminal campaigns only.
+    assessment: Optional[OutcomeAssessmentModel] = None
 
 
 class HealthModel(BaseModel):

@@ -56,9 +56,39 @@ memory/     versioned SQLite repository (campaigns/memos, immutable snapshots, m
   harms, legal/political/operational risk, affected factions), 10 per-turn
   client calls forming a cascade, ambient crisis drift, NPC decision logic with
   visible mediation, applied diffs for every change, deterministic consequence
-  stacks, open-thread tracking, failure thresholds, and 10-turn completion.
+  stacks, failure thresholds, and 10-turn completion.
   The engine also ships a framework-free Markdown dossier builder
   (`engine/dossier.py`).
+* Open-thread lifecycle (`engine/threads.py`): threads carry deterministic
+  schedules — a `due_turn`, `escalation_effects` applied as their own diff
+  batch (source `thread`, legible reason), an optional `repeat_every` re-arm,
+  and resolution via matching advice the client acted on (`resolve_tags`) or
+  explicit world-state thresholds (`resolve_conditions`). Escalations run
+  before the failure check, so an unaddressed standing risk can end the
+  engagement. Seed-thread schedules are authored in `threads.json`; threads
+  opened by the rules get their schedules from
+  `engine/consequences.py:_DYNAMIC_THREAD_SPECS`.
+* Institutional debt ledger (`engine/ledger.py`): emergency precedents
+  (sole-source procurement, delayed notice, informal hospital priority,
+  compensation frameworks, red-line crossings, leaks) accumulate on the
+  campaign; repetition is priced as its own diff batch and lowers client
+  resistance to matching advice. Clients quote the engagement record back
+  (deterministic memory lines in every decision explanation).
+* Evidence citation: submissions may stake the memo on up to three documents
+  (`cited_document_ids`, part of the idempotency fingerprint). Relevant,
+  reliable, public evidence relieves off-brief discomfort and firms up
+  adherence; contested material costs credibility as a recorded diff.
+* Living factions (`engine/factions.py`): `trust_in_player` and `influence`
+  move deterministically with legible `FactionShift` records; trust feeds the
+  decision rules; a collapsed-trust, high-pressure faction leaks a private
+  record (at most one leak per turn, one per faction, never mutating prior
+  canon).
+* Multi-axis outcome assessment (`engine/endings.py`): terminal campaigns are
+  graded on seven axes (stabilization, legitimacy, legal record,
+  independence, harm avoided, consultant standing, institutional primacy)
+  computed on demand from final state + ledger + threads; the dossier and the
+  ending screen render the verdict. Completion is no longer a binary win.
+  Remaining major work is sequenced in `docs/major-enhancement-roadmap.md`.
 * FastAPI endpoints: `GET /health`, `POST /api/campaigns`,
   `GET /api/campaigns` (recent resume metadata),
   `GET /api/campaigns/{id}`, `GET /api/campaigns/{id}/current`,

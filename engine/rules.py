@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from typing import Dict, List, Optional, Tuple
 
+from engine import factions, ledger
 from engine.models import (
     AdherenceFactor,
     AdviceOption,
@@ -19,6 +20,8 @@ from engine.models import (
     DecisionType,
     Faction,
     NpcDecision,
+    PublicStatus,
+    Reliability,
     SourceType,
 )
 from engine.state import clamp, humanize_variable
@@ -429,6 +432,90 @@ RED_LINE_COST = {
 OFF_BRIEF_BALK = 20
 OFF_BRIEF_REJECT = 55
 
+# Evidence citation weights. A memo staked on relevant, reliable evidence is
+# harder to wave off: high-reliability documents relieve off-brief discomfort
+# the most, already-public records add a little more ("it's on the record
+# anyway"), and medium-reliability sources still help. Citing contested or
+# low-reliability material costs the consultant instead. All legible constants,
+# no scoring model.
+EVIDENCE_RELIEF_HIGH = 10       # relevant, reliability HIGH
+EVIDENCE_RELIEF_MEDIUM = 4      # relevant, reliability MEDIUM
+EVIDENCE_RELIEF_PUBLIC = 5      # relevant and already on the public record
+EVIDENCE_RELIEF_CAP = 20        # total discomfort relief from citations
+EVIDENCE_ADHERENCE_BONUS = 0.05  # one relevant HIGH doc firms up adherence
+EVIDENCE_CONTESTED_COST = {"information_integrity": -1, "player_reputation": -1}
+
+
+class _CitationWeight:
+    """Deterministic reading of the documents a memo was staked on."""
+
+    __slots__ = ("relief", "adherence_bonus", "cost", "cost_titles", "factors", "conflicts")
+
+    def __init__(self):
+        self.relief = 0
+        self.adherence_bonus = 0.0
+        self.cost: Dict[str, int] = {}
+        self.cost_titles: List[str] = []
+        self.factors: List[AdherenceFactor] = []
+        self.conflicts: List[str] = []
+
+
+def _weigh_citations(
+    advice: AdviceOption, call: Optional[ClientCall], citations: List
+) -> _CitationWeight:
+    """Weigh each cited document against the advice. Pure and deterministic.
+
+    A document is *relevant* when its tags overlap the advice's decision tags
+    or the caller attached it to this very call. Relevant + HIGH reliability is
+    the strongest backing; PUBLIC status adds "it's already on the record";
+    LOW/CONTESTED material costs the consultant credibility instead.
+    """
+    weight = _CitationWeight()
+    attached = set(call.attached_document_ids) if call is not None else set()
+    advice_tags = set(advice.tags)
+
+    for doc in citations:
+        relevant = bool(set(doc.tags) & advice_tags) or doc.id in attached
+        status = f"{doc.reliability} reliability, {doc.public_status}"
+        if not relevant:
+            weight.factors.append(AdherenceFactor(
+                "Evidence cited",
+                f"{doc.title} ({status}) — did not bear on this recommendation.",
+                "neutral",
+            ))
+            continue
+        if doc.reliability in (Reliability.LOW, Reliability.CONTESTED):
+            for var, delta in EVIDENCE_CONTESTED_COST.items():
+                weight.cost[var] = weight.cost.get(var, 0) + delta
+            weight.cost_titles.append(doc.title)
+            weight.conflicts.append(
+                f"The memo leaned on contested material: {doc.title}."
+            )
+            weight.factors.append(AdherenceFactor(
+                "Evidence cited",
+                f"{doc.title} ({status}) — contested backing undercut the memo.",
+                "decrease",
+            ))
+            continue
+        relief = (
+            EVIDENCE_RELIEF_HIGH
+            if doc.reliability == Reliability.HIGH
+            else EVIDENCE_RELIEF_MEDIUM
+        )
+        if doc.public_status == PublicStatus.PUBLIC:
+            relief += EVIDENCE_RELIEF_PUBLIC
+        weight.relief += relief
+        if doc.reliability == Reliability.HIGH:
+            weight.adherence_bonus = EVIDENCE_ADHERENCE_BONUS
+        weight.factors.append(AdherenceFactor(
+            "Evidence cited",
+            f"{doc.title} ({status}) — relevant backing strengthened the memo.",
+            "increase",
+        ))
+
+    weight.relief = min(weight.relief, EVIDENCE_RELIEF_CAP)
+    return weight
+
 
 def _caller_faction(campaign: Campaign, call: Optional[ClientCall]) -> Optional[Faction]:
     if call is None:
@@ -467,17 +554,21 @@ def _modulate(
     call: Optional[ClientCall],
     draft: _DecisionDraft,
     decider: str,
+    citations: Optional[List] = None,
 ):
-    """Apply call/faction incentives to a baseline draft.
+    """Apply call/faction incentives and cited evidence to a baseline draft.
 
     Returns ``(decision_type, adherence, modifications, off_brief,
-    adjustments, cost_reason, explanation)``. Pure and deterministic.
+    adjustments, cost_reason, citation_weight, explanation)``. Pure and
+    deterministic.
     """
     faction = _caller_faction(campaign, call)
     profile = call.decision_profile if call is not None else None
+    citation_weight = _weigh_citations(advice, call, citations or [])
 
     risk_tol = faction.risk_tolerance if faction is not None else 50
     pressure = faction.current_pressure if faction is not None else 50
+    trust = faction.trust_in_player if faction is not None else 50
     advice_risk = _advice_risk(advice)
     risk_gap = advice_risk - risk_tol
 
@@ -487,6 +578,14 @@ def _modulate(
     crossed = sorted(set(advice.tags) & red_line_tags)
     red_line_hit = bool(crossed)
     off_brief_tolerance = profile.off_brief_tolerance if profile is not None else 50
+
+    # A standing precedent of the matching kind lowers resistance: the
+    # institution has signed off on this kind of measure before.
+    precedent_kind = ledger.kind_for_advice(advice)
+    precedent_count = (
+        ledger.kinds_on_ledger(campaign).get(precedent_kind, 0)
+        if precedent_kind is not None else 0
+    )
 
     decision_type = draft.decision_type
     adherence = draft.adherence
@@ -517,8 +616,18 @@ def _modulate(
         adjustments = dict(OFF_BRIEF_COST)
         cost_reason = f"Off-brief advice — not what the {decider} called about ({advice.label})"
         # Discomfort = how far the advice outruns their appetite + how little
-        # slack they have for unsolicited advice.
+        # slack they have for unsolicited advice, less any standing precedent
+        # of the same kind (they've done this before), less the weight of any
+        # relevant, reliable evidence the memo was staked on, adjusted by the
+        # caller's working trust in the consultant.
         discomfort = max(0, risk_gap) + (50 - off_brief_tolerance)
+        if precedent_count > 0:
+            discomfort -= ledger.PRECEDENT_FAMILIARITY_RELIEF
+        discomfort -= citation_weight.relief
+        if trust <= factions.TRUST_LOW:
+            discomfort += factions.TRUST_DISCOMFORT_PENALTY
+        elif trust >= factions.TRUST_HIGH:
+            discomfort -= factions.TRUST_DISCOMFORT_RELIEF
         conflicts.append(
             f"This is not what the {decider} called about — they asked: “{call.ask}”."
             if call is not None else
@@ -533,11 +642,17 @@ def _modulate(
                 f"beyond its appetite ({risk_tol})."
             )
         elif discomfort >= OFF_BRIEF_BALK:
-            decision_type = _downgrade(decision_type, 1)
+            # Collapsed working trust costs an extra rung on the ladder.
+            steps = 2 if trust <= factions.TRUST_LOW else 1
+            decision_type = _downgrade(decision_type, steps)
             adherence = min(adherence, _LADDER_ADHERENCE[decision_type])
             outcome_reason = (
                 f"The {decider} pared back off-brief advice that ran ahead of its risk "
                 f"appetite (advice risk {advice_risk} vs tolerance {risk_tol})."
+                + (
+                    " Collapsed working trust made the pare-back sharper."
+                    if trust <= factions.TRUST_LOW else ""
+                )
             )
         else:
             adherence = round(adherence * OFF_BRIEF_ADHERENCE_FACTOR, 3)
@@ -551,22 +666,71 @@ def _modulate(
             f"the {decider} acted on it per its own risk posture."
         )
 
+    # Relevant high-reliability backing firms up a non-rejected decision.
+    if (
+        citation_weight.adherence_bonus
+        and decision_type != DecisionType.REJECTED
+    ):
+        adherence = min(1.0, round(adherence + citation_weight.adherence_bonus, 3))
+
+    conflicts.extend(citation_weight.conflicts)
     explanation = _build_explanation(
         campaign, advice, call, faction, profile, decider,
         off_brief=off_brief, risk_tol=risk_tol, pressure=pressure,
         advice_risk=advice_risk, risk_gap=risk_gap, red_line_hit=red_line_hit,
         conflicts=conflicts, outcome_reason=outcome_reason, primary=primary,
+        precedent_kind=precedent_kind, precedent_count=precedent_count,
+        citation_factors=citation_weight.factors, trust=trust,
     )
     return (
         decision_type, adherence, modifications, off_brief,
-        adjustments, cost_reason, explanation,
+        adjustments, cost_reason, citation_weight, explanation,
     )
+
+
+def _client_memory(campaign: Campaign, decider: str) -> List[str]:
+    """What this decider remembers of the engagement record. Deterministic.
+
+    Quotes the two most recent turns where this same client acted on the
+    consultant's advice, plus a sharper line for any red line the consultant
+    crossed with them. Pure reads of turn history; no model call.
+    """
+    memory: List[str] = []
+    own_turns = [t for t in campaign.turn_history if t.decision.decider == decider]
+    for past in own_turns[-2:]:
+        phrasing = _DECISION_PHRASING.get(
+            past.decision.decision_type, "responded to your advice"
+        )
+        top = max(
+            (d for d in past.diffs
+             if d.source_type in (SourceType.ADVICE, SourceType.NPC_MODIFICATION)),
+            key=lambda d: abs(d.delta),
+            default=None,
+        )
+        move = (
+            f" — {humanize_variable(top.variable)} moved "
+            f"{top.old_value}→{top.new_value}"
+            if top is not None and top.delta != 0 else ""
+        )
+        memory.append(
+            f"Turn {past.turn_number}: you advised {past.advice_label}; "
+            f"we {phrasing}{move}."
+        )
+    for past in own_turns:
+        if past.decision.cost_reason.startswith("Red line"):
+            memory.append(
+                f"Turn {past.turn_number}: you proposed {past.advice_label} across "
+                f"a line we had already drawn. That is not forgotten."
+            )
+            break
+    return memory
 
 
 def _build_explanation(
     campaign, advice, call, faction, profile, decider, *,
     off_brief, risk_tol, pressure, advice_risk, risk_gap, red_line_hit,
     conflicts, outcome_reason, primary,
+    precedent_kind=None, precedent_count=0, citation_factors=None, trust=50,
 ) -> DecisionExplanation:
     incentives: list = []
     if faction is not None:
@@ -599,6 +763,15 @@ def _build_explanation(
             f"{decider} is under {pressure}/100 pressure to act.",
             "increase" if pressure >= 55 else "neutral",
         ),
+        AdherenceFactor(
+            "Working trust",
+            f"{decider} trust in the consultant is {trust}/100.",
+            (
+                "decrease" if trust <= factions.TRUST_LOW
+                else "increase" if trust >= factions.TRUST_HIGH
+                else "neutral"
+            ),
+        ),
     ]
     if red_line_hit:
         factors.append(
@@ -606,6 +779,17 @@ def _build_explanation(
                 "Red line",
                 "The advice crossed a line the caller had already refused to cross.",
                 "decrease",
+            )
+        )
+    factors.extend(citation_factors or [])
+    if precedent_count > 0 and precedent_kind is not None:
+        factors.append(
+            AdherenceFactor(
+                "Standing precedent",
+                f"{ledger.PRECEDENT_LABELS[precedent_kind]} is already on the "
+                f"institutional ledger (×{precedent_count}); resistance to "
+                f"repeating it is lower, and so is the cost of saying yes again.",
+                "increase",
             )
         )
 
@@ -628,10 +812,15 @@ def _build_explanation(
         off_brief_note=off_brief_note,
         outcome_reason=outcome_reason,
         on_brief_options=on_brief_options,
+        memory=_client_memory(campaign, decider),
     )
 
 
-def decide(campaign: Campaign, advice: AdviceOption) -> NpcDecision:
+def decide(
+    campaign: Campaign,
+    advice: AdviceOption,
+    citations: Optional[List] = None,
+) -> NpcDecision:
     """Resolve how the NPC client uses the player's chosen advice.
 
     Returns a fully deterministic ``NpcDecision``. A world-state-driven tag
@@ -669,14 +858,14 @@ def decide(campaign: Campaign, advice: AdviceOption) -> NpcDecision:
     decider = _resolve_decider(campaign)
 
     (decision_type, adherence, modifications, off_brief,
-     adjustments, cost_reason, explanation) = _modulate(
-        campaign, advice, call, draft, decider
+     adjustments, cost_reason, citation_weight, explanation) = _modulate(
+        campaign, advice, call, draft, decider, citations
     )
 
     rationale = _build_rationale(
         advice, decision_type, media, trust, campaign.turn_number, decider
     )
-    return NpcDecision(
+    decision = NpcDecision(
         advice_id=advice.id,
         decision_type=decision_type,
         decider=decider,
@@ -692,6 +881,18 @@ def decide(campaign: Campaign, advice: AdviceOption) -> NpcDecision:
         cost_reason=cost_reason,
         explanation=explanation,
     )
+    # Repeating a precedent already on the ledger carries its own visible cost.
+    decision.precedent_adjustments, decision.precedent_reason = (
+        ledger.evaluate_repeat(campaign, advice, decision)
+    )
+    # Record the memo's evidentiary basis and price any contested citations.
+    decision.cited_document_ids = [doc.id for doc in (citations or [])]
+    if citation_weight.cost:
+        decision.citation_adjustments = dict(citation_weight.cost)
+        decision.citation_reason = (
+            "Cited contested evidence — " + ", ".join(citation_weight.cost_titles)
+        )
+    return decision
 
 
 def _build_rationale(

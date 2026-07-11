@@ -62,6 +62,29 @@ export default function ConsequencesPhase({ result }: { result: TurnResult }) {
         <StackSection title="Legal / procedural fallout" items={stack.legal_fallout} tone="legal" />
         <StackSection title="Canonized events" items={stack.canonized_events} tone="canon" />
         <StackSection title="Open threads" items={stack.opened_threads} tone="thread" />
+        <StackSection
+          title="Threads escalated"
+          items={stack.escalated_threads ?? []}
+          tone="thread-escalated"
+        />
+        <StackSection
+          title="Threads resolved"
+          items={stack.resolved_threads ?? []}
+          tone="thread-resolved"
+        />
+        <StackSection
+          title="Faction standing shifts"
+          items={(result.faction_shifts ?? []).map((s) => {
+            const label =
+              s.field === "trust_in_player"
+                ? "trust"
+                : s.field === "current_pressure"
+                  ? "pressure"
+                  : "influence";
+            return `${s.faction_name}: ${label} ${s.old_value}→${s.new_value} — ${s.reason}`;
+          })}
+          tone="faction-shift"
+        />
       </div>
 
       <div className="cd-changes">

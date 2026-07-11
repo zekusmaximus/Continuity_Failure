@@ -22,6 +22,7 @@ from typing import Optional
 import uuid
 
 from engine import dossier as dossier_engine
+from engine import endings as endings_engine
 from engine import seed_data, turn as turn_engine
 from engine.models import (
     AdviceMemo,
@@ -84,6 +85,13 @@ def _open_threads(campaign: Campaign) -> list[schemas.OpenThreadModel]:
     return [
         schemas.OpenThreadModel.model_validate(asdict(t))
         for t in campaign.open_threads
+    ]
+
+
+def _debt_ledger(campaign: Campaign) -> list[schemas.PrecedentEntryModel]:
+    return [
+        schemas.PrecedentEntryModel.model_validate(asdict(entry))
+        for entry in campaign.debt_ledger
     ]
 
 
@@ -153,6 +161,29 @@ def list_recent_campaigns(limit: int = 5) -> list[schemas.RecentCampaignModel]:
     ]
 
 
+def _caller_disposition(campaign: Campaign) -> str:
+    """How the caller opens the line, from live trust. Presentation-only."""
+    call = campaign.current_call()
+    if call is None:
+        return ""
+    faction = next(
+        (f for f in campaign.world_state.factions if f.id == call.caller_faction_id),
+        None,
+    )
+    if faction is None:
+        return ""
+    trust = faction.trust_in_player
+    if trust <= 30:
+        band = "opens guarded — working trust is close to exhausted"
+    elif trust <= 45:
+        band = "opens wary — earlier turns are remembered"
+    elif trust >= 70:
+        band = "opens direct — the desk's record has earned the benefit of the doubt"
+    else:
+        band = "opens professionally"
+    return f"The {faction.name} {band} (trust {trust}/100)."
+
+
 def _current_model(campaign: Campaign) -> schemas.CurrentTurnModel:
     """Map one campaign revision to the exact turn package shown by the desk."""
     call = campaign.current_call()
@@ -174,8 +205,10 @@ def _current_model(campaign: Campaign) -> schemas.CurrentTurnModel:
         advice_options=advice_options,
         documents=_documents(campaign),
         open_threads=_open_threads(campaign),
+        debt_ledger=_debt_ledger(campaign),
         system_status=_system_status(campaign),
         last_turn=last_turn,
+        caller_disposition=_caller_disposition(campaign),
     )
 
 
@@ -216,6 +249,7 @@ def request_fingerprint(
     expected_turn: int,
     memo_id: Optional[str] = None,
     memo_revision: Optional[int] = None,
+    cited_document_ids: Optional[list[str]] = None,
 ) -> str:
     """Stable digest of everything a submission asks the engine to do.
 
@@ -228,6 +262,7 @@ def request_fingerprint(
             "expected_turn": expected_turn,
             "memo_id": memo_id,
             "memo_revision": memo_revision,
+            "cited_document_ids": sorted(cited_document_ids or []),
         },
         sort_keys=True,
         separators=(",", ":"),
@@ -338,6 +373,7 @@ def submit_advice(
     idempotency_key: str,
     memo_id: Optional[str] = None,
     memo_revision: Optional[int] = None,
+    cited_document_ids: Optional[list[str]] = None,
 ) -> ResolvedTurn:
     """Resolve one turn atomically, at most once per (campaign, key).
 
@@ -347,7 +383,7 @@ def submit_advice(
     resolved reaches the terminal and revision guards.
     """
     fingerprint = request_fingerprint(
-        advice_id, expected_turn, memo_id, memo_revision
+        advice_id, expected_turn, memo_id, memo_revision, cited_document_ids
     )
 
     with get_repository().transaction() as active:
@@ -385,6 +421,16 @@ def submit_advice(
         if option is None:
             bind_log_fields(idempotency=IdempotencyOutcome.REJECTED)
             raise errors.UnknownAdvice(advice_id)
+
+        # Cited evidence must exist and already be on the board this turn.
+        available_docs = {
+            doc.id for doc in campaign.documents
+            if doc.turn_number <= campaign.turn_number
+        }
+        for doc_id in cited_document_ids or []:
+            if doc_id not in available_docs:
+                bind_log_fields(idempotency=IdempotencyOutcome.REJECTED)
+                raise errors.UnknownDocument(doc_id)
 
         # Public API callers always attach an explicit memo. The optional
         # branch preserves direct service compatibility by materializing the
@@ -435,10 +481,15 @@ def submit_advice(
         )
 
         try:
-            result = turn_engine.advance_turn(campaign, advice_id)
+            result = turn_engine.advance_turn(
+                campaign, advice_id, cited_document_ids
+            )
         except turn_engine.UnknownAdviceOption as exc:
             bind_log_fields(idempotency=IdempotencyOutcome.REJECTED)
             raise errors.UnknownAdvice(advice_id) from exc
+        except turn_engine.UnknownDocument as exc:
+            bind_log_fields(idempotency=IdempotencyOutcome.REJECTED)
+            raise errors.UnknownDocument(str(exc)) from exc
 
         # Attach audit references only after deterministic resolution. Memo
         # prose is never visible to rules, diffs, decision type, or canon text.
@@ -497,6 +548,7 @@ def get_turns(campaign_id: str) -> Optional[schemas.TurnHistoryModel]:
         turns=turns,
         canon=canon,
         open_threads=_open_threads(campaign),
+        debt_ledger=_debt_ledger(campaign),
     )
 
 
@@ -504,12 +556,18 @@ def get_dossier(campaign_id: str) -> Optional[schemas.DossierModel]:
     campaign = _require_campaign_or_none(campaign_id)
     if campaign is None:
         return None
+    assessment = None
+    if campaign.is_terminal():
+        assessment = schemas.OutcomeAssessmentModel.model_validate(
+            asdict(endings_engine.build_outcome_assessment(campaign))
+        )
     return schemas.DossierModel(
         campaign_id=campaign.id,
         name=campaign.name,
         status=campaign.status,
         filename=dossier_engine.dossier_filename(campaign),
         markdown=dossier_engine.render_dossier_markdown(campaign),
+        assessment=assessment,
     )
 
 

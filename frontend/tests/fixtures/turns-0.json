@@ -1,8 +1,22 @@
 {
   "canon": [],
+  "debt_ledger": [],
   "open_threads": [
     {
+      "due_turn": 4,
+      "escalation_count": 0,
+      "escalation_effects": {
+        "legal_exposure": 4,
+        "media_pressure": 3
+      },
+      "escalation_note": "The disclosure-timing record grew another cycle: the town knew, and the public statement still had not caught up.",
       "id": "thread_disclosure_clock",
+      "repeat_every": 2,
+      "resolution_note": "The findings went on the public record before the timing record became indefensible.",
+      "resolve_conditions": [],
+      "resolve_tags": [
+        "disclosure"
+      ],
       "status": "open",
       "summary": "A preliminary sample sits above the advisory threshold; the confirmatory result is pending. Every turn of delay adds legal and narrative risk.",
       "tags": [
@@ -11,10 +25,29 @@
         "narrative"
       ],
       "title": "Disclosure clock on a preliminary, contested lab result",
-      "turn_opened": 1
+      "turn_opened": 1,
+      "turn_resolved": null
     },
     {
+      "due_turn": 3,
+      "escalation_count": 0,
+      "escalation_effects": {
+        "contractor_dependency": 3
+      },
+      "escalation_note": "Marquotte priced another change order into its leverage; structural dependency on the sole certified firm deepened.",
       "id": "thread_contractor_leverage",
+      "repeat_every": 3,
+      "resolution_note": "A credible squeeze on Marquotte broke the assumption that the town would pay any change order.",
+      "resolve_conditions": [
+        {
+          "op": "<=",
+          "threshold": 30,
+          "variable": "contractor_dependency"
+        }
+      ],
+      "resolve_tags": [
+        "contractor"
+      ],
       "status": "open",
       "summary": "Only Marquotte Utilities is certified for the failing valves. Indemnity demands and premium change orders compound dependency.",
       "tags": [
@@ -23,11 +56,12 @@
         "dependency"
       ],
       "title": "Sole-source contractor leverage over the repair",
-      "turn_opened": 1
+      "turn_opened": 1,
+      "turn_resolved": null
     }
   ],
   "summary": {
-    "created_at": "2026-07-10T23:31:02.756286+00:00",
+    "created_at": "2026-07-11T01:54:27.539375+00:00",
     "failure_reason": null,
     "id": "test-campaign",
     "max_turns": 10,

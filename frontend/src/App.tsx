@@ -79,6 +79,7 @@ export default function App() {
   const [lastResult, setLastResult] = useState<TurnResult | null>(null);
   const [history, setHistory] = useState<TurnHistory | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
+  const [citedDocs, setCitedDocs] = useState<string[]>([]);
   const [caseFileOpen, setCaseFileOpen] = useState(false);
   const [guideOpen, setGuideOpen] = useState(false);
   const [guideFirstRun, setGuideFirstRun] = useState(false);
@@ -161,6 +162,7 @@ export default function App() {
       setSummary(frozen.summary);
       setLastResult(result);
       setSelected(result.advice_id);
+      setCitedDocs(result.decision.cited_document_ids ?? []);
       setMemo(
         memoRecords.find((item) => item.id === result.sent_memo?.memo_id) ?? null,
       );
@@ -174,6 +176,7 @@ export default function App() {
       setSummary(cur.summary);
       setLastResult(null);
       setSelected(null);
+      setCitedDocs([]);
       setMemo(null);
       setMaxReachedIndex(0);
       gotoPhase("CALL", `Turn ${cur.summary.turn_number} incoming call loaded.`);
@@ -183,6 +186,7 @@ export default function App() {
       setSummary(cur.summary);
       setLastResult(null);
       setSelected(null);
+      setCitedDocs([]);
       setMemo(null);
       setMaxReachedIndex(TURN_STEPS.length - 1);
       gotoPhase("DOSSIER", "Campaign dossier loaded.");
@@ -259,6 +263,7 @@ export default function App() {
       saveCampaignId(created.id);
       setLastResult(null);
       setSelected(null);
+      setCitedDocs([]);
       setMemo(null);
       setMemoError(null);
       const [cur] = await Promise.all([refreshCurrent(created.id), refreshHistory(created.id)]);
@@ -288,6 +293,7 @@ export default function App() {
         newIdempotencyKey(),
         memo.id,
         memo.revision,
+        citedDocs,
       );
       setLastResult(result);
       setMemo((record) => record ? { ...record, status: "sent", sent_snapshot: result.sent_memo } : record);
@@ -316,7 +322,7 @@ export default function App() {
     } finally {
       setSubmitting(false);
     }
-  }, [campaignId, selected, current, submitting, memo, refreshCurrent, refreshHistory, gotoPhase]);
+  }, [campaignId, selected, citedDocs, current, submitting, memo, refreshCurrent, refreshHistory, gotoPhase]);
 
   const handleNextCall = useCallback(async () => {
     if (!campaignId || !lastResult) return;
@@ -426,6 +432,16 @@ export default function App() {
     }
   }, [campaignId, memo, refreshMemos]);
 
+  const handleToggleCite = useCallback((docId: string) => {
+    setCitedDocs((ids) =>
+      ids.includes(docId)
+        ? ids.filter((d) => d !== docId)
+        : ids.length >= 3
+          ? ids
+          : [...ids, docId],
+    );
+  }, []);
+
   const handleSelectAdvice = useCallback(
     (id: string) => {
       // Switching options invalidates any prior memo draft.
@@ -516,6 +532,8 @@ export default function App() {
         history={history}
         terminal={terminal}
         selected={selected}
+        citedDocs={citedDocs}
+        onToggleCite={handleToggleCite}
         submitting={busy}
         onSelect={handleSelectAdvice}
         onGoto={gotoPhase}

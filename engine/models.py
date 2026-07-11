@@ -34,6 +34,8 @@ class SourceType:
     NPC_MODIFICATION = "npc_modification"
     AMBIENT = "ambient"
     DECISION = "decision"
+    THREAD = "thread"
+    LEAK = "leak"
 
 
 class FactClassification:
@@ -213,14 +215,41 @@ class Document:
 
 
 @dataclass
+class ThreadCondition:
+    """A legible resolution threshold, mirroring the FAILURE_THRESHOLDS shape."""
+    variable: str
+    op: str                 # "<=" / ">="
+    threshold: int
+
+
+@dataclass
 class OpenThread:
-    """An unresolved risk, promise, or storyline tracked across turns."""
+    """An unresolved risk, promise, or storyline tracked across turns.
+
+    A thread with a ``due_turn`` is a scheduled deterministic consequence: if it
+    is still unresolved when that turn resolves, ``escalation_effects`` are
+    applied as their own diff batch (source ``thread``) and, when
+    ``repeat_every`` is set, the deadline re-arms. Threads resolve either when
+    the player's advice carries one of ``resolve_tags`` and the client acted on
+    it, or when every ``resolve_conditions`` threshold holds.
+    """
     id: str
     title: str
     summary: str
     turn_opened: int
     status: str = ThreadStatus.OPEN
     tags: List[str] = field(default_factory=list)
+    # --- Deterministic schedule (all optional; a bare thread is just a note) ---
+    due_turn: Optional[int] = None
+    escalation_effects: Dict[str, int] = field(default_factory=dict)
+    escalation_note: str = ""
+    repeat_every: int = 0                   # 0 = fire once; N = re-arm at +N turns
+    resolve_conditions: List[ThreadCondition] = field(default_factory=list)
+    resolve_tags: List[str] = field(default_factory=list)
+    resolution_note: str = ""
+    # --- Runtime lifecycle record (never authored in content) ---
+    turn_resolved: Optional[int] = None
+    escalation_count: int = 0
 
 
 @dataclass
@@ -328,6 +357,9 @@ class DecisionExplanation:
     off_brief_note: str = ""
     outcome_reason: str = ""
     on_brief_options: List[str] = field(default_factory=list)   # labels the caller asked for
+    # Deterministic client memory: what this decider remembers of the prior
+    # engagement record (advice given, how it was used, red lines crossed).
+    memory: List[str] = field(default_factory=list)
 
 
 @dataclass
@@ -347,6 +379,19 @@ class NpcDecision:
     off_brief: bool = False        # advice was not among the call's primary options
     off_brief_adjustments: Dict[str, int] = field(default_factory=dict)  # deterministic cost deltas
     cost_reason: str = ""          # AppliedDiff reason for the off-brief/red-line cost
+    # --- Institutional-debt mediation ---
+    # When this decision repeats an emergency precedent already on the ledger,
+    # the repetition carries its own deterministic cost, applied as a diff
+    # batch with ``precedent_reason`` as the legible AppliedDiff reason.
+    precedent_adjustments: Dict[str, int] = field(default_factory=dict)
+    precedent_reason: str = ""
+    # --- Evidence citation mediation ---
+    # Documents the consultant staked the memo on. Relevant, reliable, public
+    # evidence strengthens adherence; contested evidence carries its own
+    # deterministic cost, applied with ``citation_reason`` as the diff reason.
+    cited_document_ids: List[str] = field(default_factory=list)
+    citation_adjustments: Dict[str, int] = field(default_factory=dict)
+    citation_reason: str = ""
     explanation: Optional["DecisionExplanation"] = None
     memo_id: Optional[str] = None
     memo_revision: Optional[int] = None
@@ -451,6 +496,8 @@ class ConsequenceStack:
     legal_fallout: List[str] = field(default_factory=list)
     canonized_events: List[str] = field(default_factory=list)
     opened_threads: List[str] = field(default_factory=list)
+    escalated_threads: List[str] = field(default_factory=list)
+    resolved_threads: List[str] = field(default_factory=list)
 
 
 @dataclass
@@ -478,6 +525,40 @@ class TurnResult:
     # Defaulted so pre-existing persisted turns rebuild cleanly with an empty
     # report; every newly resolved turn carries the full causal decomposition.
     consequence_report: ConsequenceReport = field(default_factory=ConsequenceReport)
+    # Faction relationship moves this turn (trust / influence / pressure),
+    # recorded like diffs: old -> new with a legible reason.
+    faction_shifts: List["FactionShift"] = field(default_factory=list)
+
+
+@dataclass
+class FactionShift:
+    """One faction-relationship move, recorded with the same legibility as an
+    AppliedDiff: which faction, which field, old -> new, and why."""
+    faction_id: str
+    faction_name: str
+    field: str              # "trust_in_player" / "influence" / "current_pressure"
+    old_value: int
+    new_value: int
+    delta: int
+    reason: str
+
+
+@dataclass
+class PrecedentEntry:
+    """One emergency precedent on the institutional debt ledger.
+
+    Precedents are the durable cost of expedient decisions: sole-source
+    procurement, informal hospital priority, delayed public notice. Each entry
+    links back to the canon entry that recorded the turn, and repeating a kind
+    already on the ledger carries a deterministic cost and lowers the client's
+    resistance to doing it again.
+    """
+    id: str
+    kind: str               # PrecedentKind vocabulary (engine/ledger.py)
+    label: str
+    turn_recorded: int
+    detail: str             # one legible sentence for the UI and dossier
+    canon_id: str
 
 
 @dataclass
@@ -502,6 +583,7 @@ class Campaign:
     failure_reason: Optional[str] = None
     created_at: str = ""
     advice_memos: List[AdviceMemo] = field(default_factory=list)
+    debt_ledger: List[PrecedentEntry] = field(default_factory=list)
 
     def is_terminal(self) -> bool:
         return self.status in (CampaignStatus.COMPLETED, CampaignStatus.FAILED)

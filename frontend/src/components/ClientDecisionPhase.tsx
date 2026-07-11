@@ -51,6 +51,17 @@ function DecisionRationale({ ex }: { ex: DecisionExplanation }) {
         <Row k="Institutional mandate" v={ex.institutional_mandate} />
       )}
 
+      {(ex.memory ?? []).length > 0 && (
+        <div className="cd-field">
+          <div className="cd-field-k">The client remembers</div>
+          <ul className="cd-why-list cd-memory-list">
+            {ex.memory.map((line, i) => (
+              <li key={i}>{line}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {ex.incentives.length > 0 && (
         <div className="cd-field">
           <div className="cd-field-k">Caller incentives</div>
