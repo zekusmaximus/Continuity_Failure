@@ -172,6 +172,7 @@ class CampaignSummaryModel(BaseModel):
     failure_reason: Optional[str] = None
     created_at: str
     ruleset_version: str
+    variant_id: str = ""
 
 
 class CampaignModel(BaseModel):
@@ -263,12 +264,30 @@ class ApiErrorModel(BaseModel):
     detail: ApiErrorDetail
 
 
+class ScenarioVariantModel(BaseModel):
+    """One authored seed variant, as presented on the intake screen.
+
+    ``variable_overrides`` stays content-internal: the client picks a variant
+    by id; only the engine applies its perturbation.
+    """
+    id: str
+    name: str
+    description: str
+
+
 class CreateCampaignRequest(StrictRequestModel):
     name: Optional[str] = Field(
         default=None,
         min_length=1,
         max_length=80,
         pattern=r"^.*\S.*$",
+    )
+    # An authored seed-variant id ("" / omitted = the baseline starting state).
+    variant: Optional[str] = Field(
+        default=None,
+        min_length=1,
+        max_length=64,
+        pattern=r"^[a-z0-9_]+$",
     )
 
     @field_validator("name")

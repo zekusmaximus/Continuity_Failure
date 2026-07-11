@@ -21,6 +21,7 @@ from datetime import datetime, timezone
 from typing import Optional
 import uuid
 
+from engine import content
 from engine import dossier as dossier_engine
 from engine import endings as endings_engine
 from engine import seed_data, turn as turn_engine
@@ -68,6 +69,7 @@ def _summary(campaign: Campaign) -> schemas.CampaignSummaryModel:
         failure_reason=campaign.failure_reason,
         created_at=campaign.created_at,
         ruleset_version=campaign.ruleset_version,
+        variant_id=campaign.variant_id,
     )
 
 
@@ -132,8 +134,15 @@ def _system_status(campaign: Campaign) -> schemas.SystemStatusModel:
     )
 
 
-def create_campaign(name: Optional[str] = None) -> schemas.CampaignCreatedModel:
-    campaign = seed_data.create_northbridge_campaign(name=name or "")
+def create_campaign(
+    name: Optional[str] = None, variant: Optional[str] = None
+) -> schemas.CampaignCreatedModel:
+    try:
+        campaign = seed_data.create_northbridge_campaign(
+            name=name or "", variant_id=variant or ""
+        )
+    except content.UnknownVariant as exc:
+        raise errors.UnknownVariant(variant or "", exc.known) from exc
     get_repository().put(campaign)
     return schemas.CampaignCreatedModel(
         id=campaign.id,
@@ -142,6 +151,16 @@ def create_campaign(name: Optional[str] = None) -> schemas.CampaignCreatedModel:
         turn_number=campaign.turn_number,
         max_turns=campaign.max_turns,
     )
+
+
+def list_scenario_variants(scenario_id: str) -> list[schemas.ScenarioVariantModel]:
+    """The authored seed variants for a scenario, for the intake screen."""
+    if scenario_id != seed_data.SCENARIO_ID:
+        raise KeyError(scenario_id)
+    return [
+        schemas.ScenarioVariantModel.model_validate(v)
+        for v in content.scenario_variants(scenario_id)
+    ]
 
 
 def get_campaign(campaign_id: str) -> Optional[schemas.CampaignModel]:

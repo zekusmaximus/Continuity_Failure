@@ -169,3 +169,9 @@ SCENARIO_REQUIRED_KEYS: Set[str] = {
     "starting_variables", "crisis",
 }
 SCENARIO_ALLOWED_KEYS: Set[str] = SCENARIO_REQUIRED_KEYS | {"description"}
+
+# Seed variants (variants.json) are metadata like the scenario header, not a
+# runtime dataclass: every key is required -- a variant without overrides is
+# pointless, and one without a name/description cannot be presented.
+VARIANT_REQUIRED_KEYS: Set[str] = {"id", "name", "description", "variable_overrides"}
+VARIANT_ALLOWED_KEYS: Set[str] = VARIANT_REQUIRED_KEYS

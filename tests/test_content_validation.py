@@ -631,3 +631,47 @@ def test_variant_call_is_validated_as_a_full_call():
     messages = _messages(exc)
     assert any("decision_profile" in m for m in messages)
     assert any("not_a_real_option" in m for m in messages)
+
+
+# ---------------------------------------------------------------------------
+# Seed variants (variants.json)
+# ---------------------------------------------------------------------------
+
+def test_reject_variant_with_unknown_override_variable():
+    bundle = valid_bundle()
+    bundle.variants[0]["variable_overrides"]["watr_security"] = 40
+    exc = _expect_invalid(bundle)
+    assert any("unknown WorldState variable 'watr_security'" in m
+               for m in _messages(exc))
+
+
+def test_reject_variant_with_out_of_range_override():
+    bundle = valid_bundle()
+    bundle.variants[0]["variable_overrides"]["water_security"] = 140
+    exc = _expect_invalid(bundle)
+    assert any("within [0, 100]" in m for m in _messages(exc))
+
+
+def test_reject_variant_with_empty_overrides():
+    bundle = valid_bundle()
+    bundle.variants[0]["variable_overrides"] = {}
+    exc = _expect_invalid(bundle)
+    assert any("must not be empty" in m for m in _messages(exc))
+
+
+def test_reject_variant_missing_description_or_with_unknown_field():
+    bundle = valid_bundle()
+    del bundle.variants[0]["description"]
+    bundle.variants[1]["faction_overrides"] = {}
+    exc = _expect_invalid(bundle)
+    messages = _messages(exc)
+    assert any("missing required field 'description'" in m for m in messages)
+    assert any("unknown seed-variant field 'faction_overrides'" in m
+               for m in messages)
+
+
+def test_reject_duplicate_variant_ids():
+    bundle = valid_bundle()
+    bundle.variants[1]["id"] = bundle.variants[0]["id"]
+    exc = _expect_invalid(bundle)
+    assert any("duplicate variant id" in m for m in _messages(exc))

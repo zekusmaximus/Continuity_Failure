@@ -73,6 +73,20 @@ class IdempotencyKeyConflict(TurnResolutionError):
         self.idempotency_key = idempotency_key
 
 
+class UnknownVariant(TurnResolutionError):
+    """The requested seed variant is not authored for this scenario."""
+
+    code = "unknown_variant"
+    status_code = 422
+
+    def __init__(self, variant_id: str, known: list) -> None:
+        authored = ", ".join(known) if known else "none"
+        super().__init__(
+            f"Unknown scenario variant: {variant_id}. Authored variants: {authored}."
+        )
+        self.variant_id = variant_id
+
+
 class UnknownAdvice(TurnResolutionError):
     code = "unknown_advice_option"
     status_code = 400

@@ -27,6 +27,7 @@ One coherent file per authored domain:
 | `documents.json`       | evidence-board documents; `turn_number` is the freshness/available-from turn |
 | `threads.json`         | open threads seeded at engagement start                        |
 | `thread_specs.json`    | dynamic-thread rules: when the engine opens a consequence thread mid-game, and the schedule it carries |
+| `variants.json`        | seed variants: authored starting-state perturbations selectable at campaign creation |
 
 Field names match the engine dataclasses in `engine/models.py`. Any field that
 equals its dataclass default may be omitted; required fields (those without a
@@ -92,6 +93,16 @@ one pass):
 - **Document tags** — non-empty; **freshness** (`turn_number`) in range.
 - **Threshold coverage** — every variable the failure thresholds and ambient
   drift reference has a starting value.
+- **Seed variants** — each `variants.json` entry needs `id`, `name`,
+  `description`, and a non-empty `variable_overrides` map of known WorldState
+  variables within 0–100; ids are unique; no other fields. A variant is a
+  deterministic perturbation of `starting_variables` selected by id at
+  campaign creation (`POST /api/campaigns` `{"variant": "hot_summer"}`); the
+  campaign persists `variant_id` so exact replay is scenario + variant +
+  advice sequence. Balance obligation: before shipping a variant, run
+  `python tests/support/balance_trace.py <variant_id>` — some documented
+  advice sequence must complete it, and both spam strategies must still fail
+  (see `tests/test_seed_variants.py`, which pins both facts per variant).
 - **Call variants** — a call's `variants` list holds authored alternate
   openings: `{id, conditions, call}`. Each variant `call` is a complete call
   body validated by every base-call rule (same `turn` as its slot, `id` equal

@@ -133,12 +133,22 @@ export interface CampaignSummary {
   failure_reason: string | null;
   created_at: string;
   ruleset_version: string;
+  variant_id: string;
 }
 
 // The resume-screen projection is built from denormalized SQL columns and
-// does not carry ruleset_version (only the full campaign payload does).
-export interface RecentCampaign extends Omit<CampaignSummary, "ruleset_version"> {
+// does not carry ruleset_version / variant_id (only the full payload does).
+export interface RecentCampaign
+  extends Omit<CampaignSummary, "ruleset_version" | "variant_id"> {
   updated_at: string;
+}
+
+// An authored seed variant for the intake screen: a deterministic
+// starting-state perturbation, selected by id at campaign creation.
+export interface ScenarioVariant {
+  id: string;
+  name: string;
+  description: string;
 }
 
 export interface AdherenceFactor {
@@ -622,11 +632,16 @@ async function requestWithRetry<T>(path: string, init: RequestInit): Promise<T> 
 
 export const api = {
   health: () => request<Health>("/health"),
-  createCampaign: (name?: string) =>
+  createCampaign: (name?: string, variant?: string) =>
     request<CampaignCreated>("/api/campaigns", {
       method: "POST",
-      body: JSON.stringify(name ? { name } : {}),
+      body: JSON.stringify({
+        ...(name ? { name } : {}),
+        ...(variant ? { variant } : {}),
+      }),
     }),
+  listScenarioVariants: (scenarioId: string) =>
+    request<ScenarioVariant[]>(`/api/scenarios/${scenarioId}/variants`),
   listRecentCampaigns: (limit = 5) =>
     request<RecentCampaign[]>(`/api/campaigns?limit=${limit}`),
   getCampaign: (id: string) =>

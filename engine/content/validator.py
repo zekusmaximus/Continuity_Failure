@@ -508,6 +508,37 @@ def _validate_document(
         c.check_str_list(file, f"{path}.tags", doc["tags"], "tags", require_nonempty=True)
 
 
+def _validate_seed_variant(
+    c: _Collector, file: str, path: str, variant: Dict[str, Any]
+) -> None:
+    for key in variant:
+        if key not in schema.VARIANT_ALLOWED_KEYS:
+            c.add(file, f"{path}.{key}", f"unknown seed-variant field '{key}'")
+    for key in sorted(schema.VARIANT_REQUIRED_KEYS):
+        if key not in variant:
+            c.add(file, path, f"seed variant is missing required field '{key}'")
+    for key in ("id", "name", "description"):
+        if key in variant:
+            c.check_nonempty_str(file, f"{path}.{key}", variant[key], key)
+
+    overrides = variant.get("variable_overrides")
+    if overrides is None:
+        return
+    if not c.is_mapping(file, f"{path}.variable_overrides", overrides,
+                        "variable_overrides"):
+        return
+    if not overrides:
+        c.add(file, f"{path}.variable_overrides",
+              "variable_overrides must not be empty (a variant that changes "
+              "nothing is indistinguishable from the baseline)")
+    for name, value in overrides.items():
+        if name not in schema.KNOWN_VARIABLES:
+            c.add(file, f"{path}.variable_overrides.{name}",
+                  f"unknown WorldState variable '{name}' in variant overrides")
+            continue
+        c.check_int_range(file, f"{path}.variable_overrides.{name}", value, 0, 100)
+
+
 def _validate_conditions(
     c: _Collector, file: str, path: str, conditions: Any, label: str,
     faction_ids: Set[str],
@@ -809,6 +840,13 @@ def validate_bundle(bundle) -> None:
             if c.is_mapping(f["threads"], f"[{i}]", thread, "open thread"):
                 _validate_thread(c, f["threads"], f"[{i}]", thread, max_turns,
                                  faction_ids)
+
+    # --- seed variants (authored starting-state perturbations) ---
+    if c.is_list(f["variants"], "", bundle.variants, "variants"):
+        _collect_ids(c, f["variants"], bundle.variants, "variant")
+        for i, variant in enumerate(bundle.variants):
+            if c.is_mapping(f["variants"], f"[{i}]", variant, "seed variant"):
+                _validate_seed_variant(c, f["variants"], f"[{i}]", variant)
 
     # --- thread specs (dynamic-thread opening rules) ---
     if c.is_list(f["thread_specs"], "", bundle.thread_specs, "thread_specs"):

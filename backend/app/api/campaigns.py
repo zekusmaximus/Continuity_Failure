@@ -15,6 +15,27 @@ from app.schemas import api as schemas
 
 router = APIRouter(prefix="/api/campaigns", tags=["campaigns"])
 
+# Read-only scenario metadata (seed variants for the intake screen).
+scenarios_router = APIRouter(prefix="/api/scenarios", tags=["scenarios"])
+
+
+@scenarios_router.get(
+    "/{scenario_id}/variants",
+    summary="List the authored seed variants for a scenario",
+)
+def list_scenario_variants(
+    scenario_id: str = Path(min_length=1, max_length=64, pattern=r"^[a-z0-9_]+$"),
+) -> list[schemas.ScenarioVariantModel]:
+    try:
+        return campaign_service.list_scenario_variants(scenario_id)
+    except KeyError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=_error_body(
+                "scenario_not_found", f"Scenario not found: {scenario_id}"
+            ),
+        )
+
 
 def _error_body(
     code: str,
@@ -67,7 +88,14 @@ def _turn_error(campaign_id: str, exc: errors.TurnResolutionError) -> HTTPExcept
 )
 def create_campaign(payload: schemas.CreateCampaignRequest | None = None):
     name = payload.name if payload and payload.name else None
-    return campaign_service.create_campaign(name=name)
+    variant = payload.variant if payload and payload.variant else None
+    try:
+        return campaign_service.create_campaign(name=name, variant=variant)
+    except errors.TurnResolutionError as exc:
+        raise HTTPException(
+            status_code=exc.status_code,
+            detail=_error_body(exc.code, exc.message),
+        )
 
 
 @router.get(

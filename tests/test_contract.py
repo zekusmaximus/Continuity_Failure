@@ -235,6 +235,7 @@ TS_INTERFACE_TO_MODEL = {
     "VariableConsequence": schemas.VariableConsequenceModel,
     "ConsequenceReport": schemas.ConsequenceReportModel,
     "TurnResult": schemas.TurnResultModel,
+    "ScenarioVariant": schemas.ScenarioVariantModel,
     "SystemStatus": schemas.SystemStatusModel,
     "MemoContent": schemas.MemoContentModel,
     "MemoDraft": schemas.MemoDraftModel,

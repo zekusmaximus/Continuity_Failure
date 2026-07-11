@@ -20,10 +20,12 @@ the deterministic-engine import boundary.
 from engine.content.loader import (
     IncompatibleSchemaVersion,
     RawContent,
+    UnknownVariant,
     build_campaign,
     load_campaign,
     load_raw,
     scenario_metadata,
+    scenario_variants,
     validate_scenario,
 )
 from engine.content.schema import CURRENT_SCHEMA_VERSION, SUPPORTED_SCHEMA_VERSIONS
@@ -40,10 +42,12 @@ __all__ = [
     "ContentError",
     "ContentValidationError",
     "IncompatibleSchemaVersion",
+    "UnknownVariant",
     "load_campaign",
     "build_campaign",
     "load_raw",
     "validate_scenario",
     "validate_bundle",
     "scenario_metadata",
+    "scenario_variants",
 ]

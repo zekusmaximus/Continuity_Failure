@@ -3,7 +3,10 @@
 Run before tuning ANY new pressure (degradation drift, variant starting
 states, new advice effects):
 
-    python tests/support/balance_trace.py
+    python tests/support/balance_trace.py [variant_id]
+
+With a seed-variant id, every sequence plays against that authored starting
+state instead of the baseline.
 
 Prints a per-turn trace of the variables closest to failure thresholds for
 the three canonical strategies -- the pinned SURVIVAL_SEQUENCE, contractor
@@ -65,9 +68,11 @@ def headroom(variable: str, value: int):
     return value - threshold if op == "<=" else threshold - value
 
 
-def run_sequence(sequence) -> Campaign:
+def run_sequence(sequence, variant_id: str = "") -> Campaign:
     """Play a fresh Northbridge campaign through ``sequence``; stop at terminal."""
-    campaign = seed_data.create_northbridge_campaign(name="balance-trace")
+    campaign = seed_data.create_northbridge_campaign(
+        name="balance-trace", variant_id=variant_id
+    )
     for advice_id in sequence:
         if campaign.is_terminal():
             break
@@ -75,9 +80,11 @@ def run_sequence(sequence) -> Campaign:
     return campaign
 
 
-def trace(name: str, sequence) -> Campaign:
+def trace(name: str, sequence, variant_id: str = "") -> Campaign:
     """Play ``sequence`` printing a per-turn table and min-headroom summary."""
-    campaign = seed_data.create_northbridge_campaign(name=name)
+    campaign = seed_data.create_northbridge_campaign(
+        name=name, variant_id=variant_id
+    )
     print(f"\n=== {name} ===")
     print("turn advice                 "
           + " ".join(f"{v[:12]:>12}" for v in WATCH))
@@ -105,5 +112,8 @@ def trace(name: str, sequence) -> Campaign:
 
 
 if __name__ == "__main__":
+    variant = sys.argv[1] if len(sys.argv) > 1 else ""
+    if variant:
+        print(f"seed variant: {variant}")
     for name, sequence in CANONICAL_SEQUENCES.items():
-        trace(name, sequence)
+        trace(name, sequence, variant_id=variant)

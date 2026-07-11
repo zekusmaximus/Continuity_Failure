@@ -666,6 +666,10 @@ class Campaign:
     # Authored call variants per turn (see CallVariant). Engine-internal: the
     # API always presents the RESOLVED call, never the variant table.
     call_variants: Dict[int, List[CallVariant]] = field(default_factory=dict)
+    # The authored seed variant this campaign started from ("" = the baseline
+    # starting state). Persisted so an exact replay is scenario + variant +
+    # advice sequence -- replayability without randomness.
+    variant_id: str = ""
 
     def is_terminal(self) -> bool:
         return self.status in (CampaignStatus.COMPLETED, CampaignStatus.FAILED)

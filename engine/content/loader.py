@@ -53,11 +53,26 @@ _FILES: Dict[str, str] = {
     "documents": "documents.json",
     "threads": "threads.json",
     "thread_specs": "thread_specs.json",
+    "variants": "variants.json",
 }
 
 
 class IncompatibleSchemaVersion(Exception):
     """Raised when content declares a schema version the loader cannot read."""
+
+
+class UnknownVariant(Exception):
+    """Raised when a campaign is requested with a variant id the scenario
+    does not author."""
+
+    def __init__(self, scenario_id: str, variant_id: str, known) -> None:
+        self.scenario_id = scenario_id
+        self.variant_id = variant_id
+        self.known = sorted(known)
+        super().__init__(
+            f"scenario '{scenario_id}' has no variant '{variant_id}' "
+            f"(authored: {', '.join(self.known) or 'none'})"
+        )
 
 
 @dataclass
@@ -74,6 +89,7 @@ class RawContent:
     documents: Any = field(default_factory=list)
     threads: Any = field(default_factory=list)
     thread_specs: Any = field(default_factory=list)
+    variants: Any = field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
@@ -240,8 +256,17 @@ def _last_verified(turn: int) -> str:
     return f"Turn {turn} · Operational snapshot (deterministic)"
 
 
-def build_campaign(bundle: RawContent, campaign_id: str = "", name: str = "") -> Campaign:
-    """Construct a campaign from an already-loaded bundle (validates first)."""
+def build_campaign(
+    bundle: RawContent, campaign_id: str = "", name: str = "",
+    variant_id: str = "",
+) -> Campaign:
+    """Construct a campaign from an already-loaded bundle (validates first).
+
+    ``variant_id`` selects an authored starting-state perturbation from
+    ``variants.json`` -- deterministic replayability without randomness. The
+    empty string is the baseline starting state; an unknown id raises
+    ``UnknownVariant`` before any authoritative state is created.
+    """
     bundle = _apply_schema_version(bundle)
     validate_bundle(bundle)
 
@@ -249,11 +274,19 @@ def build_campaign(bundle: RawContent, campaign_id: str = "", name: str = "") ->
     campaign_id = campaign_id or uuid.uuid4().hex[:8]
     name = name or scenario["name"]
 
+    starting_variables = dict(scenario["starting_variables"])
+    if variant_id:
+        by_id = {v["id"]: v for v in bundle.variants}
+        variant = by_id.get(variant_id)
+        if variant is None:
+            raise UnknownVariant(bundle.root, variant_id, by_id)
+        starting_variables.update(variant["variable_overrides"])
+
     client_calls, call_variants = _build_calls(bundle.calls)
     crisis_raw = scenario["crisis"]
     world_state = WorldState(
         turn_number=1,
-        variables=dict(scenario["starting_variables"]),
+        variables=starting_variables,
         factions=_build_factions(bundle.factions),
         active_crisis=Crisis(**crisis_raw),
         last_verified=_last_verified(1),
@@ -275,11 +308,12 @@ def build_campaign(bundle: RawContent, campaign_id: str = "", name: str = "") ->
         thread_specs=_build_thread_specs(bundle.thread_specs),
         created_at=datetime.now(timezone.utc).isoformat(),
         ruleset_version=rules.CURRENT_RULESET_VERSION,
+        variant_id=variant_id,
     )
 
 
 def load_campaign(
-    scenario_id: str, campaign_id: str = "", name: str = ""
+    scenario_id: str, campaign_id: str = "", name: str = "", variant_id: str = ""
 ) -> Campaign:
     """The single content factory: validate ``scenario_id`` and build a campaign.
 
@@ -287,7 +321,24 @@ def load_campaign(
     campaign is never partially seeded from invalid content.
     """
     bundle = load_raw(scenario_id)
-    return build_campaign(bundle, campaign_id=campaign_id, name=name)
+    return build_campaign(
+        bundle, campaign_id=campaign_id, name=name, variant_id=variant_id
+    )
+
+
+def scenario_variants(scenario_id: str) -> List[Dict[str, Any]]:
+    """Return the validated seed variants for a scenario: id, name, description.
+
+    ``variable_overrides`` stays content-internal -- callers present the
+    variant, the loader applies it.
+    """
+    bundle = load_raw(scenario_id)
+    bundle = _apply_schema_version(bundle)
+    validate_bundle(bundle)
+    return [
+        {"id": v["id"], "name": v["name"], "description": v["description"]}
+        for v in bundle.variants
+    ]
 
 
 def scenario_metadata(scenario_id: str) -> Dict[str, Any]:

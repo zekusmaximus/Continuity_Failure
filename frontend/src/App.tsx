@@ -7,6 +7,7 @@ import type {
   TurnResult,
   AdviceMemo,
   RecentCampaign,
+  ScenarioVariant,
 } from "./api/client";
 import type { Phase } from "./domain";
 import { PHASE_LABEL, TURN_STEPS } from "./domain";
@@ -17,6 +18,7 @@ import CaseFile from "./components/CaseFile";
 import DeskGuide, { ONBOARDING_STORAGE_KEY } from "./components/DeskGuide";
 
 const CAMPAIGN_STORAGE_KEY = "continuity-failure.campaign-id";
+const SCENARIO_ID = "northbridge_water_failure";
 
 function readSavedCampaignId(): string | null {
   const fromUrl = new URL(window.location.href).searchParams.get("campaign");
@@ -84,6 +86,8 @@ export default function App() {
   const [guideOpen, setGuideOpen] = useState(false);
   const [guideFirstRun, setGuideFirstRun] = useState(false);
   const [recentCampaigns, setRecentCampaigns] = useState<RecentCampaign[]>([]);
+  const [variants, setVariants] = useState<ScenarioVariant[]>([]);
+  const [selectedVariant, setSelectedVariant] = useState<string>("");
 
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -200,6 +204,14 @@ export default function App() {
     setLoading(true);
     setError(null);
     void (async () => {
+      // Seed variants are presentation sugar on the intake screen: if the
+      // fetch fails, the selector simply doesn't render.
+      try {
+        const available = await api.listScenarioVariants(SCENARIO_ID);
+        if (!cancelled) setVariants(available);
+      } catch {
+        if (!cancelled) setVariants([]);
+      }
       try {
         const recent = await api.listRecentCampaigns();
         if (!cancelled) setRecentCampaigns(recent);
@@ -258,7 +270,7 @@ export default function App() {
     setLoading(true);
     setError(null);
     try {
-      const created = await api.createCampaign();
+      const created = await api.createCampaign(undefined, selectedVariant || undefined);
       setCampaignId(created.id);
       saveCampaignId(created.id);
       setLastResult(null);
@@ -276,7 +288,7 @@ export default function App() {
     } finally {
       setLoading(false);
     }
-  }, [gotoPhase, refreshCurrent, refreshHistory, showFirstTurnGuide]);
+  }, [gotoPhase, refreshCurrent, refreshHistory, showFirstTurnGuide, selectedVariant]);
 
   const handleSendAdvice = useCallback(async () => {
     if (!campaignId || !selected || !current || !memo || submitting) return;
@@ -476,6 +488,9 @@ export default function App() {
           onResume={handleResume}
           recentCampaigns={recentCampaigns}
           loading={loading}
+          variants={variants}
+          selectedVariant={selectedVariant}
+          onVariantChange={setSelectedVariant}
         />
         {error && (
           <div className="cd-banner-alert cd-alert cd-alert-error" role="alert">
