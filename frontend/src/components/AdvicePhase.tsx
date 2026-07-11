@@ -4,6 +4,7 @@ import type {
   ClientCall,
   DocumentRecord,
   Faction,
+  SystemStatus,
 } from "../api/client";
 import { levelClass, titleCase, VARIABLE_META } from "../domain";
 import MemoDraftPanel from "./MemoDraftPanel";
@@ -25,6 +26,7 @@ interface Props {
   documents?: DocumentRecord[];
   citedDocs?: string[];
   onToggleCite?: (id: string) => void;
+  systemStatus?: SystemStatus | null;
 }
 
 // Deterministic preview of how a citation will land — the same tag-overlap
@@ -254,6 +256,7 @@ export default function AdvicePhase({
   documents = [],
   citedDocs = [],
   onToggleCite,
+  systemStatus = null,
 }: Props) {
   const selectedOption = options.find((o) => o.id === selected) ?? null;
   const callerName = call?.caller ?? "client";
@@ -368,6 +371,7 @@ export default function AdvicePhase({
             saving={memoSaving}
             error={memoError}
             onSave={onSaveMemo}
+            systemStatus={systemStatus}
           />
 
           {onToggleCite && documents.length > 0 && (

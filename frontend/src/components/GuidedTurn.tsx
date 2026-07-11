@@ -150,6 +150,7 @@ export default function GuidedTurn(props: Props) {
           documents={current.documents}
           citedDocs={citedDocs}
           onToggleCite={onToggleCite}
+          systemStatus={current.system_status}
         />
       ) : null;
       action = (

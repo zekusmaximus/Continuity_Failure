@@ -16,6 +16,7 @@ import ContinuityHeader from "./components/ContinuityHeader";
 import GuidedTurn from "./components/GuidedTurn";
 import CaseFile from "./components/CaseFile";
 import DeskGuide, { ONBOARDING_STORAGE_KEY } from "./components/DeskGuide";
+import { DegradationBanner } from "./components/SystemStatusPanel";
 
 const CAMPAIGN_STORAGE_KEY = "continuity-failure.campaign-id";
 const SCENARIO_ID = "northbridge_water_failure";
@@ -504,8 +505,14 @@ export default function App() {
     );
   }
 
+  const systemStatus = current?.system_status ?? null;
+  const degradedClass =
+    systemStatus && systemStatus.degradation_band !== "NOMINAL"
+      ? ` cd-degraded-${systemStatus.degradation_band.toLowerCase()}`
+      : "";
+
   return (
-    <div className="cd-app">
+    <div className={`cd-app${degradedClass}`}>
       <a className="cd-skip-link" href="#main-content">Skip to main content</a>
       <ContinuityHeader
         summary={headerSummary}
@@ -518,6 +525,8 @@ export default function App() {
         onRestart={handleRestart}
         busy={busy}
       />
+
+      <DegradationBanner status={systemStatus} />
 
       {error && (
         <div className="cd-banner-alert cd-alert cd-alert-error" role="alert">

@@ -2,6 +2,7 @@ import { useRef, useState, type KeyboardEvent } from "react";
 import type { CurrentTurn, TurnHistory } from "../api/client";
 import EvidenceBoard from "./EvidenceBoard";
 import FactionPanel from "./FactionPanel";
+import SystemStatusPanel from "./SystemStatusPanel";
 import StateReadout from "./StateReadout";
 import CanonPanel from "./CanonPanel";
 import TurnHistoryPanel from "./TurnHistory";
@@ -90,7 +91,11 @@ export default function CaseFile({ open, onClose, campaignId, current, history }
       >
           {tab === "Evidence" &&
             (current ? (
-              <EvidenceBoard documents={current.documents} call={current.client_call} />
+              <EvidenceBoard
+                documents={current.documents}
+                call={current.client_call}
+                systemStatus={current.system_status}
+              />
             ) : (
               <p className="cd-muted">No evidence loaded.</p>
             ))}
@@ -102,7 +107,13 @@ export default function CaseFile({ open, onClose, campaignId, current, history }
             ))}
           {tab === "Full State" &&
             (current ? (
-              <StateReadout state={current.world_state} />
+              <>
+                <SystemStatusPanel status={current.system_status} />
+                <StateReadout
+                  state={current.world_state}
+                  stale={!current.system_status.live_feeds}
+                />
+              </>
             ) : (
               <p className="cd-muted">No state loaded.</p>
             ))}

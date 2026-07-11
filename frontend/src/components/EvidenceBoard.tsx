@@ -1,13 +1,14 @@
 import { useState } from "react";
-import type { ClientCall, DocumentRecord } from "../api/client";
+import type { ClientCall, DocumentRecord, SystemStatus } from "../api/client";
 import DocumentCard from "./DocumentCard";
 
 interface Props {
   documents: DocumentRecord[];
   call: ClientCall | null;
+  systemStatus?: SystemStatus | null;
 }
 
-export default function EvidenceBoard({ documents, call }: Props) {
+export default function EvidenceBoard({ documents, call, systemStatus = null }: Props) {
   const [openId, setOpenId] = useState<string | null>(null);
   const attached = new Set(call?.attached_document_ids ?? []);
 
@@ -22,12 +23,24 @@ export default function EvidenceBoard({ documents, call }: Props) {
     return a.turn_number - b.turn_number;
   });
 
+  const stale = systemStatus ? !systemStatus.live_feeds : false;
+  const staleAnchor =
+    systemStatus && systemStatus.last_live_turn > 0
+      ? `turn ${systemStatus.last_live_turn} close-out`
+      : "engagement intake";
+
   return (
     <section className="cd-panel">
       <header className="cd-panel-head">
         <h2>Evidence Board</h2>
         <span className="cd-verified">{documents.length} on file</span>
       </header>
+      {stale && (
+        <p className="cd-evidence-stale" role="status">
+          <span aria-hidden>⚠ </span>
+          Stale snapshot — live feeds lost; documents last verified at the {staleAnchor}.
+        </p>
+      )}
       {ordered.length === 0 ? (
         <p className="cd-muted">No documents available yet.</p>
       ) : (
