@@ -4,6 +4,7 @@ import type {
   ClientCall,
   DocumentRecord,
   Faction,
+  PowerAllocation,
   SystemStatus,
 } from "../api/client";
 import { levelClass, titleCase, VARIABLE_META } from "../domain";
@@ -27,7 +28,28 @@ interface Props {
   citedDocs?: string[];
   onToggleCite?: (id: string) => void;
   systemStatus?: SystemStatus | null;
+  poweredSubsystem?: PowerAllocation | null;
+  onAllocatePower?: (allocation: PowerAllocation) => void;
 }
+
+// The three auxiliary-power routes at CRITICAL, with what each keeps alive.
+const POWER_ALLOCATIONS: Array<{ id: PowerAllocation; label: string; detail: string }> = [
+  {
+    id: "MODEL_ACCESS",
+    label: "Model access",
+    detail: "Assisted drafting stays available; citations and caller history go dark.",
+  },
+  {
+    id: "COMMUNICATIONS",
+    label: "Communications",
+    detail: "The caller's history reaches the desk; drafting and citations go dark.",
+  },
+  {
+    id: "LIVE_DATA",
+    label: "Live data",
+    detail: "Evidence can be verified and cited; drafting and caller history go dark.",
+  },
+];
 
 // Deterministic preview of how a citation will land — the same tag-overlap
 // rule the engine applies, phrased for the consultant before they commit.
@@ -257,7 +279,12 @@ export default function AdvicePhase({
   citedDocs = [],
   onToggleCite,
   systemStatus = null,
+  poweredSubsystem = null,
+  onAllocatePower,
 }: Props) {
+  const allocationRequired = !!systemStatus?.requires_power_allocation;
+  const draftingDark = allocationRequired && poweredSubsystem !== "MODEL_ACCESS";
+  const citationsDark = allocationRequired && poweredSubsystem !== "LIVE_DATA";
   const selectedOption = options.find((o) => o.id === selected) ?? null;
   const callerName = call?.caller ?? "client";
   const primaryIds = new Set(call?.primary_advice_ids ?? []);
@@ -347,6 +374,31 @@ export default function AdvicePhase({
 
       {selected && (
         <div className="cd-advice-memo">
+          {allocationRequired && (
+            <fieldset className="cd-power-allocation">
+              <legend className="cd-field-k">
+                Auxiliary power · one subsystem this turn
+              </legend>
+              <p className="cd-muted cd-small">
+                The workstation is critical. Route the auxiliary feed before
+                sending advice; everything unpowered stays dark this cycle.
+              </p>
+              {POWER_ALLOCATIONS.map((allocation) => (
+                <label key={allocation.id} className="cd-power-option">
+                  <input
+                    type="radio"
+                    name="power-allocation"
+                    value={allocation.id}
+                    checked={poweredSubsystem === allocation.id}
+                    disabled={readOnly}
+                    onChange={() => onAllocatePower?.(allocation.id)}
+                  />
+                  <span className="cd-power-label">{allocation.label}</span>
+                  <span className="cd-muted cd-small">{allocation.detail}</span>
+                </label>
+              ))}
+            </fieldset>
+          )}
           <button
             className="cd-btn cd-btn-ghost"
             onClick={onCreateManualMemo}
@@ -357,7 +409,8 @@ export default function AdvicePhase({
           <button
             className="cd-btn cd-btn-ghost"
             onClick={onDraftMemo}
-            disabled={memoLoading || !!memo}
+            disabled={memoLoading || !!memo || draftingDark}
+            title={draftingDark ? "Model access is unpowered this turn" : undefined}
           >
             {memoLoading ? "Drafting…" : "Request assisted draft"}
           </button>
@@ -395,7 +448,7 @@ export default function AdvicePhase({
                         <input
                           type="checkbox"
                           checked={checked}
-                          disabled={readOnly || atCap}
+                          disabled={readOnly || atCap || citationsDark}
                           onChange={() => onToggleCite(doc.id)}
                         />
                         <span className="cd-cite-title">{doc.title}</span>

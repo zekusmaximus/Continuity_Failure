@@ -444,9 +444,11 @@ def test_failure_immediately_after_deterministic_resolution_persists_nothing(
     class Injected(RuntimeError):
         pass
 
-    def resolve_then_fail(campaign_obj, advice_id, cited_document_ids=None):
+    def resolve_then_fail(campaign_obj, advice_id, cited_document_ids=None,
+                          powered_subsystem=None):
         # fully mutates the in-memory campaign
-        real_advance(campaign_obj, advice_id, cited_document_ids)
+        real_advance(campaign_obj, advice_id, cited_document_ids,
+                     powered_subsystem=powered_subsystem)
         raise Injected("simulated crash after deterministic resolution")
 
     with pytest.MonkeyPatch.context() as patch:

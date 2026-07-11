@@ -6,6 +6,7 @@ import type {
   TurnHistory,
   TurnResult,
   AdviceMemo,
+  PowerAllocation,
   RecentCampaign,
   ScenarioVariant,
 } from "./api/client";
@@ -83,6 +84,8 @@ export default function App() {
   const [history, setHistory] = useState<TurnHistory | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [citedDocs, setCitedDocs] = useState<string[]>([]);
+  // Auxiliary-power allocation for the current turn (CRITICAL band only).
+  const [poweredSubsystem, setPoweredSubsystem] = useState<PowerAllocation | null>(null);
   const [caseFileOpen, setCaseFileOpen] = useState(false);
   const [guideOpen, setGuideOpen] = useState(false);
   const [guideFirstRun, setGuideFirstRun] = useState(false);
@@ -168,6 +171,7 @@ export default function App() {
       setLastResult(result);
       setSelected(result.advice_id);
       setCitedDocs(result.decision.cited_document_ids ?? []);
+      setPoweredSubsystem(result.powered_subsystem);
       setMemo(
         memoRecords.find((item) => item.id === result.sent_memo?.memo_id) ?? null,
       );
@@ -182,6 +186,7 @@ export default function App() {
       setLastResult(null);
       setSelected(null);
       setCitedDocs([]);
+      setPoweredSubsystem(null);
       setMemo(null);
       setMaxReachedIndex(0);
       gotoPhase("CALL", `Turn ${cur.summary.turn_number} incoming call loaded.`);
@@ -192,6 +197,7 @@ export default function App() {
       setLastResult(null);
       setSelected(null);
       setCitedDocs([]);
+      setPoweredSubsystem(null);
       setMemo(null);
       setMaxReachedIndex(TURN_STEPS.length - 1);
       gotoPhase("DOSSIER", "Campaign dossier loaded.");
@@ -277,6 +283,7 @@ export default function App() {
       setLastResult(null);
       setSelected(null);
       setCitedDocs([]);
+      setPoweredSubsystem(null);
       setMemo(null);
       setMemoError(null);
       const [cur] = await Promise.all([refreshCurrent(created.id), refreshHistory(created.id)]);
@@ -293,6 +300,15 @@ export default function App() {
 
   const handleSendAdvice = useCallback(async () => {
     if (!campaignId || !selected || !current || !memo || submitting) return;
+    // The CRITICAL-band constraint: the backend will 409 without an
+    // allocation, so hold the submission client-side with the same rule.
+    if (current.system_status.requires_power_allocation && !poweredSubsystem) {
+      setError(
+        "The workstation is critical: allocate auxiliary power to one "
+        + "subsystem before sending advice.",
+      );
+      return;
+    }
     setSubmitting(true);
     setError(null);
     try {
@@ -307,6 +323,7 @@ export default function App() {
         memo.id,
         memo.revision,
         citedDocs,
+        current.system_status.requires_power_allocation ? poweredSubsystem : null,
       );
       setLastResult(result);
       setMemo((record) => record ? { ...record, status: "sent", sent_snapshot: result.sent_memo } : record);
@@ -391,6 +408,9 @@ export default function App() {
         creation_mode: "ai",
         advice_id: selected,
         name: `Advice of record — ${option?.title || option?.label || selected}`,
+        ...(current?.system_status.requires_power_allocation && poweredSubsystem
+          ? { powered_subsystem: poweredSubsystem }
+          : {}),
       });
       setMemo(draft);
       setMemos((records) => [...records, draft]);
@@ -400,7 +420,7 @@ export default function App() {
     } finally {
       setMemoLoading(false);
     }
-  }, [campaignId, selected, current]);
+  }, [campaignId, selected, current, poweredSubsystem]);
 
   const handleCreateManualMemo = useCallback(async () => {
     if (!campaignId || !selected || !current) return;
@@ -446,6 +466,14 @@ export default function App() {
   }, [campaignId, memo, refreshMemos]);
 
   const handleToggleCite = useCallback((docId: string) => {
+    // At CRITICAL, evidence verification runs on the live-data circuit: no
+    // citations unless auxiliary power is allocated there.
+    if (
+      current?.system_status.requires_power_allocation &&
+      poweredSubsystem !== "LIVE_DATA"
+    ) {
+      return;
+    }
     setCitedDocs((ids) =>
       ids.includes(docId)
         ? ids.filter((d) => d !== docId)
@@ -453,6 +481,13 @@ export default function App() {
           ? ids
           : [...ids, docId],
     );
+  }, [current, poweredSubsystem]);
+
+  const handleAllocatePower = useCallback((allocation: PowerAllocation) => {
+    setPoweredSubsystem(allocation);
+    // Moving auxiliary power off the live-data circuit invalidates any
+    // citations composed under it.
+    if (allocation !== "LIVE_DATA") setCitedDocs([]);
   }, []);
 
   const handleSelectAdvice = useCallback(
@@ -558,6 +593,8 @@ export default function App() {
         selected={selected}
         citedDocs={citedDocs}
         onToggleCite={handleToggleCite}
+        poweredSubsystem={poweredSubsystem}
+        onAllocatePower={handleAllocatePower}
         submitting={busy}
         onSelect={handleSelectAdvice}
         onGoto={gotoPhase}

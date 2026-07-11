@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
-import type { AdviceMemo, CurrentTurn, TurnHistory, TurnResult } from "../api/client";
+import type {
+  PowerAllocation, AdviceMemo, CurrentTurn, TurnHistory, TurnResult } from "../api/client";
 import type { Phase } from "../domain";
 import { TURN_STEPS } from "../domain";
 import CallPhase from "./CallPhase";
@@ -22,6 +23,8 @@ interface Props {
   selected: string | null;
   citedDocs: string[];
   onToggleCite: (id: string) => void;
+  poweredSubsystem: PowerAllocation | null;
+  onAllocatePower: (allocation: PowerAllocation) => void;
   submitting: boolean;
   onSelect: (id: string) => void;
   onGoto: (phase: Phase) => void;
@@ -55,6 +58,8 @@ export default function GuidedTurn(props: Props) {
     selected,
     citedDocs,
     onToggleCite,
+    poweredSubsystem,
+    onAllocatePower,
     submitting,
     onSelect,
     onGoto,
@@ -151,20 +156,28 @@ export default function GuidedTurn(props: Props) {
           citedDocs={citedDocs}
           onToggleCite={onToggleCite}
           systemStatus={current.system_status}
+          poweredSubsystem={poweredSubsystem}
+          onAllocatePower={onAllocatePower}
         />
       ) : null;
       action = (
         <PrimaryAction
           label="Send Advice"
           hint={
-            selected
-              ? memo
-                ? `Send ${memo.name}, revision ${memo.revision}. The client decides what to do with it.`
-                : "Create and attach a memo before sending this recommendation."
-              : "Select a recommendation to send."
+            current?.system_status.requires_power_allocation && !poweredSubsystem
+              ? "Allocate auxiliary power to one subsystem before sending."
+              : selected
+                ? memo
+                  ? `Send ${memo.name}, revision ${memo.revision}. The client decides what to do with it.`
+                  : "Create and attach a memo before sending this recommendation."
+                : "Select a recommendation to send."
           }
           onClick={onSendAdvice}
-          disabled={!selected || !memo || memo.status !== "draft"}
+          disabled={
+            !selected || !memo || memo.status !== "draft" ||
+            (current?.system_status.requires_power_allocation === true &&
+              !poweredSubsystem)
+          }
           busy={submitting}
         />
       );

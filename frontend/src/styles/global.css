@@ -1415,3 +1415,26 @@ body {
 .cd-system-ok { color: var(--text-dim); }
 .cd-system-off { color: var(--crit); font-weight: 600; }
 .cd-system-stale { margin: 6px 0 0; color: var(--warn); font-size: 12px; }
+
+/* Auxiliary-power allocation (CRITICAL band, Wave 2b B4). */
+.cd-power-allocation {
+  border: 1px solid var(--crit);
+  border-radius: 4px;
+  padding: 10px 12px;
+  margin: 0 0 12px;
+  display: grid;
+  gap: 8px;
+  background: color-mix(in srgb, var(--crit) 7%, var(--bg-panel-2));
+}
+.cd-power-allocation legend {
+  color: var(--crit);
+  padding: 0 4px;
+}
+.cd-power-option {
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  gap: 8px;
+  align-items: baseline;
+  cursor: pointer;
+}
+.cd-power-label { color: var(--text-bright); font-weight: 600; }

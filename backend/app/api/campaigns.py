@@ -164,6 +164,7 @@ def submit_advice(
             memo_id=payload.memo_id,
             memo_revision=payload.memo_revision,
             cited_document_ids=payload.cited_document_ids,
+            powered_subsystem=payload.powered_subsystem,
         )
     except errors.TurnResolutionError as exc:
         raise _turn_error(campaign_id, exc) from None
@@ -242,6 +243,7 @@ def create_memo(campaign_id: str, payload: schemas.CreateMemoRequest):
             advice_id=payload.advice_id,
             name=payload.name,
             content=payload.content,
+            powered_subsystem=payload.powered_subsystem,
         )
     except errors.TurnResolutionError as exc:
         raise _turn_error(campaign_id, exc) from None
@@ -297,7 +299,9 @@ def draft_memo(campaign_id: str, payload: schemas.AdviceRequest):
     if campaign_service.get_campaign(campaign_id) is None:
         _not_found(campaign_id)
     try:
-        result = campaign_service.draft_memo(campaign_id, payload.advice_id)
+        result = campaign_service.draft_memo(
+            campaign_id, payload.advice_id, payload.powered_subsystem
+        )
     except UnknownAdviceOption as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

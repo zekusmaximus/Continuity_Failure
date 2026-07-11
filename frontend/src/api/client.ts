@@ -360,7 +360,11 @@ export interface TurnResult {
   consequence_report: ConsequenceReport;
   faction_shifts: FactionShift[];
   call_variant_id: string | null;
+  powered_subsystem: PowerAllocation | null;
 }
+
+// Which subsystem auxiliary power supports during a CRITICAL turn (Wave 2b).
+export type PowerAllocation = "MODEL_ACCESS" | "COMMUNICATIONS" | "LIVE_DATA";
 
 export interface SystemStatus {
   power: number;
@@ -677,6 +681,7 @@ export const api = {
     memoId: string,
     memoRevision: number,
     citedDocumentIds: string[] = [],
+    poweredSubsystem: PowerAllocation | null = null,
   ) =>
     requestWithRetry<TurnResult>(`/api/campaigns/${id}/advice`, {
       method: "POST",
@@ -687,6 +692,7 @@ export const api = {
         memo_id: memoId,
         memo_revision: memoRevision,
         cited_document_ids: citedDocumentIds,
+        ...(poweredSubsystem ? { powered_subsystem: poweredSubsystem } : {}),
       }),
     }),
   getTurns: (id: string) =>
@@ -702,6 +708,7 @@ export const api = {
       advice_id: string;
       name: string;
       content?: string;
+      powered_subsystem?: PowerAllocation;
     },
   ) =>
     request<AdviceMemo>(`/api/campaigns/${id}/memos`, {
@@ -719,10 +726,13 @@ export const api = {
     }),
   // Advisory only: drafts a memo without advancing the turn or changing state.
   // With AI off (the default) this returns a deterministic fallback memo.
-  draftMemo: (id: string, adviceId: string) =>
+  draftMemo: (id: string, adviceId: string, poweredSubsystem: PowerAllocation | null = null) =>
     request<MemoDraft>(`/api/campaigns/${id}/memo`, {
       method: "POST",
-      body: JSON.stringify({ advice_id: adviceId }),
+      body: JSON.stringify({
+        advice_id: adviceId,
+        ...(poweredSubsystem ? { powered_subsystem: poweredSubsystem } : {}),
+      }),
     }),
   // Read-only log of AI model runs recorded for this campaign.
   getModelRuns: (id: string) =>

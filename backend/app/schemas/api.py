@@ -194,6 +194,9 @@ class RecentCampaignModel(BaseModel):
     updated_at: str
 
 
+POWER_ALLOCATION_PATTERN = r"^(MODEL_ACCESS|COMMUNICATIONS|LIVE_DATA)$"
+
+
 class AdviceRequest(StrictRequestModel):
     """Advisory, non-mutating requests (memo drafting)."""
 
@@ -201,6 +204,11 @@ class AdviceRequest(StrictRequestModel):
         min_length=1,
         max_length=64,
         pattern=r"^[a-z0-9_]+$",
+    )
+    # Provisional auxiliary-power routing for this drafting request (CRITICAL
+    # band only). Advisory: the binding allocation ships with the advice.
+    powered_subsystem: Optional[str] = Field(
+        default=None, pattern=POWER_ALLOCATION_PATTERN
     )
 
 
@@ -231,6 +239,12 @@ class AdviceSubmissionRequest(StrictRequestModel):
     cited_document_ids: List[str] = Field(
         default_factory=list,
         max_length=3,
+    )
+    # The binding auxiliary-power allocation for this turn. Required by the
+    # service when the desk is CRITICAL, rejected otherwise; joins the
+    # idempotency request fingerprint like cited_document_ids.
+    powered_subsystem: Optional[str] = Field(
+        default=None, pattern=POWER_ALLOCATION_PATTERN
     )
 
     @field_validator("cited_document_ids")
@@ -454,6 +468,11 @@ class CreateMemoRequest(StrictRequestModel):
     advice_id: str = Field(min_length=1, max_length=64, pattern=r"^[a-z0-9_]+$")
     name: str = Field(min_length=1, max_length=120, pattern=r"^.*\S.*$")
     content: Optional[str] = Field(default=None, min_length=1, max_length=12000)
+    # Provisional auxiliary-power routing for an "ai" drafting request
+    # (CRITICAL band only). See AdviceRequest.powered_subsystem.
+    powered_subsystem: Optional[str] = Field(
+        default=None, pattern=POWER_ALLOCATION_PATTERN
+    )
 
     @field_validator("name")
     @classmethod
@@ -551,6 +570,9 @@ class TurnResultModel(BaseModel):
     # The authored call variant that was on the line this turn, when one fired
     # (None = the base call). Defaulted so pre-variant replays still validate.
     call_variant_id: Optional[str] = None
+    # The auxiliary-power allocation the turn resolved under (CRITICAL band
+    # only; None otherwise). Defaulted so earlier replays still validate.
+    powered_subsystem: Optional[str] = None
 
 
 class SystemStatusModel(BaseModel):

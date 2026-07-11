@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import List, Optional
 
-from engine import calls, factions, rules
+from engine import calls, degradation, factions, rules
 from engine.consequences import build_consequence_report, build_consequence_stack
 from engine.diffs import apply_diffs
 from engine.ledger import record_precedents
@@ -23,6 +23,7 @@ from engine.models import (
     CampaignStatus,
     DecisionType,
     FactClassification,
+    PowerAllocation,
     PublicStatus,
     SourceType,
     TurnResult,
@@ -35,6 +36,25 @@ class UnknownAdviceOption(Exception):
 
 class UnknownDocument(Exception):
     """Raised when a cited document id is unknown or not yet available."""
+
+
+class PowerAllocationRequired(Exception):
+    """The desk is CRITICAL: a turn cannot resolve without allocating
+    auxiliary power to exactly one subsystem."""
+
+
+class PowerAllocationUnavailable(Exception):
+    """An allocation was submitted while the desk is not CRITICAL -- there is
+    no auxiliary constraint to satisfy, so the request is malformed."""
+
+
+class UnknownPowerAllocation(Exception):
+    """The submitted allocation is not a recognized subsystem."""
+
+
+class EvidenceUnverifiable(Exception):
+    """Citations were submitted while the live-data circuit is unpowered:
+    the desk cannot verify evidence it cannot reach."""
 
 
 def find_advice(campaign: Campaign, advice_id: str) -> AdviceOption:
@@ -69,6 +89,7 @@ def advance_turn(
     campaign: Campaign,
     advice_id: str,
     cited_document_ids: Optional[List[str]] = None,
+    powered_subsystem: Optional[str] = None,
 ) -> TurnResult:
     """Resolve the current turn against ``advice_id`` and advance the campaign.
 
@@ -81,11 +102,39 @@ def advance_turn(
       6. Build an aftermath summary and canon entry.
       7. Check failure / completion.
       8. Increment the turn counter and record history.
+
+    ``powered_subsystem`` is the auxiliary-power allocation (PowerAllocation):
+    REQUIRED when the desk is CRITICAL, rejected otherwise. First-cut effects
+    are capability gates, never diffs -- LIVE_DATA unpowered refuses citations,
+    COMMUNICATIONS unpowered means the caller's history never reached the desk
+    (recorded in the explanation), MODEL_ACCESS matters upstream at the
+    drafting seam. Balance is untouched by design.
     """
     if campaign.is_terminal():
         raise RuntimeError(
             f"Campaign {campaign.id} is terminal ({campaign.status}); "
             "no further turns can be advanced."
+        )
+
+    # The auxiliary-power constraint is assessed against the pre-turn record,
+    # exactly what the player saw when composing the submission.
+    status = degradation.assess_degradation(campaign)
+    if status.requires_power_allocation:
+        if powered_subsystem is None:
+            raise PowerAllocationRequired(
+                "the desk is CRITICAL; allocate auxiliary power to one subsystem"
+            )
+        if powered_subsystem not in PowerAllocation.ALL:
+            raise UnknownPowerAllocation(powered_subsystem)
+        if cited_document_ids and powered_subsystem != PowerAllocation.LIVE_DATA:
+            raise EvidenceUnverifiable(
+                "citations require the live-data circuit; auxiliary power "
+                f"is allocated to {powered_subsystem}"
+            )
+    elif powered_subsystem is not None:
+        raise PowerAllocationUnavailable(
+            f"no auxiliary constraint at band {status.band}; "
+            "omit powered_subsystem"
         )
 
     advice = find_advice(campaign, advice_id)
@@ -100,6 +149,21 @@ def advance_turn(
 
     citations = _resolve_citations(campaign, cited_document_ids, resolving_turn)
     decision = rules.decide(campaign, advice, citations, call=call)
+
+    # Communications unpowered: the caller still remembers, but none of it
+    # reached the desk this cycle. Display-only -- adherence inputs are
+    # untouched -- and deterministic: the allocation is part of the turn's
+    # input, so a replay reproduces the same recorded explanation.
+    if (
+        status.requires_power_allocation
+        and powered_subsystem != PowerAllocation.COMMUNICATIONS
+        and decision.explanation is not None
+    ):
+        decision.explanation.memory = [
+            "Communications dark — the caller's history did not reach the "
+            "desk this cycle (auxiliary power allocated to "
+            f"{powered_subsystem})."
+        ]
 
     # Snapshot the pre-turn values so the consequence report can reconcile
     # start -> attributed deltas -> final for every touched variable.
@@ -270,6 +334,7 @@ def advance_turn(
         ),
         faction_shifts=faction_shifts,
         call_variant_id=call_variant_id,
+        powered_subsystem=powered_subsystem,
     )
     campaign.turn_history.append(turn_result)
     return turn_result

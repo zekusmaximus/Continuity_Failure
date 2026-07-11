@@ -34,10 +34,26 @@ with a legible reason, AI never mutates state, snapshots stay append-only.
 | 4e | Deadline budget (HO#6) | Wave 1 citations |
 | 5 | Additional read-only AI tools (ME#7) | everything above (per the review) |
 
-> **Wave 2 implementation plan:** `docs/wave-2-implementation-plan.md`
-> (2026-07-11) — verified current-state check, batch sequencing (2a → 2b),
-> exact schemas/contract ripples, balance traces, and the scope trims that
-> return here (§7 of the plan) if approved.
+> **Wave 2 is complete** (2026-07-11, batches A1–A4 + B1–B4 on this branch;
+> plan: `docs/wave-2-implementation-plan.md`). Shipped: ruleset_version with
+> golden-trace pinning, content-authored thread specs, faction-gated call
+> variants, seed variants, power_stability drivers (ruleset "2"),
+> degradation bands with capability gating, the degraded workstation UI,
+> and the CRITICAL-band auxiliary-power choice (HO#8).
+>
+> **Trimmed from Wave 2, returned here with reasons** (plan §7):
+> 1. *Faction-field overrides in seed variants* — variable perturbations
+>    deliver the replayability payoff; revisit with 4b, which will exercise
+>    variants hard.
+> 2. *Numeric world-state costs for unpowered subsystems* — the CRITICAL
+>    allocation is capability-gating only; attaching diffs is a balance
+>    change (survival headroom is 2 points of budget) that deserves its own
+>    instrumented pass after playtesting the bands.
+> 3. *Playwright e2e for the degraded path* — needs a long scripted
+>    playthrough; covered by vitest band tests + the manual checklist. A
+>    seeded low-power scenario variant would make this e2e cheap.
+> 4. *Comms degradation affecting adherence/decisions* — belongs with Wave
+>    5's AI tools, where model access has in-world costs to degrade.
 
 ## Wave 2a — Versioned scenario/rules engine completion (ME#4 remainder)
 

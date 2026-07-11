@@ -86,6 +86,22 @@ class ThreadStatus:
     RESOLVED = "resolved"
 
 
+class PowerAllocation:
+    """Which subsystem auxiliary power supports during a CRITICAL turn.
+
+    At the CRITICAL degradation band (engine/degradation.py) the desk runs on
+    auxiliary power that sustains exactly ONE subsystem per turn; the player
+    allocates it with each advice submission. A per-turn constraint, not a
+    twitch mechanic -- the choice joins the idempotency fingerprint and is
+    recorded on the resolved turn.
+    """
+    MODEL_ACCESS = "MODEL_ACCESS"        # the drafting/model stack
+    COMMUNICATIONS = "COMMUNICATIONS"    # caller history and disposition
+    LIVE_DATA = "LIVE_DATA"              # evidence verification (citations)
+
+    ALL = (MODEL_ACCESS, COMMUNICATIONS, LIVE_DATA)
+
+
 # ---------------------------------------------------------------------------
 # Core entities
 # ---------------------------------------------------------------------------
@@ -614,6 +630,10 @@ class TurnResult:
     # When an authored call variant (not the base call) was on the line this
     # turn, its id -- so the record always shows which opening the caller used.
     call_variant_id: Optional[str] = None
+    # The auxiliary-power allocation this turn resolved under (PowerAllocation),
+    # None outside the CRITICAL band. On the record: capability gating is part
+    # of what the desk could and could not do when the advice went out.
+    powered_subsystem: Optional[str] = None
 
 
 @dataclass
