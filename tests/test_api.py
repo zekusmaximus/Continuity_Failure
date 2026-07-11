@@ -522,7 +522,7 @@ def test_create_campaign_with_variant(client):
 
     current = client.get(f"/api/campaigns/{campaign_id}/current").json()
     assert current["summary"]["variant_id"] == "hot_summer"
-    assert current["world_state"]["variables"]["power_stability"] == 64
+    assert current["world_state"]["variables"]["power_stability"] == 60
     assert current["world_state"]["variables"]["water_security"] == 40
 
 
@@ -541,3 +541,73 @@ def test_create_campaign_with_unknown_variant_is_422(client):
     assert detail["error"] == "unknown_variant"
     assert "hot_summer" in detail["message"]
     assert "request_id" in detail
+
+
+# ---------------------------------------------------------------------------
+# POST /campaigns/{id}/power-allocation (pre-turn auxiliary commitment)
+# ---------------------------------------------------------------------------
+
+def _force_critical(campaign_id: str) -> None:
+    repository = campaign_service.get_repository()
+    record = repository.get(campaign_id)
+    record.world_state.variables["power_stability"] = 10
+    repository.put(record)
+
+
+def test_power_allocation_endpoint_commits_and_reveals_the_caller(client, campaign):
+    _force_critical(campaign)
+    dark = client.get(f"/api/campaigns/{campaign}/current").json()
+    assert "Communications dark" in dark["caller_disposition"]
+
+    res = client.post(
+        f"/api/campaigns/{campaign}/power-allocation",
+        json={"allocation": "COMMUNICATIONS", "expected_turn": 1},
+    )
+    assert res.status_code == 200
+    body = res.json()
+    assert body["system_status"]["power_commitment"] == "COMMUNICATIONS"
+    # The pre-decision payoff: the caller can now actually be read.
+    assert "Communications dark" not in body["caller_disposition"]
+    assert "trust" in body["caller_disposition"]
+
+    # Re-committing the same subsystem is a no-op; a different one conflicts.
+    again = client.post(
+        f"/api/campaigns/{campaign}/power-allocation",
+        json={"allocation": "COMMUNICATIONS", "expected_turn": 1},
+    )
+    assert again.status_code == 200
+    conflict = client.post(
+        f"/api/campaigns/{campaign}/power-allocation",
+        json={"allocation": "LIVE_DATA", "expected_turn": 1},
+    )
+    assert conflict.status_code == 409
+    assert conflict.json()["detail"]["error"] == "power_allocation_conflict"
+
+
+def test_power_allocation_endpoint_rejects_outside_critical(client, campaign):
+    res = client.post(
+        f"/api/campaigns/{campaign}/power-allocation",
+        json={"allocation": "COMMUNICATIONS", "expected_turn": 1},
+    )
+    assert res.status_code == 409
+    assert res.json()["detail"]["error"] == "power_allocation_not_available"
+
+
+def test_power_allocation_endpoint_guards_the_body_and_revision(client, campaign):
+    _force_critical(campaign)
+    malformed = client.post(
+        f"/api/campaigns/{campaign}/power-allocation",
+        json={"allocation": "FLUX_CAPACITOR", "expected_turn": 1},
+    )
+    assert malformed.status_code == 422
+    stale = client.post(
+        f"/api/campaigns/{campaign}/power-allocation",
+        json={"allocation": "COMMUNICATIONS", "expected_turn": 2},
+    )
+    assert stale.status_code == 409
+    assert stale.json()["detail"]["error"] == "stale_turn"
+    missing = client.post(
+        "/api/campaigns/does-not-exist/power-allocation",
+        json={"allocation": "COMMUNICATIONS", "expected_turn": 1},
+    )
+    assert missing.status_code == 404

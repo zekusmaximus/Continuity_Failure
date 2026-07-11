@@ -25,6 +25,8 @@ interface Props {
   onToggleCite: (id: string) => void;
   poweredSubsystem: PowerAllocation | null;
   onAllocatePower: (allocation: PowerAllocation) => void;
+  // Commits the turn's auxiliary allocation server-side (CRITICAL only).
+  onCommitPower: (allocation: PowerAllocation) => void;
   submitting: boolean;
   onSelect: (id: string) => void;
   onGoto: (phase: Phase) => void;
@@ -60,6 +62,7 @@ export default function GuidedTurn(props: Props) {
     onToggleCite,
     poweredSubsystem,
     onAllocatePower,
+    onCommitPower,
     submitting,
     onSelect,
     onGoto,
@@ -90,7 +93,16 @@ export default function GuidedTurn(props: Props) {
 
   switch (phase) {
     case "CALL":
-      panel = <CallPhase call={call} disposition={current?.caller_disposition ?? ""} />;
+      panel = (
+        <CallPhase
+          call={call}
+          disposition={current?.caller_disposition ?? ""}
+          systemStatus={current?.system_status ?? null}
+          // A resolved turn is read-only review; no commitment from there.
+          onCommitPower={lastResult ? undefined : onCommitPower}
+          busy={submitting}
+        />
+      );
       action = call ? (
         <PrimaryAction
           label="Accept Call"

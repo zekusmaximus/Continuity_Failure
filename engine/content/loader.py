@@ -36,6 +36,7 @@ from engine.models import (
     Crisis,
     Document,
     Faction,
+    FactionAdviceTrustCost,
     OpenThread,
     ThreadCondition,
     ThreadSpec,
@@ -182,7 +183,16 @@ def validate_scenario(scenario_id: str) -> None:
 # ---------------------------------------------------------------------------
 
 def _build_factions(raw: List[dict]) -> List[Faction]:
-    return [Faction(**f) for f in raw]
+    factions = []
+    for f in raw:
+        data = dict(f)
+        costs = data.get("advice_trust_costs")
+        if isinstance(costs, list):
+            data["advice_trust_costs"] = [
+                FactionAdviceTrustCost(**cost) for cost in costs
+            ]
+        factions.append(Faction(**data))
+    return factions
 
 
 def _build_advice(raw: List[dict]) -> List[AdviceOption]:

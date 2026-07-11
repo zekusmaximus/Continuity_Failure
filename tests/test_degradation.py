@@ -125,11 +125,11 @@ def test_last_live_turn_is_the_latest_turn_that_closed_with_live_feeds():
         if campaign.is_terminal():
             break
         turn.advance_turn(campaign, advice_id)
-    # End-of-turn power under ruleset 2: 72,72,66,60,54,48,44,44,40,40 --
+    # End-of-turn power under ruleset 3: 72,72,66,60,54,48,42,36,30,24 --
     # the last close-out at or above the nominal floor (55) is turn 4.
     status = assess_degradation(campaign)
-    assert status.band == DegradationBand.STRAINED
-    assert status.power == 40
+    assert status.band == DegradationBand.DEGRADED
+    assert status.power == 24
     assert status.last_live_turn == 4
 
 

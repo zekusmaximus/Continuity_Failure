@@ -193,6 +193,13 @@
     "tags": [
       "sole_source",
       "leverage"
+    ],
+    "advice_trust_costs": [
+      {
+        "advice_tag": "contractor",
+        "delta": -6,
+        "reason": "The consultant's squeeze strategy reached Marquotte's contracts office; the firm reads the desk as adversarial and copies it on less."
+      }
     ]
   },
   {

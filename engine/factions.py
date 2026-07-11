@@ -48,6 +48,15 @@ TRUST_GAIN_FOLLOWED = 4        # advice followed and the caller's priorities imp
 TRUST_GAIN_PARTIAL = 2
 TRUST_LOSS_REJECTED_OFF_BRIEF = 2
 TRUST_LOSS_RED_LINE = 8
+
+# Decision types under which advice aimed AT a faction actually landed on it.
+# Content-authored trust costs (Faction.advice_trust_costs) apply only when the
+# client acted in some form; a DELAYED or REJECTED squeeze never happened.
+_ADVICE_LANDED = (
+    DecisionType.FOLLOWED,
+    DecisionType.PARTIALLY_FOLLOWED,
+    DecisionType.MODIFIED,
+)
 PRESSURE_GAIN_RED_LINE = 5
 INFLUENCE_GAIN_HIGH_PRESSURE = 2   # pressure >= 70: the crisis is theirs to carry
 INFLUENCE_DECAY_LOW_PRESSURE = 2   # pressure <= 30: attention moves elsewhere
@@ -160,6 +169,21 @@ def update_faction_relations(
                 caller, "trust_in_player", -TRUST_LOSS_REJECTED_OFF_BRIEF,
                 "The call was spent on advice the caller had not asked for.",
             ))
+
+    # Cross-faction trust: a faction that is the TARGET of an acted-on strategy
+    # reacts even when someone else is on the line. The reaction is authored
+    # content (Faction.advice_trust_costs), matched by advice tag; the caller's
+    # seat is governed by the caller rules above, never double-charged here.
+    if decision.decision_type in _ADVICE_LANDED:
+        advice_tags = set(advice.tags)
+        for faction in campaign.world_state.factions:
+            if caller is not None and faction.id == caller.id:
+                continue
+            for cost in faction.advice_trust_costs:
+                if cost.advice_tag in advice_tags:
+                    shifts.append(_shift(
+                        faction, "trust_in_player", cost.delta, cost.reason,
+                    ))
 
     for faction in campaign.world_state.factions:
         if faction.current_pressure >= 70:

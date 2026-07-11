@@ -41,6 +41,13 @@ export default function DocumentCard({ doc, expanded, onToggle, highlighted }: P
           className={PUBLIC_STATUS_CLASS[doc.public_status] ?? "tag-private"}
         />
         <StatusTag label={`Turn ${doc.turn_number}`} className="tag-turn" />
+        {doc.unverified_offline && (
+          <StatusTag
+            label="Unverified — arrived after feed loss"
+            className="tag-offline"
+            title="Live feeds were already down when this record reached the desk; it did not come over a verified feed."
+          />
+        )}
       </div>
       <p className="cd-doc-summary">{doc.summary}</p>
       {expanded && doc.content && (
