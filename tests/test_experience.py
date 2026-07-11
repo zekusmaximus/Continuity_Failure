@@ -399,3 +399,41 @@ def test_pydantic_model_defaults_the_lead_for_old_payloads():
     old = schemas.TurnResultModel.model_validate(data)
     assert old.consequence_lead.headline == ""
     assert old.consequence_lead.references == []
+
+
+# ---------------------------------------------------------------------------
+# Wave 3 B2: the dossier timeline carries the lead, before reconciliation
+# ---------------------------------------------------------------------------
+
+def test_dossier_places_causal_lead_before_reconciliation():
+    from engine.dossier import render_dossier_markdown
+
+    campaign = seed_data.create_northbridge_campaign(name="lead-dossier")
+    result = turn.advance_turn(campaign, "controlled_disclosure")
+    markdown = render_dossier_markdown(campaign)
+
+    assert f"- **Causal lead:** {result.consequence_lead.headline}" in markdown
+    if result.consequence_lead.future_hook:
+        assert (
+            f"- **On the record next:** {result.consequence_lead.future_hook}"
+            in markdown
+        )
+    # The lead supplements the audit immediately before the reconciliation it
+    # summarizes — and replaces none of the existing Wave-2 facts.
+    assert markdown.index("**Causal lead:**") < markdown.index("**State reconciliation")
+    assert "**NPC decision:**" in markdown
+    assert "**Aftermath:**" in markdown
+
+
+def test_dossier_omits_the_lead_for_pre_lead_turns():
+    from engine.dossier import render_dossier_markdown
+    from engine.models import ConsequenceLead
+
+    campaign = seed_data.create_northbridge_campaign(name="lead-dossier-old")
+    turn.advance_turn(campaign, "controlled_disclosure")
+    # Simulate a turn persisted before the field existed.
+    campaign.turn_history[-1].consequence_lead = ConsequenceLead()
+    markdown = render_dossier_markdown(campaign)
+    assert "**Causal lead:**" not in markdown
+    assert "**On the record next:**" not in markdown
+    assert "**State reconciliation" in markdown

@@ -1474,3 +1474,19 @@ body {
   border-radius: 4px;
   font-size: 13px;
 }
+
+/* Causal lead and consequence hierarchy (Wave 3 B2). No animation on the
+   full-record disclosure: expanding is instant for everyone, which is the
+   prefers-reduced-motion equivalent by construction. */
+.cd-causal-lead {
+  border-left: 3px solid var(--accent);
+  padding: 8px 12px;
+  margin: 0 0 12px;
+  background: var(--bg-panel-2);
+}
+.cd-causal-headline { margin: 0; }
+.cd-causal-refs { margin: 4px 0 0; }
+.cd-causal-receipt { margin: 6px 0 0; display: flex; gap: 8px; align-items: center; }
+.cd-future-hook { margin-bottom: 12px; }
+.cd-full-record { margin-top: 8px; }
+.cd-full-record > .cd-expandable-toggle { font-weight: 600; }

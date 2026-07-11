@@ -118,12 +118,31 @@ function DecisionRationale({ ex }: { ex: DecisionExplanation }) {
  */
 export default function ClientDecisionPhase({ result }: { result: TurnResult }) {
   const d = result.decision;
+  const lead = result.consequence_lead;
+  // Only the references the headline itself covers belong here. Thread and
+  // precedent references back the future hook, which stays undisclosed until
+  // the Consequences phase — the progressive reveal keeps its meaning.
+  const headlineRefs = (lead?.references ?? []).filter(
+    (ref) => ref.kind === "decision" || ref.kind === "diff" || ref.kind === "failure",
+  );
   return (
     <section className="cd-stage-panel cd-decision">
       <h1 className="cd-eyebrow">
         <span className="cd-eyebrow-dot" aria-hidden />
         Client decision · Turn {result.turn_number}
       </h1>
+
+      {lead?.headline && (
+        <div className="cd-causal-lead">
+          <p className="cd-lead cd-causal-headline">{lead.headline}</p>
+          {headlineRefs.length > 0 && (
+            <p className="cd-causal-refs cd-muted cd-small">
+              On the record:{" "}
+              {headlineRefs.map((ref) => ref.label).join(" · ")}
+            </p>
+          )}
+        </div>
+      )}
 
       <div className="cd-decision-head">
         <span className={`cd-decision-badge ${DECISION_BADGE[d.decision_type] ?? ""}`}>
