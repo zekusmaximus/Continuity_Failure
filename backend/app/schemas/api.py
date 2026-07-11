@@ -225,6 +225,21 @@ class AdviceRequest(StrictRequestModel):
     )
 
 
+class PowerAllocationRequest(StrictRequestModel):
+    """Commit the turn's auxiliary-power allocation (CRITICAL band only).
+
+    This is the pre-decision action: committing COMMUNICATIONS makes the
+    caller's disposition readable before advice is composed; committing
+    MODEL_ACCESS lifts the drafting gate. Binding for the turn -- any later
+    gated action or the advice submission must carry the same subsystem.
+    ``expected_turn`` pins the campaign revision the allocation was chosen
+    against, exactly like an advice submission.
+    """
+
+    allocation: str = Field(pattern=POWER_ALLOCATION_PATTERN)
+    expected_turn: int = Field(ge=1, le=MAX_TURN_NUMBER, strict=True)
+
+
 class AdviceSubmissionRequest(StrictRequestModel):
     """A turn-resolution request: what to do, to which revision, exactly once.
 

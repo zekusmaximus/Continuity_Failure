@@ -445,3 +445,161 @@ def test_reject_trust_cost_beyond_the_bounded_nudge():
     contractor["advice_trust_costs"][0]["delta"] = -40
     messages = _expect_invalid(bundle)
     assert any("within [-20, 20]" in m for m in messages)
+
+
+# ---------------------------------------------------------------------------
+# 8. COMMUNICATIONS has a real pre-decision effect (pre-turn allocation)
+# ---------------------------------------------------------------------------
+
+def test_pre_turn_communications_commitment_makes_the_caller_readable():
+    campaign_id = _stored_campaign_with_power(10)
+    dark = campaign_service.get_current(campaign_id)
+    assert "Communications dark" in dark.caller_disposition
+    assert "Route auxiliary power to COMMUNICATIONS" in dark.caller_disposition
+
+    current = campaign_service.allocate_power(
+        campaign_id, allocation=PowerAllocation.COMMUNICATIONS, expected_turn=1
+    )
+    assert current.system_status.power_commitment == PowerAllocation.COMMUNICATIONS
+    # The disposition is now the live read, before any advice is composed.
+    assert "Communications dark" not in current.caller_disposition
+    assert "trust" in current.caller_disposition
+
+
+def test_pre_turn_commitment_elsewhere_names_the_committed_circuit():
+    campaign_id = _stored_campaign_with_power(10)
+    current = campaign_service.allocate_power(
+        campaign_id, allocation=PowerAllocation.LIVE_DATA, expected_turn=1
+    )
+    assert "Communications dark" in current.caller_disposition
+    assert "LIVE_DATA" in current.caller_disposition
+
+
+def test_pre_turn_allocation_is_binding_for_the_submission():
+    campaign_id = _stored_campaign_with_power(10)
+    campaign_service.allocate_power(
+        campaign_id, allocation=PowerAllocation.COMMUNICATIONS, expected_turn=1
+    )
+    # Re-committing the same subsystem is an idempotent no-op.
+    campaign_service.allocate_power(
+        campaign_id, allocation=PowerAllocation.COMMUNICATIONS, expected_turn=1
+    )
+    # A different subsystem is a conflict, at allocation and at submission.
+    with pytest.raises(errors.PowerAllocationConflict):
+        campaign_service.allocate_power(
+            campaign_id, allocation=PowerAllocation.MODEL_ACCESS, expected_turn=1
+        )
+    with pytest.raises(errors.PowerAllocationConflict):
+        campaign_service.submit_advice(
+            campaign_id, "controlled_disclosure",
+            expected_turn=1, idempotency_key="pre-turn-conflict",
+            powered_subsystem=PowerAllocation.LIVE_DATA,
+        )
+    resolved = campaign_service.submit_advice(
+        campaign_id, "controlled_disclosure",
+        expected_turn=1, idempotency_key="pre-turn-match",
+        powered_subsystem=PowerAllocation.COMMUNICATIONS,
+    )
+    assert resolved.result.powered_subsystem == PowerAllocation.COMMUNICATIONS
+
+
+def test_pre_turn_allocation_guards():
+    nominal_id = _stored_campaign_with_power(72)
+    with pytest.raises(errors.PowerAllocationUnavailable):
+        campaign_service.allocate_power(
+            nominal_id, allocation=PowerAllocation.COMMUNICATIONS, expected_turn=1
+        )
+    critical_id = _stored_campaign_with_power(10)
+    with pytest.raises(errors.StaleTurn):
+        campaign_service.allocate_power(
+            critical_id, allocation=PowerAllocation.COMMUNICATIONS, expected_turn=2
+        )
+    with pytest.raises(errors.UnknownPowerAllocation):
+        campaign_service.allocate_power(
+            critical_id, allocation="FLUX_CAPACITOR", expected_turn=1
+        )
+    # Nothing was committed by the failed attempts.
+    campaign = campaign_service.get_repository().get(critical_id)
+    assert campaign.power_commitments == {}
+
+
+def test_pre_turn_model_access_commitment_lifts_the_drafting_gate(monkeypatch):
+    """Committing MODEL_ACCESS at the top of the turn lifts the diegetic
+    drafting gate for the whole turn -- no per-request provisional needed."""
+    monkeypatch.setenv("CF_AI_ENABLED", "true")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
+    from app.ai.logging import get_run_store
+
+    campaign_id = _stored_campaign_with_power(10)
+    campaign_service.allocate_power(
+        campaign_id, allocation=PowerAllocation.MODEL_ACCESS, expected_turn=1
+    )
+    current = campaign_service.get_current(campaign_id)
+    assert "auxiliary power" in current.system_status.model_status
+
+    campaign_service.draft_memo(campaign_id, "controlled_disclosure")
+    runs = get_run_store().for_campaign(campaign_id)
+    assert runs[-1].provider != "offline"
+
+
+# ---------------------------------------------------------------------------
+# 9. The record keeps the caller's true memory; presentation masks it
+# ---------------------------------------------------------------------------
+
+def _play_to_turn_ten_at_critical() -> str:
+    """Advance a stored campaign to turn 10 (Town Manager again -- the one
+    repeat caller, so client memory is non-empty) and force CRITICAL."""
+    created = campaign_service.create_campaign(name="Memory Truth")
+    repository = campaign_service.get_repository()
+    sequence = [
+        "controlled_disclosure", "contractor_pressure", "mutual_aid",
+        "controlled_disclosure", "state_support", "controlled_disclosure",
+        "mutual_aid", "contractor_pressure", "controlled_disclosure",
+    ]
+    for i, advice_id in enumerate(sequence, start=1):
+        campaign_service.submit_advice(
+            created.id, advice_id,
+            expected_turn=i, idempotency_key=f"memory-truth-{i}",
+        )
+    campaign = repository.get(created.id)
+    assert campaign.turn_number == 10
+    campaign.world_state.variables["power_stability"] = 10
+    repository.put(campaign)
+    return created.id
+
+
+def test_record_keeps_true_memory_while_presentation_shows_the_dark_line():
+    campaign_id = _play_to_turn_ten_at_critical()
+    resolved = campaign_service.submit_advice(
+        campaign_id, "mutual_aid",
+        expected_turn=10, idempotency_key="memory-truth-10",
+        powered_subsystem=PowerAllocation.LIVE_DATA,
+    )
+    # Presentation: the desk could not hear the caller -- the dark line.
+    assert resolved.result.decision.explanation.memory == [
+        "Communications dark — the caller's history did not reach the desk "
+        "this cycle (auxiliary power allocated to LIVE_DATA)."
+    ]
+    # Authoritative record: the Town Manager genuinely remembered turn 1.
+    campaign = campaign_service.get_repository().get(campaign_id)
+    recorded = campaign.turn_history[-1].decision.explanation.memory
+    assert recorded, "the record must keep the caller's true memory"
+    assert any("Turn 1" in line for line in recorded)
+    assert all("Communications dark" not in line for line in recorded)
+    # History projection masks it the same way, deterministically.
+    turns = campaign_service.get_turns(campaign_id)
+    assert turns.turns[-1].decision.explanation.memory[0].startswith(
+        "Communications dark"
+    )
+
+
+def test_comms_powered_turn_presents_the_true_memory():
+    campaign_id = _play_to_turn_ten_at_critical()
+    resolved = campaign_service.submit_advice(
+        campaign_id, "mutual_aid",
+        expected_turn=10, idempotency_key="memory-heard-10",
+        powered_subsystem=PowerAllocation.COMMUNICATIONS,
+    )
+    memory = resolved.result.decision.explanation.memory
+    assert memory and any("Turn 1" in line for line in memory)
+    assert all("Communications dark" not in line for line in memory)

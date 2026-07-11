@@ -651,3 +651,36 @@ turn-4 lever cannot carry dependency from 52 to ≤ 40 against drift. Making
 own balance pass; until then it is display vocabulary, not an attainable
 band, and the same holds for a few other extreme bands (strong harm avoided,
 strong consultant standing, compromised/failed institutional primacy).
+
+### COMMUNICATIONS pre-decision usefulness (follow-up)
+
+The review's remaining medium: the auxiliary allocation only arrived with the
+advice submission, so committing COMMUNICATIONS could never inform the advice
+it was submitted with — and `advance_turn` falsified the stored explanation
+by overwriting the caller's memory with the dark line.
+
+Fixed in two moves:
+
+1. **Pre-turn allocation.** `POST /api/campaigns/{id}/power-allocation`
+   (`{allocation, expected_turn}`) commits the turn's auxiliary allocation at
+   the top of the turn, on the same `Campaign.power_commitments` binding used
+   by drafting and submission. Committing COMMUNICATIONS makes the caller's
+   disposition readable at the Call phase — the pre-decision payoff;
+   committing MODEL_ACCESS lifts the drafting gate for the whole turn (and
+   the system status says so). Binding is unchanged: a later gated action or
+   submission naming a different subsystem is `power_allocation_conflict`.
+   The Call screen now carries the routing panel; the Advice-phase picker
+   remains for players who defer the choice.
+2. **Truthful record, masked presentation.** `advance_turn` no longer
+   overwrites `decision.explanation.memory`: the authoritative record keeps
+   what the caller actually remembered (the blackout is the desk's, not the
+   caller's). The service projection (`_turn_result_model`) masks the memory
+   with the communications-dark line whenever the turn resolved with
+   COMMUNICATIONS unpowered — deterministically, from the recorded
+   allocation, across the submit response, turn history, and the frozen
+   presentation snapshot.
+
+Witnesses: `tests/test_wave2_balance.py` §8–9 (pre-turn commitment reveals
+the disposition and binds the submission; the record keeps the Town
+Manager's true turn-1 memory at turn 10 while every projection shows the
+dark line) and `tests/test_api.py` (endpoint contract: 200/409/422 paths).

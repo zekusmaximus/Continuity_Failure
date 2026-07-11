@@ -69,19 +69,18 @@ def _ai_offline_reason(
     Non-None means the drafter must take the deterministic fallback path
     regardless of deployment configuration -- below the degraded threshold
     the desk cannot sustain model access at all. Exception: at CRITICAL the
-    auxiliary switchover engages, and a drafting request that provisionally
-    routes it to MODEL_ACCESS lifts the gate for that request. (Provisional:
-    drafting is advisory-only and never mutates state; the binding allocation
-    is the one submitted with the advice.)
+    auxiliary switchover engages, and the gate lifts when the turn's
+    allocation is already committed to MODEL_ACCESS (the pre-turn allocation
+    action) or when this drafting request routes it there (which itself binds
+    the commitment -- see ``_bind_provisional_allocation``).
     """
     status = degradation_engine.assess_degradation(campaign)
     if status.ai_operational:
         return None
-    if (
-        status.requires_power_allocation
-        and powered_subsystem == PowerAllocation.MODEL_ACCESS
-    ):
-        return None
+    if status.requires_power_allocation:
+        committed = campaign.power_commitments.get(campaign.turn_number)
+        if PowerAllocation.MODEL_ACCESS in (powered_subsystem, committed):
+            return None
     return f"grid power {status.power} below sustaining threshold"
 
 
@@ -125,6 +124,35 @@ def _documents(campaign: Campaign) -> list[schemas.DocumentModel]:
     return documents
 
 
+# What the desk shows in place of the caller's memory when a turn resolved
+# with the communications circuit unpowered. The authoritative record keeps
+# the caller's true memory (engine/turn.py); this line is presentation.
+_COMMS_DARK_MEMORY = (
+    "Communications dark — the caller's history did not reach the desk "
+    "this cycle (auxiliary power allocated to {allocation})."
+)
+
+
+def _turn_result_model(result) -> schemas.TurnResultModel:
+    """Project one TurnResult for presentation.
+
+    A turn resolved at CRITICAL with communications unpowered masks the
+    decision explanation's memory with the dark line: the caller remembered
+    (and the record keeps it), but none of it reached the desk that cycle.
+    Deterministic -- the mask is a pure function of the recorded allocation --
+    so every projection of the same turn presents identically.
+    """
+    data = asdict(result)
+    allocation = result.powered_subsystem
+    if allocation is not None and allocation != PowerAllocation.COMMUNICATIONS:
+        explanation = data["decision"].get("explanation")
+        if explanation is not None:
+            explanation["memory"] = [
+                _COMMS_DARK_MEMORY.format(allocation=allocation)
+            ]
+    return schemas.TurnResultModel.model_validate(data)
+
+
 def _open_threads(campaign: Campaign) -> list[schemas.OpenThreadModel]:
     return [
         schemas.OpenThreadModel.model_validate(asdict(t))
@@ -159,7 +187,19 @@ def _system_status(campaign: Campaign) -> schemas.SystemStatusModel:
     comms = min(power, info + 10)
     ai_live = settings.ai_live
     provider = get_provider(settings) if ai_live else None
-    if not status.ai_operational:
+    # At CRITICAL, a committed MODEL_ACCESS allocation puts the model stack on
+    # the auxiliary feed: the diegetic gate lifts for exactly this turn.
+    aux_model_powered = (
+        status.requires_power_allocation
+        and campaign.power_commitments.get(campaign.turn_number)
+        == PowerAllocation.MODEL_ACCESS
+    )
+    if aux_model_powered:
+        model_status = (
+            "Model access on auxiliary power — the one powered subsystem "
+            "this turn"
+        )
+    elif not status.ai_operational:
         # The diegetic gate outranks deployment state: below the degraded
         # threshold the desk cannot sustain the model stack at all.
         model_status = (
@@ -177,7 +217,7 @@ def _system_status(campaign: Campaign) -> schemas.SystemStatusModel:
         comms=comms,
         data_freshness=data_freshness,
         staff_capacity=staff,
-        ai_available=ai_live and status.ai_operational,
+        ai_available=ai_live and (status.ai_operational or aux_model_powered),
         model_status=model_status,
         degradation_band=status.band,
         live_feeds=status.live_feeds,
@@ -241,15 +281,26 @@ def list_recent_campaigns(limit: int = 5) -> list[schemas.RecentCampaignModel]:
 def _caller_disposition(campaign: Campaign) -> str:
     """How the caller opens the line, from live trust. Presentation-only.
 
-    At CRITICAL the communications circuit is dark until the player allocates
-    auxiliary power -- and the binding allocation only arrives with the advice
-    submission, so at presentation time the disposition is always unreadable.
+    At CRITICAL the communications circuit is dark unless the player has
+    committed this turn's auxiliary power to COMMUNICATIONS (the pre-turn
+    allocation action). That is the allocation's pre-decision value: commit
+    the circuit before composing advice and the caller can actually be read.
     """
     if degradation_engine.assess_degradation(campaign).requires_power_allocation:
-        return (
-            "Communications dark — the caller's disposition cannot be read. "
-            "Auxiliary power must be allocated with this turn's advice."
-        )
+        committed = campaign.power_commitments.get(campaign.turn_number)
+        if committed is None:
+            return (
+                "Communications dark — the caller's disposition cannot be "
+                "read. Route auxiliary power to COMMUNICATIONS now to open "
+                "the line, or commit it elsewhere and take the call blind."
+            )
+        if committed != PowerAllocation.COMMUNICATIONS:
+            return (
+                f"Communications dark — auxiliary power is committed to "
+                f"{committed} this turn; the caller's disposition cannot be "
+                "read."
+            )
+        # COMMUNICATIONS is powered: fall through to the live disposition.
     call = campaign.current_call()
     if call is None:
         return ""
@@ -281,9 +332,7 @@ def _current_model(campaign: Campaign) -> schemas.CurrentTurnModel:
     ]
     last_turn = None
     if campaign.turn_history:
-        last_turn = schemas.TurnResultModel.model_validate(
-            asdict(campaign.turn_history[-1])
-        )
+        last_turn = _turn_result_model(campaign.turn_history[-1])
 
     system_status = _system_status(campaign)
     world_state = _world_state(campaign)
@@ -463,6 +512,48 @@ def _new_memo(
     )
     campaign.advice_memos.append(memo)
     return memo
+
+
+def allocate_power(
+    campaign_id: str, *, allocation: str, expected_turn: int
+) -> schemas.CurrentTurnModel:
+    """Commit the turn's auxiliary-power allocation BEFORE any gated action.
+
+    This is the pre-decision seam the CRITICAL band was missing: committing
+    COMMUNICATIONS at the top of the turn makes the caller's disposition
+    readable while the advice is still being composed; committing
+    MODEL_ACCESS lifts the drafting gate for the turn. The commitment is
+    binding (it energizes a circuit): a later drafting request or the advice
+    submission naming a different subsystem is a typed conflict. Re-committing
+    the same subsystem is an idempotent no-op.
+
+    Returns the refreshed current-turn package so the client sees the newly
+    readable (or explicitly dark) state in one round trip.
+    """
+    if allocation not in PowerAllocation.ALL:
+        raise errors.UnknownPowerAllocation(allocation)
+    with get_repository().transaction() as active:
+        campaign = active.get_campaign(campaign_id)
+        if campaign is None:
+            raise errors.CampaignNotFound(campaign_id)
+        if campaign.is_terminal():
+            raise errors.CampaignTerminal(campaign.status, campaign.failure_reason)
+        if campaign.ruleset_version != rules_engine.CURRENT_RULESET_VERSION:
+            raise errors.RulesetIncompatible(
+                campaign.ruleset_version, rules_engine.CURRENT_RULESET_VERSION
+            )
+        if campaign.turn_number != expected_turn:
+            raise errors.StaleTurn(expected_turn, campaign.turn_number)
+        status = degradation_engine.assess_degradation(campaign)
+        if not status.requires_power_allocation:
+            raise errors.PowerAllocationUnavailable(status.band)
+        committed = campaign.power_commitments.get(campaign.turn_number)
+        if committed is not None and committed != allocation:
+            raise errors.PowerAllocationConflict(committed, allocation)
+        if committed is None:
+            campaign.power_commitments[campaign.turn_number] = allocation
+            active.save_campaign(campaign)
+        return _current_model(campaign)
 
 
 def _bind_provisional_allocation(
@@ -702,7 +793,7 @@ def submit_advice(
         memo.updated_at = sent_at
         memo.sent_snapshot = sent_snapshot
 
-        response = schemas.TurnResultModel.model_validate(asdict(result))
+        response = _turn_result_model(result)
         active.save_campaign(campaign, snapshot_turn=result.turn_number)
         active.save_turn_presentation(
             campaign_id=campaign_id,
@@ -730,9 +821,7 @@ def get_turns(campaign_id: str) -> Optional[schemas.TurnHistoryModel]:
     campaign = _require_campaign_or_none(campaign_id)
     if campaign is None:
         return None
-    turns = [
-        schemas.TurnResultModel.model_validate(asdict(t)) for t in campaign.turn_history
-    ]
+    turns = [_turn_result_model(t) for t in campaign.turn_history]
     canon = [
         schemas.CanonEntryModel.model_validate(asdict(c)) for c in campaign.canon
     ]

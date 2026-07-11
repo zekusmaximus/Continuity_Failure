@@ -1,3 +1,29 @@
+import type { PowerAllocation } from "./api/client";
+
+// The three auxiliary-power routes at CRITICAL, with what each keeps alive.
+// Shared by the Call-phase commitment panel and the Advice-phase picker.
+export const POWER_ALLOCATIONS: Array<{
+  id: PowerAllocation;
+  label: string;
+  detail: string;
+}> = [
+  {
+    id: "MODEL_ACCESS",
+    label: "Model access",
+    detail: "Assisted drafting stays available; citations and caller history go dark.",
+  },
+  {
+    id: "COMMUNICATIONS",
+    label: "Communications",
+    detail: "The caller can be read — disposition and history reach the desk; drafting and citations go dark.",
+  },
+  {
+    id: "LIVE_DATA",
+    label: "Live data",
+    detail: "Evidence can be verified and cited; drafting and caller history go dark.",
+  },
+];
+
 // Human-readable metadata for the 16 world-state variables.
 // ``risk: true`` means HIGHER IS WORSE (drives bar color and label wording).
 

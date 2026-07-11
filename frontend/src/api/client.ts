@@ -709,6 +709,17 @@ export const api = {
         ...(poweredSubsystem ? { powered_subsystem: poweredSubsystem } : {}),
       }),
     }),
+  /**
+   * Commit the turn's auxiliary-power allocation (CRITICAL band only) —
+   * the pre-decision action: COMMUNICATIONS opens the caller's disposition
+   * before advice is composed; MODEL_ACCESS lifts the drafting gate.
+   * Binding for the turn; returns the refreshed current-turn package.
+   */
+  allocatePower: (id: string, allocation: PowerAllocation, expectedTurn: number) =>
+    request<CurrentTurn>(`/api/campaigns/${id}/power-allocation`, {
+      method: "POST",
+      body: JSON.stringify({ allocation, expected_turn: expectedTurn }),
+    }),
   getTurns: (id: string) =>
     request<TurnHistory>(`/api/campaigns/${id}/turns`),
   getDossier: (id: string) =>

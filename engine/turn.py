@@ -123,11 +123,19 @@ def advance_turn(
       8. Increment the turn counter and record history.
 
     ``powered_subsystem`` is the auxiliary-power allocation (PowerAllocation):
-    REQUIRED when the desk is CRITICAL, rejected otherwise. First-cut effects
-    are capability gates, never diffs -- LIVE_DATA unpowered refuses citations,
-    COMMUNICATIONS unpowered means the caller's history never reached the desk
-    (recorded in the explanation), MODEL_ACCESS matters upstream at the
-    drafting seam. Balance is untouched by design.
+    REQUIRED when the desk is CRITICAL, rejected otherwise. Effects are
+    capability gates, never diffs -- LIVE_DATA unpowered refuses citations,
+    COMMUNICATIONS unpowered means the caller's history never reached the
+    desk, MODEL_ACCESS matters upstream at the drafting seam. Balance is
+    untouched by design.
+
+    The record stays truthful: the caller's actual memory is stored on the
+    decision explanation regardless of the allocation -- the caller remembers
+    whether or not the desk could hear it. What the desk (and therefore the
+    player) sees is a presentation concern: the service layer masks the
+    memory with the communications-dark line when the turn resolved with
+    COMMUNICATIONS unpowered. The authoritative record is never falsified to
+    match a blackout.
     """
     if campaign.is_terminal():
         raise RuntimeError(
@@ -172,20 +180,11 @@ def advance_turn(
     citations = _resolve_citations(campaign, cited_document_ids, resolving_turn)
     decision = rules.decide(campaign, advice, citations, call=call)
 
-    # Communications unpowered: the caller still remembers, but none of it
-    # reached the desk this cycle. Display-only -- adherence inputs are
-    # untouched -- and deterministic: the allocation is part of the turn's
-    # input, so a replay reproduces the same recorded explanation.
-    if (
-        status.requires_power_allocation
-        and powered_subsystem != PowerAllocation.COMMUNICATIONS
-        and decision.explanation is not None
-    ):
-        decision.explanation.memory = [
-            "Communications dark — the caller's history did not reach the "
-            "desk this cycle (auxiliary power allocated to "
-            f"{powered_subsystem})."
-        ]
+    # Communications unpowered: the caller still remembers, and the RECORD
+    # keeps that memory -- the blackout is the desk's, not the caller's. The
+    # service layer presents the communications-dark line instead of the
+    # memory when this turn's ``powered_subsystem`` is not COMMUNICATIONS
+    # (deterministic: the allocation is on the resolved turn).
 
     # Snapshot the pre-turn values so the consequence report can reconcile
     # start -> attributed deltas -> final for every touched variable.

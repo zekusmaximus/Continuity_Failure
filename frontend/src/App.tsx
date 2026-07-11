@@ -499,6 +499,30 @@ export default function App() {
     );
   }, [current, poweredSubsystem]);
 
+  const handleCommitPower = useCallback(
+    async (allocation: PowerAllocation) => {
+      // Bind the turn's auxiliary allocation at the top of the turn (CRITICAL
+      // only). The response is the refreshed turn package: with
+      // COMMUNICATIONS committed the caller's disposition becomes readable
+      // before any advice is composed.
+      if (!campaignId || !current || lastResult) return;
+      setError(null);
+      try {
+        const updated = await api.allocatePower(
+          campaignId,
+          allocation,
+          current.summary.turn_number,
+        );
+        setCurrent(updated);
+        setSummary(updated.summary);
+        setLiveMessage(`Auxiliary power committed to ${allocation}.`);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : String(e));
+      }
+    },
+    [campaignId, current, lastResult],
+  );
+
   const handleAllocatePower = useCallback((allocation: PowerAllocation) => {
     // A committed allocation (a drafting action already energized a circuit
     // this turn) cannot be re-routed; the backend enforces the same rule.
@@ -614,6 +638,7 @@ export default function App() {
         onToggleCite={handleToggleCite}
         poweredSubsystem={poweredSubsystem}
         onAllocatePower={handleAllocatePower}
+        onCommitPower={handleCommitPower}
         submitting={busy}
         onSelect={handleSelectAdvice}
         onGoto={gotoPhase}

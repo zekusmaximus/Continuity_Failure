@@ -305,7 +305,7 @@ When making changes:
 
 ## Current Priority
 
-The deterministic Northbridge MVP is implemented, playable, and tested (521
+The deterministic Northbridge MVP is implemented, playable, and tested (531
 Python tests as of this commit — always re-derive the count with `pytest -q`
 rather than trusting this number; plus 46 vitest and 24 Playwright tests). A
 dormant, validation-gated AI-assist layer (memo drafter + `ModelRun` logging)

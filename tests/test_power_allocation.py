@@ -120,7 +120,12 @@ def test_allocation_gates_capability_but_never_moves_state():
     ] == records[PowerAllocation.LIVE_DATA]
 
 
-def test_comms_unpowered_replaces_client_memory_with_the_dark_line():
+def test_comms_unpowered_keeps_the_record_truthful_and_masks_at_presentation():
+    """The caller remembers whether or not the desk could hear it: the
+    AUTHORITATIVE record keeps the true memory under every allocation; the
+    dark line is a presentation mask applied by the service projection
+    (asserted in tests/test_wave2_balance.py). The engine never falsifies
+    the explanation to match a blackout."""
     base = _critical_campaign()
 
     dark = copy.deepcopy(base)
@@ -129,18 +134,15 @@ def test_comms_unpowered_replaces_client_memory_with_the_dark_line():
         powered_subsystem=PowerAllocation.LIVE_DATA,
     )
     assert result.powered_subsystem == PowerAllocation.LIVE_DATA
-    assert result.decision.explanation.memory == [
-        "Communications dark — the caller's history did not reach the desk "
-        "this cycle (auxiliary power allocated to LIVE_DATA)."
-    ]
+    # Turn 1 has no prior history with this caller: the true (empty) memory
+    # stays on the record, NOT a fabricated dark line.
+    assert result.decision.explanation.memory == []
 
     heard = copy.deepcopy(base)
     result = turn.advance_turn(
         heard, "controlled_disclosure",
         powered_subsystem=PowerAllocation.COMMUNICATIONS,
     )
-    # Turn 1 has no prior history with this caller, so memory is simply the
-    # ordinary (empty) record — NOT the dark line.
     assert result.decision.explanation.memory == []
 
 

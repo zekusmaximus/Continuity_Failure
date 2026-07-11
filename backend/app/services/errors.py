@@ -115,6 +115,20 @@ class PowerAllocationUnavailable(TurnResolutionError):
         self.band = band
 
 
+class UnknownPowerAllocation(TurnResolutionError):
+    """The named subsystem is not one auxiliary power can support."""
+
+    code = "unknown_power_allocation"
+    status_code = 422
+
+    def __init__(self, allocation: str) -> None:
+        super().__init__(
+            f"Unknown auxiliary-power subsystem: {allocation}. Auxiliary "
+            "power supports MODEL_ACCESS, COMMUNICATIONS, or LIVE_DATA."
+        )
+        self.allocation = allocation
+
+
 class PowerAllocationConflict(TurnResolutionError):
     """The turn's auxiliary power is already committed to another subsystem."""
 

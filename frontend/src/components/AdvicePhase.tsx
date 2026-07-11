@@ -7,7 +7,7 @@ import type {
   PowerAllocation,
   SystemStatus,
 } from "../api/client";
-import { levelClass, titleCase, VARIABLE_META } from "../domain";
+import { levelClass, titleCase, POWER_ALLOCATIONS, VARIABLE_META } from "../domain";
 import MemoDraftPanel from "./MemoDraftPanel";
 
 interface Props {
@@ -31,25 +31,6 @@ interface Props {
   poweredSubsystem?: PowerAllocation | null;
   onAllocatePower?: (allocation: PowerAllocation) => void;
 }
-
-// The three auxiliary-power routes at CRITICAL, with what each keeps alive.
-const POWER_ALLOCATIONS: Array<{ id: PowerAllocation; label: string; detail: string }> = [
-  {
-    id: "MODEL_ACCESS",
-    label: "Model access",
-    detail: "Assisted drafting stays available; citations and caller history go dark.",
-  },
-  {
-    id: "COMMUNICATIONS",
-    label: "Communications",
-    detail: "The caller's history reaches the desk; drafting and citations go dark.",
-  },
-  {
-    id: "LIVE_DATA",
-    label: "Live data",
-    detail: "Evidence can be verified and cited; drafting and caller history go dark.",
-  },
-];
 
 // Deterministic preview of how a citation will land — the same tag-overlap
 // rule the engine applies, phrased for the consultant before they commit.
