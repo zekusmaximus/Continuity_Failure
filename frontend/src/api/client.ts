@@ -131,9 +131,12 @@ export interface CampaignSummary {
   max_turns: number;
   failure_reason: string | null;
   created_at: string;
+  ruleset_version: string;
 }
 
-export interface RecentCampaign extends CampaignSummary {
+// The resume-screen projection is built from denormalized SQL columns and
+// does not carry ruleset_version (only the full campaign payload does).
+export interface RecentCampaign extends Omit<CampaignSummary, "ruleset_version"> {
   updated_at: string;
 }
 

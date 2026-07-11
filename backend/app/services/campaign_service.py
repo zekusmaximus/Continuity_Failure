@@ -67,6 +67,7 @@ def _summary(campaign: Campaign) -> schemas.CampaignSummaryModel:
         max_turns=campaign.max_turns,
         failure_reason=campaign.failure_reason,
         created_at=campaign.created_at,
+        ruleset_version=campaign.ruleset_version,
     )
 
 

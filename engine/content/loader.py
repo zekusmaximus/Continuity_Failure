@@ -18,6 +18,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Callable, Dict, List
 
+from engine import rules
 from engine.content import schema
 from engine.content.validator import (
     ContentError,
@@ -234,6 +235,7 @@ def build_campaign(bundle: RawContent, campaign_id: str = "", name: str = "") ->
         documents=_build_documents(bundle.documents),
         open_threads=_build_threads(bundle.threads),
         created_at=datetime.now(timezone.utc).isoformat(),
+        ruleset_version=rules.CURRENT_RULESET_VERSION,
     )
 
 

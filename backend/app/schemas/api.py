@@ -168,6 +168,7 @@ class CampaignSummaryModel(BaseModel):
     max_turns: int = Field(ge=1)
     failure_reason: Optional[str] = None
     created_at: str
+    ruleset_version: str
 
 
 class CampaignModel(BaseModel):

@@ -584,6 +584,12 @@ class Campaign:
     created_at: str = ""
     advice_memos: List[AdviceMemo] = field(default_factory=list)
     debt_ledger: List[PrecedentEntry] = field(default_factory=list)
+    # The deterministic-rules version this campaign is resolved under
+    # (engine.rules.CURRENT_RULESET_VERSION at creation). Defaults to "1"
+    # because every snapshot persisted before this field existed was resolved
+    # under the Wave-1 rules -- the persistence default-fill labels old rows
+    # correctly with no migration.
+    ruleset_version: str = "1"
 
     def is_terminal(self) -> bool:
         return self.status in (CampaignStatus.COMPLETED, CampaignStatus.FAILED)

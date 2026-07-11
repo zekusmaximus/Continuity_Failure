@@ -408,11 +408,12 @@
     }
   ],
   "summary": {
-    "created_at": "2026-07-11T01:54:27.539375+00:00",
+    "created_at": "2026-07-11T12:12:31.161758+00:00",
     "failure_reason": null,
     "id": "test-campaign",
     "max_turns": 10,
     "name": "Northbridge Water Failure",
+    "ruleset_version": "1",
     "scenario_id": "northbridge_water_failure",
     "status": "ACTIVE",
     "turn_number": 1

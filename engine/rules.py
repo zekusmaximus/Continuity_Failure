@@ -27,6 +27,19 @@ from engine.models import (
 from engine.state import clamp, humanize_variable
 
 
+# ---------------------------------------------------------------------------
+# Ruleset version. Campaigns are stamped with the version of the deterministic
+# rules that resolve them, so replayed history can always be matched to the
+# balance that produced it. Bump this string with ANY change that alters the
+# authoritative diff stream (thresholds, drift, decision constants, thread or
+# ledger pricing) and add a matching golden entry in
+# tests/test_ruleset_version.py -- the golden-trace test fails loudly until
+# both move together, so balance tuning can never silently rewrite history.
+# ---------------------------------------------------------------------------
+
+CURRENT_RULESET_VERSION = "1"
+
+
 # An internal working draft of an NPC decision, before the public NpcDecision
 # is assembled. The first three fields (decision_type, adherence, modifications)
 # are authoritative and determinism-tested; the descriptive fields only surface
