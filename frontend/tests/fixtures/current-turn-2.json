@@ -414,7 +414,7 @@
       "involved_factions": [
         "Town Manager's Office"
       ],
-      "memo_id": "memo_e2a02426c1d342ed8a7989ed26dee04e",
+      "memo_id": "memo_5d9caec9f4e44eebb1a4c75ee316e9a2",
       "public_status": "public",
       "source": "Town Manager's Office",
       "tags": [
@@ -818,7 +818,7 @@
         ],
         "outcome_reason": "On-brief: Full disclosure and emergency conservation order was one of the options the Town Manager's Office asked about; the Town Manager's Office acted on it per its own risk posture."
       },
-      "memo_id": "memo_e2a02426c1d342ed8a7989ed26dee04e",
+      "memo_id": "memo_5d9caec9f4e44eebb1a4c75ee316e9a2",
       "memo_revision": 1,
       "modifications": {},
       "off_brief": false,
@@ -969,7 +969,7 @@
       "classification": "proposed",
       "content": "RECOMMENDATION\nRelease the preliminary result with a conservation order, notify the state agency in writing, and publish the response timeline.\n\nRATIONALE\nMinimizes legal exposure and protects information integrity.\n\nOPERATIONAL STEPS\n- Transmit the preliminary result and response timeline to the state liaison in writing.\n- Issue the conservation order with separate hospital and school operating instructions.\n- Publish the source report, known uncertainties, and the next verification deadline together.\n\nCOMMUNICATIONS\nFrame public communications around Full disclosure and emergency conservation order. State only what the record supports.\n\nLIKELY OPPOSITION\nExpect review or resistance from: Town Manager's Office, Local Media / Rumor Network, Parent and Resident Coalition, Local Business Alliance.\n\nSECOND-ORDER RISKS\n- Short-term public-order shock and media amplification.\n- Business and school disruption spike before mitigation lands.\n\nFALLBACK PLAN\nIf the client deviates from this advice, preserve the written advice of record and revisit at the next call.",
       "content_digest": "95bd13bbef8d5c824567a6575e58be5b73db32ad6e5fa59a33d69f95c1ef5117",
-      "memo_id": "memo_e2a02426c1d342ed8a7989ed26dee04e",
+      "memo_id": "memo_5d9caec9f4e44eebb1a4c75ee316e9a2",
       "name": "Advice of record — Full disclosure and emergency conservation order",
       "provenance": {
         "fallback_used": true,
@@ -981,7 +981,7 @@
         "workflow": "deterministic_fallback"
       },
       "revision": 1,
-      "sent_at": "2026-07-11T01:47:16.206010+00:00",
+      "sent_at": "2026-07-11T01:54:27.625003+00:00",
       "source": "system"
     },
     "status_after": "ACTIVE",
@@ -1047,7 +1047,7 @@
     }
   ],
   "summary": {
-    "created_at": "2026-07-11T01:47:16.135900+00:00",
+    "created_at": "2026-07-11T01:54:27.539375+00:00",
     "failure_reason": null,
     "id": "test-campaign",
     "max_turns": 10,

@@ -594,12 +594,35 @@ class CampaignCreatedModel(BaseModel):
     max_turns: int = Field(ge=1)
 
 
+class OutcomeFactorModel(BaseModel):
+    label: str
+    detail: str
+    direction: str = Field(pattern=r"^(increase|decrease|neutral)$")
+
+
+class OutcomeAxisModel(BaseModel):
+    id: str
+    label: str
+    score: int = Field(ge=0, le=100)
+    band: str = Field(pattern=r"^(strong|holding|compromised|failed)$")
+    factors: List[OutcomeFactorModel] = Field(default_factory=list)
+
+
+class OutcomeAssessmentModel(BaseModel):
+    axes: List[OutcomeAxisModel]
+    verdict_title: str
+    verdict_body: List[str] = Field(default_factory=list)
+    campaign_status: str = Field(pattern=CAMPAIGN_STATUS_PATTERN)
+
+
 class DossierModel(BaseModel):
     campaign_id: str
     name: str
     status: str = Field(pattern=CAMPAIGN_STATUS_PATTERN)
     filename: str
     markdown: str
+    # Structured multi-axis verdict; populated for terminal campaigns only.
+    assessment: Optional[OutcomeAssessmentModel] = None
 
 
 class HealthModel(BaseModel):

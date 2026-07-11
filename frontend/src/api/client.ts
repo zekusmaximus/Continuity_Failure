@@ -392,12 +392,35 @@ export interface CampaignCreated {
   max_turns: number;
 }
 
+export interface OutcomeFactor {
+  label: string;
+  detail: string;
+  direction: string;
+}
+
+export interface OutcomeAxis {
+  id: string;
+  label: string;
+  score: number;
+  band: string;
+  factors: OutcomeFactor[];
+}
+
+/** Structured multi-axis verdict; present on terminal campaigns only. */
+export interface OutcomeAssessment {
+  axes: OutcomeAxis[];
+  verdict_title: string;
+  verdict_body: string[];
+  campaign_status: string;
+}
+
 export interface Dossier {
   campaign_id: string;
   name: string;
   status: string;
   filename: string;
   markdown: string;
+  assessment: OutcomeAssessment | null;
 }
 
 export interface Health {

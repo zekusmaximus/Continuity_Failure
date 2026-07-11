@@ -22,6 +22,7 @@ from typing import Optional
 import uuid
 
 from engine import dossier as dossier_engine
+from engine import endings as endings_engine
 from engine import seed_data, turn as turn_engine
 from engine.models import (
     AdviceMemo,
@@ -555,12 +556,18 @@ def get_dossier(campaign_id: str) -> Optional[schemas.DossierModel]:
     campaign = _require_campaign_or_none(campaign_id)
     if campaign is None:
         return None
+    assessment = None
+    if campaign.is_terminal():
+        assessment = schemas.OutcomeAssessmentModel.model_validate(
+            asdict(endings_engine.build_outcome_assessment(campaign))
+        )
     return schemas.DossierModel(
         campaign_id=campaign.id,
         name=campaign.name,
         status=campaign.status,
         filename=dossier_engine.dossier_filename(campaign),
         markdown=dossier_engine.render_dossier_markdown(campaign),
+        assessment=assessment,
     )
 
 

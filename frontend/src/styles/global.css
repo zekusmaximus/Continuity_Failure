@@ -1300,3 +1300,22 @@ body {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ============================ Outcome assessment (Dossier) ============================ */
+.cd-outcome { border: 1px solid var(--border); border-radius: 4px; padding: 14px 16px; margin-bottom: 14px; background: var(--bg-panel-2); }
+.cd-outcome-title { margin: 0 0 8px; font-size: 16px; color: var(--text-bright); }
+.cd-outcome-body { margin: 4px 0; font-size: 12.5px; color: var(--text); }
+.cd-outcome-axes { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.cd-outcome-axis-head {
+  display: grid; grid-template-columns: 160px 1fr 34px 92px; gap: 10px; align-items: center;
+  width: 100%; background: none; border: none; padding: 4px 2px; cursor: pointer;
+  color: var(--text); font: inherit; text-align: left;
+}
+.cd-outcome-axis-head:hover { background: var(--bg-panel); }
+.cd-outcome-axis-label { font-size: 12px; }
+.cd-outcome-axis-score { font-family: var(--mono); font-size: 12px; text-align: right; }
+.cd-outcome-band { font-family: var(--mono); font-size: 9px; letter-spacing: 0.06em; text-transform: uppercase; text-align: right; }
+.cd-band-strong { color: var(--good); }
+.cd-band-holding { color: var(--info); }
+.cd-band-compromised { color: var(--warn); }
+.cd-band-failed { color: var(--crit); }

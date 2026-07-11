@@ -35,6 +35,11 @@ export default function IntroScreen({
             Every recommendation creates a record. Every record can become
             precedent, evidence, or blame.
           </p>
+          <p>
+            Reaching the end is not winning. The final dossier grades what
+            kind of institution survived — and what the consultant became in
+            the process.
+          </p>
         </div>
 
         <div className="cd-intro-engagement">
