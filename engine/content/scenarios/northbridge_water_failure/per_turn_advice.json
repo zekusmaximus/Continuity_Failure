@@ -122,6 +122,49 @@
    ]
   }
  ],
+ "4": [
+  {
+   "id": "competitive_procurement",
+   "label": "Stage a competitive emergency procurement",
+   "summary": "Qualify a second firm and split the emergency scope so the sole-source leverage stops setting the town's terms.",
+   "rationale": "Slower and costlier this quarter, but it is the only lever that actually reduces structural dependency instead of renting it back one change order at a time.",
+   "tags": [
+    "contractor"
+   ],
+   "effects": {
+    "contractor_dependency": -12,
+    "water_security": -4,
+    "budget_capacity": -3,
+    "legal_exposure": 2,
+    "media_pressure": 2
+   },
+   "type": "PROCUREMENT_STRATEGY",
+   "title": "Competitive emergency procurement",
+   "recommendation": "Open an expedited qualification for a second certified firm and split the emergency scope, accepting a slower repair sequence to break sole-source leverage.",
+   "expected_benefits": [
+    "Structural dependency on the sole-source firm actually falls.",
+    "Future change orders price against a real alternative, not a bluff."
+   ],
+   "expected_harms": [
+    "The repair sequence slows while the second firm qualifies; water security slips.",
+    "Marquotte reads a competitive posture as a declaration of hostilities.",
+    "Expedited qualification invites a procurement-protest exposure."
+   ],
+   "operational_steps": [
+    "Issue an expedited qualification notice scoped to the failing valve class.",
+    "Split the emergency scope so no single firm controls the critical path.",
+    "Document the sole-source risk record supporting the expedited process."
+   ],
+   "legal_risk": 45,
+   "political_risk": 50,
+   "operational_risk": 60,
+   "affected_factions": [
+    "utility_contractor",
+    "water_authority",
+    "council_majority"
+   ]
+  }
+ ],
  "5": [
   {
    "id": "load_shedding_protocol",

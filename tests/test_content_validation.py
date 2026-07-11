@@ -60,7 +60,7 @@ def test_loader_builds_expected_campaign_shape():
     assert campaign.turn_number == 1
     assert len(campaign.world_state.factions) == 10
     assert len(campaign.advice_options) == 6
-    assert set(campaign.per_turn_advice) == {2, 3, 5, 7}
+    assert set(campaign.per_turn_advice) == {2, 3, 4, 5, 7}
     assert set(campaign.client_calls) == set(range(1, 11))
     assert len(campaign.documents) == 12
     assert len(campaign.thread_specs) == 6
