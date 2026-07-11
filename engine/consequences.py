@@ -14,6 +14,7 @@ from __future__ import annotations
 
 from typing import Dict, List, Tuple
 
+from engine import conditions
 from engine.models import (
     AdviceEffectOutcome,
     AdviceMediation,
@@ -28,7 +29,7 @@ from engine.models import (
     NpcDecision,
     OpenThread,
     SourceType,
-    ThreadCondition,
+    ThreadSpec,
     VariableConsequence,
 )
 from engine.state import humanize_variable, variable_direction
@@ -391,68 +392,33 @@ def _legal_fallout(variables, advice: AdviceOption, decision: NpcDecision) -> Li
 
 
 # ---------------------------------------------------------------------------
-# Open threads opened or escalated by this turn.
+# Open threads opened by this turn.
 #
-# Every dynamically opened thread carries a deterministic schedule: how many
-# turns until it escalates if unaddressed, what the escalation costs, and what
-# resolves it. ``due_in`` is relative to the turn the thread opens. Keeping the
-# specs here (rather than in scenario content) is deliberate for now: these
-# threads are consequences of the deterministic rules above, not authored
-# story beats; moving them into content is wave-2 work alongside branchable
-# calls.
+# The rules for WHEN a dynamic thread opens -- and the deterministic schedule
+# it carries (turns until escalation, escalation cost, what resolves it) --
+# are authored scenario content (``thread_specs.json``, loaded into
+# ``campaign.thread_specs`` as ``ThreadSpec``). This module only evaluates
+# those specs against the post-advice world state; the trigger semantics are
+# documented on the ``ThreadSpec`` dataclass.
 # ---------------------------------------------------------------------------
 
-_DYNAMIC_THREAD_SPECS: dict = {
-    "thread_concealment_narrative": dict(
-        due_in=2, repeat_every=2,
-        escalation_effects={"public_trust": -3, "media_pressure": +3},
-        escalation_note=(
-            "The concealment frame hardened another cycle without a full "
-            "public accounting."
-        ),
-        resolve_tags=["disclosure"],
-        resolution_note="A full public accounting broke the concealment frame.",
-    ),
-    "thread_oversight_designation": dict(
-        due_in=2, repeat_every=2,
-        escalation_effects={"state_oversight_risk": +4},
-        escalation_note=(
-            "The oversight review file thickened while local metrics kept sliding."
-        ),
-        resolve_conditions=[ThreadCondition("state_oversight_risk", "<=", 45)],
-        resolution_note="Oversight risk fell back below the designation threshold.",
-    ),
-    "thread_contractor_precedent": dict(
-        due_in=2, repeat_every=2,
-        escalation_effects={"legal_exposure": +4, "state_oversight_risk": +3},
-        escalation_note=(
-            "The sole-source emergency terms were cited as precedent again; "
-            "procurement-law exposure and state attention both deepened."
-        ),
-        resolve_conditions=[ThreadCondition("contractor_dependency", "<=", 50)],
-        resolution_note="Dependency fell far enough to renegotiate on normal terms.",
-    ),
-    "thread_school_standoff": dict(
-        due_in=2, repeat_every=2,
-        escalation_effects={"school_disruption": +3, "public_trust": -2},
-        escalation_note=(
-            "Another cycle without a published closure threshold kept parents "
-            "improvising and the superintendent exposed."
-        ),
-        resolve_tags=["school_closure"],
-        resolution_note="A published closure protocol ended the standoff.",
-    ),
-    "thread_trust_collapse": dict(
-        due_in=2, repeat_every=2,
-        escalation_effects={"public_order": -3},
-        escalation_note=(
-            "With consent eroded, compliance with emergency measures slipped "
-            "further."
-        ),
-        resolve_conditions=[ThreadCondition("public_trust", ">=", 45)],
-        resolution_note="Trust recovered enough for emergency measures to hold.",
-    ),
-}
+def _spec_triggers(
+    spec: ThreadSpec, advice: AdviceOption, decision: NpcDecision, variables
+) -> bool:
+    """Whether an authored thread spec's opening trigger holds this turn."""
+    if not conditions.all_hold(spec.open_conditions_all, variables):
+        return False
+    if spec.open_conditions_any and not conditions.any_holds(
+        spec.open_conditions_any, variables
+    ):
+        return False
+    if spec.open_advice_tags or spec.open_decision_types:
+        if (
+            _primary_tag(advice) not in spec.open_advice_tags
+            and decision.decision_type not in spec.open_decision_types
+        ):
+            return False
+    return True
 
 
 def _threads_for_turn(
@@ -461,60 +427,28 @@ def _threads_for_turn(
 ) -> List[OpenThread]:
     existing = {t.id for t in campaign.open_threads}
     new: List[OpenThread] = []
-    media = variables.get("media_pressure", 0)
-    trust = variables.get("public_trust", 50)
-    oversight = variables.get("state_oversight_risk", 0)
-    dependency = variables.get("contractor_dependency", 0)
-    school = variables.get("school_disruption", 0)
-    tag = _primary_tag(advice)
-
-    def maybe(tid, title, summary, ttags):
-        if tid not in existing:
-            spec = dict(_DYNAMIC_THREAD_SPECS.get(tid, {}))
-            due_in = spec.pop("due_in", None)
-            due_turn = resolving_turn + due_in if due_in is not None else None
-            new.append(OpenThread(
-                id=tid, title=title, summary=summary,
-                turn_opened=resolving_turn, tags=ttags,
-                due_turn=due_turn, **spec,
-            ))
-            existing.add(tid)
-
-    if (tag == "delay" or decision.decision_type == DecisionType.DELAYED) and media >= 45:
-        maybe(
-            "thread_concealment_narrative",
-            "'Cover-up' concealment narrative",
-            "A delay posture under rising media pressure let a concealment frame take hold.",
-            ["narrative", "trust", "media"],
-        )
-    if oversight >= 60:
-        maybe(
-            "thread_oversight_designation",
-            "State oversight designation threat",
-            "Late notification and sliding metrics put a formal oversight review in play.",
-            ["state", "oversight", "intervention"],
-        )
-    if (tag == "contractor") and dependency >= 70:
-        maybe(
-            "thread_contractor_precedent",
-            "Sole-source contractor precedent",
-            "Conceded emergency terms are hardening into structural dependency.",
-            ["contractor", "procurement", "dependency"],
-        )
-    if school >= 55 or trust < 45:
-        maybe(
-            "thread_school_standoff",
-            "School closure standoff",
-            "Parents and the superintendent demand an on-the-record closure threshold.",
-            ["school", "parent_pressure"],
-        )
-    if trust < 40:
-        maybe(
-            "thread_trust_collapse",
-            "Public-trust collapse",
-            "Trust has fallen far enough that emergency measures lose public consent.",
-            ["trust", "consent"],
-        )
+    for spec in campaign.thread_specs:
+        if spec.id in existing:
+            continue
+        if not _spec_triggers(spec, advice, decision, variables):
+            continue
+        new.append(OpenThread(
+            id=spec.id,
+            title=spec.title,
+            summary=spec.summary,
+            turn_opened=resolving_turn,
+            tags=list(spec.tags),
+            due_turn=(
+                resolving_turn + spec.due_in if spec.due_in is not None else None
+            ),
+            escalation_effects=dict(spec.escalation_effects),
+            escalation_note=spec.escalation_note,
+            repeat_every=spec.repeat_every,
+            resolve_conditions=list(spec.resolve_conditions),
+            resolve_tags=list(spec.resolve_tags),
+            resolution_note=spec.resolution_note,
+        ))
+        existing.add(spec.id)
     return new
 
 

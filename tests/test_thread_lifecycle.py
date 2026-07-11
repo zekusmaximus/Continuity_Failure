@@ -295,3 +295,121 @@ def test_thread_lifecycle_is_bit_for_bit_repeatable():
         ]
         assert ra.consequence_stack.escalated_threads == rb.consequence_stack.escalated_threads
         assert ra.consequence_stack.resolved_threads == rb.consequence_stack.resolved_threads
+
+
+# ---------------------------------------------------------------------------
+# Authored dynamic-thread specs (thread_specs.json) drive thread opening
+# ---------------------------------------------------------------------------
+
+from engine.consequences import _spec_triggers, _threads_for_turn
+from engine.models import ThreadSpec
+
+
+def _spec(**overrides) -> ThreadSpec:
+    base = dict(id="spec_test", title="Spec test", summary="Trigger test spec.")
+    base.update(overrides)
+    return ThreadSpec(**base)
+
+
+def _decision(decision_type):
+    return type("D", (), {"decision_type": decision_type})()
+
+
+def test_spec_advice_tag_and_decision_type_are_an_or():
+    """The concealment shape: primary tag OR decision type, plus conditions."""
+    campaign = _fresh_campaign()
+    spec = _spec(
+        open_advice_tags=["delay"],
+        open_decision_types=[DecisionType.DELAYED],
+        open_conditions_all=[ThreadCondition("media_pressure", ">=", 45)],
+    )
+    variables = {"media_pressure": 50}
+    delay_advice = _find_advice(campaign, "delay_disclosure")
+    other_advice = _find_advice(campaign, "controlled_disclosure")
+
+    # Tag branch: delay advice, even when the client pivoted (MODIFIED).
+    assert _spec_triggers(spec, delay_advice, _decision(DecisionType.MODIFIED), variables)
+    # Decision branch: any advice the client DELAYED.
+    assert _spec_triggers(spec, other_advice, _decision(DecisionType.DELAYED), variables)
+    # Neither branch: on-tag/on-type miss means no thread.
+    assert not _spec_triggers(
+        spec, other_advice, _decision(DecisionType.FOLLOWED), variables
+    )
+    # Conditions still gate the tag branch.
+    assert not _spec_triggers(
+        spec, delay_advice, _decision(DecisionType.DELAYED), {"media_pressure": 44}
+    )
+
+
+def test_spec_conditions_any_is_an_or_over_thresholds():
+    """The school-standoff shape: either threshold alone opens the thread."""
+    campaign = _fresh_campaign()
+    spec = _spec(
+        open_conditions_any=[
+            ThreadCondition("school_disruption", ">=", 55),
+            ThreadCondition("public_trust", "<=", 44),
+        ],
+    )
+    advice = _find_advice(campaign, "controlled_disclosure")
+    decision = _decision(DecisionType.FOLLOWED)
+
+    assert _spec_triggers(spec, advice, decision, {"school_disruption": 55, "public_trust": 60})
+    assert _spec_triggers(spec, advice, decision, {"school_disruption": 10, "public_trust": 44})
+    assert not _spec_triggers(spec, advice, decision, {"school_disruption": 54, "public_trust": 45})
+
+
+def test_spec_never_reopens_an_id_already_on_the_record():
+    campaign = _fresh_campaign()
+    campaign.thread_specs = [
+        _spec(id="spec_once", open_conditions_all=[ThreadCondition("media_pressure", ">=", 0)])
+    ]
+    campaign.open_threads = [
+        _bare_thread(id="spec_once", status=ThreadStatus.RESOLVED, turn_resolved=2)
+    ]
+    advice = _find_advice(campaign, "controlled_disclosure")
+    opened = _threads_for_turn(
+        campaign, advice, _decision(DecisionType.FOLLOWED),
+        campaign.world_state.variables, resolving_turn=3,
+    )
+    assert opened == []
+
+
+def test_opened_thread_carries_the_specs_schedule():
+    campaign = _fresh_campaign()
+    campaign.thread_specs = [
+        _spec(
+            id="spec_sched",
+            tags=["test"],
+            open_conditions_all=[ThreadCondition("media_pressure", ">=", 0)],
+            due_in=2, repeat_every=3,
+            escalation_effects={"legal_exposure": 4},
+            escalation_note="It got worse.",
+            resolve_tags=["disclosure"],
+            resolve_conditions=[ThreadCondition("media_pressure", "<=", 20)],
+            resolution_note="It got better.",
+        )
+    ]
+    advice = _find_advice(campaign, "controlled_disclosure")
+    opened = _threads_for_turn(
+        campaign, advice, _decision(DecisionType.FOLLOWED),
+        campaign.world_state.variables, resolving_turn=4,
+    )
+    assert len(opened) == 1
+    thread = opened[0]
+    assert thread.turn_opened == 4
+    assert thread.due_turn == 6                 # resolving_turn + due_in
+    assert thread.repeat_every == 3
+    assert thread.escalation_effects == {"legal_exposure": 4}
+    assert thread.resolve_tags == ["disclosure"]
+    assert thread.resolve_conditions[0].variable == "media_pressure"
+    assert thread.status == ThreadStatus.OPEN
+
+
+def test_delay_spam_still_opens_the_concealment_thread_from_content():
+    """End to end: the authored concealment spec reproduces wave-1 behavior."""
+    campaign = _fresh_campaign()
+    while not campaign.is_terminal():
+        turn.advance_turn(campaign, "delay_disclosure")
+    by_id = {t.id: t for t in campaign.open_threads}
+    assert "thread_concealment_narrative" in by_id
+    assert by_id["thread_concealment_narrative"].escalation_count >= 1

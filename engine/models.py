@@ -253,6 +253,44 @@ class OpenThread:
 
 
 @dataclass
+class ThreadSpec:
+    """An authored dynamic-thread specification.
+
+    Where ``OpenThread`` is a live risk on the record, a ``ThreadSpec`` is the
+    authored rule for *when the engine opens one*: a deterministic trigger
+    evaluated after each resolved turn, plus the schedule the resulting thread
+    carries. Specs are scenario content (``thread_specs.json``), not engine
+    constants, so a scenario can author its own consequence threads.
+
+    Trigger semantics (all deterministic, evaluated against the post-advice
+    world state): the spec opens its thread when every ``open_conditions_all``
+    holds, AND at least one ``open_conditions_any`` holds (when that list is
+    non-empty), AND — when either ``open_advice_tags`` or
+    ``open_decision_types`` is non-empty — the resolved advice's primary
+    decision tag is in ``open_advice_tags`` OR the client's decision type is
+    in ``open_decision_types``. A spec never re-opens a thread id that is
+    already on the record.
+    """
+    id: str
+    title: str
+    summary: str
+    tags: List[str] = field(default_factory=list)
+    # --- Opening trigger ---
+    open_conditions_all: List[ThreadCondition] = field(default_factory=list)
+    open_conditions_any: List[ThreadCondition] = field(default_factory=list)
+    open_advice_tags: List[str] = field(default_factory=list)
+    open_decision_types: List[str] = field(default_factory=list)
+    # --- Schedule carried by the OpenThread this spec creates ---
+    due_in: Optional[int] = None            # turns until first escalation
+    repeat_every: int = 0
+    escalation_effects: Dict[str, int] = field(default_factory=dict)
+    escalation_note: str = ""
+    resolve_tags: List[str] = field(default_factory=list)
+    resolve_conditions: List[ThreadCondition] = field(default_factory=list)
+    resolution_note: str = ""
+
+
+@dataclass
 class AppliedDiff:
     variable: str
     old_value: int
@@ -590,6 +628,10 @@ class Campaign:
     # under the Wave-1 rules -- the persistence default-fill labels old rows
     # correctly with no migration.
     ruleset_version: str = "1"
+    # Authored dynamic-thread rules (see ThreadSpec). Defaults to empty for
+    # snapshots persisted before the field existed: such campaigns keep their
+    # already-open threads but stop opening NEW dynamic threads mid-campaign.
+    thread_specs: List[ThreadSpec] = field(default_factory=list)
 
     def is_terminal(self) -> bool:
         return self.status in (CampaignStatus.COMPLETED, CampaignStatus.FAILED)

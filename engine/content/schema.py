@@ -24,12 +24,14 @@ from engine.models import (
     CallDecisionProfile,
     ClientCall,
     Crisis,
+    DecisionType,
     Document,
     Faction,
     OpenThread,
     PublicStatus,
     Reliability,
     ThreadCondition,
+    ThreadSpec,
     Urgency,
 )
 from engine.state import STATE_VARIABLE_LABELS
@@ -66,6 +68,7 @@ def _string_values(cls) -> Set[str]:
 URGENCY_VALUES: Set[str] = _string_values(Urgency)
 PUBLIC_STATUS_VALUES: Set[str] = _string_values(PublicStatus)
 RELIABILITY_VALUES: Set[str] = _string_values(Reliability)
+DECISION_TYPE_VALUES: Set[str] = _string_values(DecisionType)
 
 # Coarser controlled vocabularies (authored in docs/state-schema.md).
 FACTION_ALIGNMENTS: Set[str] = {"authority", "opposition", "neutral", "service"}
@@ -137,6 +140,7 @@ FIELD_SPECS: Dict[str, FieldSpec] = {
     "document": FieldSpec(Document),
     "thread": FieldSpec(OpenThread),
     "thread_condition": FieldSpec(ThreadCondition),
+    "thread_spec": FieldSpec(ThreadSpec),
     "crisis": FieldSpec(Crisis),
 }
 

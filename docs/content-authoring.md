@@ -26,6 +26,7 @@ One coherent file per authored domain:
 | `calls.json`           | one client call per turn (`1..max_turns`), any order           |
 | `documents.json`       | evidence-board documents; `turn_number` is the freshness/available-from turn |
 | `threads.json`         | open threads seeded at engagement start                        |
+| `thread_specs.json`    | dynamic-thread rules: when the engine opens a consequence thread mid-game, and the schedule it carries |
 
 Field names match the engine dataclasses in `engine/models.py`. Any field that
 equals its dataclass default may be omitted; required fields (those without a
@@ -91,6 +92,18 @@ one pass):
 - **Document tags** — non-empty; **freshness** (`turn_number`) in range.
 - **Threshold coverage** — every variable the failure thresholds and ambient
   drift reference has a starting value.
+- **Thread specs** — every spec has a non-empty opening trigger (at least one
+  of `open_conditions_all`, `open_conditions_any`, `open_advice_tags`,
+  `open_decision_types`); conditions reference known variables with `<=`/`>=`
+  ops and 0–100 thresholds; `open_advice_tags`/`resolve_tags` are recognized
+  decision tags; `open_decision_types` are known decision types; `due_in >= 1`;
+  `repeat_every >= 0`; `escalation_effects` require an `escalation_note`; spec
+  ids are unique and must not collide with seeded `threads.json` ids (a spec
+  never re-opens an id already on the record). Trigger semantics: all
+  `open_conditions_all` AND (any `open_conditions_any`, when present) AND — when
+  either tag/type list is present — the advice's primary tag is in
+  `open_advice_tags` OR the decision type is in `open_decision_types`. See the
+  `ThreadSpec` dataclass in `engine/models.py`.
 
 ## Schema version and migrations
 

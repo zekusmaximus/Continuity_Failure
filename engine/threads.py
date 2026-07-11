@@ -25,6 +25,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import List, Tuple
 
+from engine import conditions
 from engine.diffs import apply_diffs
 from engine.models import (
     AdviceOption,
@@ -55,13 +56,7 @@ class ThreadEvent:
 def _conditions_hold(thread: OpenThread, variables) -> bool:
     if not thread.resolve_conditions:
         return False
-    for condition in thread.resolve_conditions:
-        value = variables.get(condition.variable, 50)
-        if condition.op == "<=" and not value <= condition.threshold:
-            return False
-        if condition.op == ">=" and not value >= condition.threshold:
-            return False
-    return True
+    return conditions.all_hold(thread.resolve_conditions, variables)
 
 
 def _resolved_by_advice(

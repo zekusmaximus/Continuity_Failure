@@ -442,6 +442,105 @@ def _validate_document(
         c.check_str_list(file, f"{path}.tags", doc["tags"], "tags", require_nonempty=True)
 
 
+def _validate_conditions(
+    c: _Collector, file: str, path: str, conditions: Any, label: str
+) -> None:
+    """Validate a list of ThreadCondition-shaped mappings."""
+    if not c.is_list(file, path, conditions, label):
+        return
+    for i, cond in enumerate(conditions):
+        cpath = f"{path}[{i}]"
+        if not c.is_mapping(file, cpath, cond, label):
+            continue
+        c.check_fields(file, cpath, cond,
+                       schema.FIELD_SPECS["thread_condition"], label)
+        variable = cond.get("variable")
+        if variable is not None and variable not in schema.KNOWN_VARIABLES:
+            c.add(file, f"{cpath}.variable",
+                  f"unknown WorldState variable '{variable}' in {label}")
+        op = cond.get("op")
+        if op is not None and op not in schema.THREAD_CONDITION_OPS:
+            c.add(file, f"{cpath}.op",
+                  f"{label} op must be one of "
+                  f"{', '.join(sorted(schema.THREAD_CONDITION_OPS))}")
+        if "threshold" in cond:
+            c.check_int_range(file, f"{cpath}.threshold", cond["threshold"], 0, 100)
+
+
+def _validate_thread_spec(
+    c: _Collector, file: str, path: str, spec: Dict[str, Any]
+) -> None:
+    c.check_fields(file, path, spec, schema.FIELD_SPECS["thread_spec"], "thread spec")
+    for key in ("id", "title", "summary"):
+        if key in spec:
+            c.check_nonempty_str(file, f"{path}.{key}", spec[key], key)
+    if "tags" in spec:
+        c.check_str_list(file, f"{path}.tags", spec["tags"], "tags", require_nonempty=False)
+
+    # --- Opening trigger: at least one criterion, every part legible ---
+    trigger_keys = ("open_conditions_all", "open_conditions_any",
+                    "open_advice_tags", "open_decision_types")
+    if not any(spec.get(key) for key in trigger_keys):
+        c.add(file, path,
+              "thread spec has no opening trigger (one of "
+              f"{', '.join(trigger_keys)}); it would open unconditionally on "
+              "the first resolved turn")
+    for key in ("open_conditions_all", "open_conditions_any"):
+        if key in spec:
+            _validate_conditions(c, file, f"{path}.{key}", spec[key], "open condition")
+    for i, tag in enumerate(spec.get("open_advice_tags", []) or []):
+        if not isinstance(tag, str) or tag not in schema.KNOWN_DECISION_TAGS:
+            c.add(file, f"{path}.open_advice_tags[{i}]",
+                  f"open advice tag '{tag}' is not a recognized decision tag "
+                  f"(one of {', '.join(sorted(schema.KNOWN_DECISION_TAGS))})")
+    for i, dtype in enumerate(spec.get("open_decision_types", []) or []):
+        if not isinstance(dtype, str) or dtype not in schema.DECISION_TYPE_VALUES:
+            c.add(file, f"{path}.open_decision_types[{i}]",
+                  f"unknown decision type '{dtype}' "
+                  f"(allowed: {', '.join(sorted(schema.DECISION_TYPE_VALUES))})")
+
+    # --- Schedule carried by the thread the spec opens ---
+    due_in = spec.get("due_in")
+    if due_in is not None:
+        if isinstance(due_in, bool) or not isinstance(due_in, int) or due_in < 1:
+            c.add(file, f"{path}.due_in",
+                  "thread spec due_in must be an integer >= 1 (turns until "
+                  "first escalation)")
+    repeat = spec.get("repeat_every")
+    if repeat is not None:
+        if isinstance(repeat, bool) or not isinstance(repeat, int) or repeat < 0:
+            c.add(file, f"{path}.repeat_every",
+                  "thread spec repeat_every must be a non-negative integer")
+
+    effects = spec.get("escalation_effects")
+    if effects is not None and c.is_mapping(
+        file, f"{path}.escalation_effects", effects, "escalation_effects"
+    ):
+        for var, delta in effects.items():
+            if var not in schema.KNOWN_VARIABLES:
+                c.add(file, f"{path}.escalation_effects.{var}",
+                      f"unknown WorldState variable '{var}' in escalation map")
+                continue
+            c.check_int_range(file, f"{path}.escalation_effects.{var}", delta,
+                              schema.MIN_EFFECT_DELTA, schema.MAX_EFFECT_DELTA)
+        if effects and not (
+            isinstance(spec.get("escalation_note"), str)
+            and spec.get("escalation_note", "").strip()
+        ):
+            c.add(file, f"{path}.escalation_note",
+                  "a thread spec with escalation_effects must carry a non-empty "
+                  "escalation_note so the applied diff stays legible")
+
+    if "resolve_conditions" in spec:
+        _validate_conditions(c, file, f"{path}.resolve_conditions",
+                             spec["resolve_conditions"], "resolve condition")
+    for i, rtag in enumerate(spec.get("resolve_tags", []) or []):
+        if not isinstance(rtag, str) or rtag not in schema.KNOWN_DECISION_TAGS:
+            c.add(file, f"{path}.resolve_tags[{i}]",
+                  f"resolve tag '{rtag}' is not a recognized decision tag "
+                  f"(one of {', '.join(sorted(schema.KNOWN_DECISION_TAGS))})")
+
+
 def _validate_thread(
     c: _Collector, file: str, path: str, thread: Dict[str, Any], max_turns: Optional[int]
 ) -> None:
@@ -633,11 +732,25 @@ def validate_bundle(bundle) -> None:
                     c.add(f["calls"], "", f"no client call defined for turn {turn}")
 
     # --- threads ---
+    thread_ids: Set[str] = set()
     if c.is_list(f["threads"], "", bundle.threads, "threads"):
-        _collect_ids(c, f["threads"], bundle.threads, "thread")
+        thread_ids = _collect_ids(c, f["threads"], bundle.threads, "thread")
         for i, thread in enumerate(bundle.threads):
             if c.is_mapping(f["threads"], f"[{i}]", thread, "open thread"):
                 _validate_thread(c, f["threads"], f"[{i}]", thread, max_turns)
+
+    # --- thread specs (dynamic-thread opening rules) ---
+    if c.is_list(f["thread_specs"], "", bundle.thread_specs, "thread_specs"):
+        spec_ids = _collect_ids(c, f["thread_specs"], bundle.thread_specs, "thread spec")
+        # A spec never re-opens an id already on the record, so a spec that
+        # shares an id with a seeded thread could never fire.
+        for shared in sorted(spec_ids & thread_ids):
+            c.add(f["thread_specs"], "",
+                  f"thread spec id '{shared}' collides with a seeded thread in "
+                  "threads.json; the spec could never open")
+        for i, spec in enumerate(bundle.thread_specs):
+            if c.is_mapping(f["thread_specs"], f"[{i}]", spec, "thread spec"):
+                _validate_thread_spec(c, f["thread_specs"], f"[{i}]", spec)
 
     if c.errors:
         raise ContentValidationError(bundle.root, c.errors)

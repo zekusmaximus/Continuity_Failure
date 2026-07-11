@@ -63,6 +63,7 @@ def test_loader_builds_expected_campaign_shape():
     assert set(campaign.per_turn_advice) == {2, 3, 7}
     assert set(campaign.client_calls) == set(range(1, 11))
     assert len(campaign.documents) == 12
+    assert len(campaign.thread_specs) == 5
     assert campaign.world_state.active_crisis.id == "northbridge_water_crisis"
     assert len(campaign.world_state.variables) == 16
 
@@ -451,3 +452,87 @@ def test_reject_negative_repeat_every():
     bundle.threads[0]["repeat_every"] = -1
     exc = _expect_invalid(bundle)
     assert any("repeat_every" in m for m in _messages(exc))
+
+
+# ---------------------------------------------------------------------------
+# Thread specs (dynamic-thread opening rules, thread_specs.json)
+# ---------------------------------------------------------------------------
+
+def test_loader_builds_thread_specs():
+    campaign = load_campaign(NORTHBRIDGE_SCENARIO_ID, campaign_id="fixed")
+    assert [s.id for s in campaign.thread_specs] == [
+        "thread_concealment_narrative",
+        "thread_oversight_designation",
+        "thread_contractor_precedent",
+        "thread_school_standoff",
+        "thread_trust_collapse",
+    ]
+    concealment = campaign.thread_specs[0]
+    assert concealment.open_advice_tags == ["delay"]
+    assert concealment.open_decision_types == ["DELAYED"]
+    assert concealment.open_conditions_all[0].variable == "media_pressure"
+    assert concealment.due_in == 2 and concealment.repeat_every == 2
+
+
+def test_reject_thread_spec_without_any_opening_trigger():
+    bundle = valid_bundle()
+    for key in ("open_conditions_all", "open_conditions_any",
+                "open_advice_tags", "open_decision_types"):
+        bundle.thread_specs[0].pop(key, None)
+    exc = _expect_invalid(bundle)
+    assert any("no opening trigger" in m for m in _messages(exc))
+
+
+def test_reject_thread_spec_with_unknown_open_condition_variable():
+    bundle = valid_bundle()
+    bundle.thread_specs[0]["open_conditions_all"] = [
+        {"variable": "not_a_variable", "op": ">=", "threshold": 45}
+    ]
+    exc = _expect_invalid(bundle)
+    assert any("unknown WorldState variable 'not_a_variable'" in m
+               for m in _messages(exc))
+
+
+def test_reject_thread_spec_with_unknown_advice_tag_or_decision_type():
+    bundle = valid_bundle()
+    bundle.thread_specs[0]["open_advice_tags"] = ["not_a_tag"]
+    bundle.thread_specs[0]["open_decision_types"] = ["SHRUGGED"]
+    exc = _expect_invalid(bundle)
+    messages = _messages(exc)
+    assert any("open advice tag 'not_a_tag'" in m for m in messages)
+    assert any("unknown decision type 'SHRUGGED'" in m for m in messages)
+
+
+def test_reject_thread_spec_escalation_without_note():
+    bundle = valid_bundle()
+    bundle.thread_specs[0]["escalation_note"] = ""
+    exc = _expect_invalid(bundle)
+    assert any("escalation_note" in m for m in _messages(exc))
+
+
+def test_reject_thread_spec_with_bad_due_in():
+    bundle = valid_bundle()
+    bundle.thread_specs[0]["due_in"] = 0
+    exc = _expect_invalid(bundle)
+    assert any("due_in" in m for m in _messages(exc))
+
+
+def test_reject_thread_spec_id_colliding_with_seeded_thread():
+    bundle = valid_bundle()
+    bundle.thread_specs[0]["id"] = bundle.threads[0]["id"]
+    exc = _expect_invalid(bundle)
+    assert any("collides with a seeded thread" in m for m in _messages(exc))
+
+
+def test_reject_duplicate_thread_spec_ids():
+    bundle = valid_bundle()
+    bundle.thread_specs[1]["id"] = bundle.thread_specs[0]["id"]
+    exc = _expect_invalid(bundle)
+    assert any("duplicate thread spec id" in m for m in _messages(exc))
+
+
+def test_reject_unknown_thread_spec_field():
+    bundle = valid_bundle()
+    bundle.thread_specs[0]["opens_when"] = "media is high"
+    exc = _expect_invalid(bundle)
+    assert any("unknown field 'opens_when'" in m for m in _messages(exc))

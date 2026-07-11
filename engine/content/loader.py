@@ -36,6 +36,7 @@ from engine.models import (
     Faction,
     OpenThread,
     ThreadCondition,
+    ThreadSpec,
     WorldState,
 )
 
@@ -50,6 +51,7 @@ _FILES: Dict[str, str] = {
     "calls": "calls.json",
     "documents": "documents.json",
     "threads": "threads.json",
+    "thread_specs": "thread_specs.json",
 }
 
 
@@ -70,6 +72,7 @@ class RawContent:
     calls: Any = field(default_factory=list)
     documents: Any = field(default_factory=list)
     threads: Any = field(default_factory=list)
+    thread_specs: Any = field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
@@ -200,6 +203,18 @@ def _build_threads(raw: List[dict]) -> List[OpenThread]:
     return threads
 
 
+def _build_thread_specs(raw: List[dict]) -> List[ThreadSpec]:
+    specs = []
+    for s in raw:
+        data = dict(s)
+        for key in ("open_conditions_all", "open_conditions_any", "resolve_conditions"):
+            conditions = data.get(key)
+            if isinstance(conditions, list):
+                data[key] = [ThreadCondition(**cond) for cond in conditions]
+        specs.append(ThreadSpec(**data))
+    return specs
+
+
 def _last_verified(turn: int) -> str:
     return f"Turn {turn} · Operational snapshot (deterministic)"
 
@@ -234,6 +249,7 @@ def build_campaign(bundle: RawContent, campaign_id: str = "", name: str = "") ->
         client_calls=_build_calls(bundle.calls),
         documents=_build_documents(bundle.documents),
         open_threads=_build_threads(bundle.threads),
+        thread_specs=_build_thread_specs(bundle.thread_specs),
         created_at=datetime.now(timezone.utc).isoformat(),
         ruleset_version=rules.CURRENT_RULESET_VERSION,
     )
