@@ -50,6 +50,64 @@ CANONICAL_SEQUENCES = {
 # ---------------------------------------------------------------------------
 
 GOLDEN_TRACES = {
+    # Ruleset "2" (Wave 2b, batch B1): power_stability gained deterministic
+    # drivers -- the authored heat-event ambient window (turns 3-6, -6/turn)
+    # and the grid-stress thread spec (opens at power <= 55, escalates -4
+    # every 2 turns). None of the canonical sequences plays the load-shedding
+    # counter, so every "2" entry differs from its "1" entry ONLY in
+    # power_stability (asserted by
+    # test_ruleset_two_changed_only_power_stability below).
+    "2": {
+        "survival": {
+            "status": CampaignStatus.COMPLETED,
+            "failure_reason": None,
+            "turns_resolved": 10,
+            "final_variables": {
+                "water_security": 62, "power_stability": 40,
+                "public_trust": 63, "public_order": 54,
+                "budget_capacity": 2, "staff_capacity": 40,
+                "legal_exposure": 60, "media_pressure": 73,
+                "hospital_stability": 74, "school_disruption": 46,
+                "state_oversight_risk": 42, "contractor_dependency": 74,
+                "information_integrity": 79, "player_reputation": 45,
+                "player_perceived_neutrality": 50, "player_shadow_authority": 20,
+            },
+        },
+        "contractor_spam": {
+            "status": CampaignStatus.FAILED,
+            "failure_reason": (
+                "Legal Exposure reached 98 (failure threshold >= 95)."
+            ),
+            "turns_resolved": 10,
+            "final_variables": {
+                "water_security": 87, "power_stability": 40,
+                "public_trust": 46, "public_order": 66,
+                "budget_capacity": 21, "staff_capacity": 40,
+                "legal_exposure": 98, "media_pressure": 70,
+                "hospital_stability": 46, "school_disruption": 58,
+                "state_oversight_risk": 35, "contractor_dependency": 100,
+                "information_integrity": 62, "player_reputation": 42,
+                "player_perceived_neutrality": 44, "player_shadow_authority": 18,
+            },
+        },
+        "delay_spam": {
+            "status": CampaignStatus.FAILED,
+            "failure_reason": (
+                "Legal Exposure reached 100 (failure threshold >= 95)."
+            ),
+            "turns_resolved": 8,
+            "final_variables": {
+                "water_security": 30, "power_stability": 44,
+                "public_trust": 14, "public_order": 63,
+                "budget_capacity": 24, "staff_capacity": 42,
+                "legal_exposure": 100, "media_pressure": 98,
+                "hospital_stability": 48, "school_disruption": 60,
+                "state_oversight_risk": 54, "contractor_dependency": 66,
+                "information_integrity": 43, "player_reputation": 33,
+                "player_perceived_neutrality": 36, "player_shadow_authority": 18,
+            },
+        },
+    },
     "1": {
         "survival": {
             "status": CampaignStatus.COMPLETED,
@@ -149,6 +207,27 @@ def test_canonical_sequences_match_the_golden_traces():
             f"trace for ruleset {CURRENT_RULESET_VERSION!r}. If this change is "
             "intentional, bump CURRENT_RULESET_VERSION in engine/rules.py and "
             "add a new golden entry -- do not edit the existing one."
+        )
+
+
+def test_ruleset_two_changed_only_power_stability():
+    """The B1 drivers touch no failure-threshold variable: every canonical
+    outcome, turn count, and non-power variable is bit-identical to ruleset
+    "1". This is the pinned statement that the 2b drift is capability
+    pressure, not balance pressure."""
+    for name in CANONICAL_SEQUENCES:
+        v1 = GOLDEN_TRACES["1"][name]
+        v2 = GOLDEN_TRACES["2"][name]
+        assert v1["status"] == v2["status"], name
+        assert v1["failure_reason"] == v2["failure_reason"], name
+        assert v1["turns_resolved"] == v2["turns_resolved"], name
+        changed = {
+            var for var, value in v2["final_variables"].items()
+            if v1["final_variables"][var] != value
+        }
+        assert changed == {"power_stability"}, (
+            f"{name}: ruleset 2 changed {sorted(changed)}; only "
+            "power_stability may differ from ruleset 1"
         )
 
 

@@ -22,6 +22,7 @@ from engine import rules
 from engine.conditions import FACTION_CONDITION_FIELDS
 from engine.models import (
     AdviceOption,
+    AmbientWindow,
     CallDecisionProfile,
     CallVariant,
     ClientCall,
@@ -88,6 +89,7 @@ ADVICE_TYPES: Set[str] = {
     "INDEPENDENT_REVIEW", "BACKCHANNEL",
     # As-built per-turn advice types (see engine content).
     "SCHOOL_CLOSURE_PROTOCOL", "HOSPITAL_PRIORITY", "BUSINESS_COMPENSATION",
+    "LOAD_SHEDDING_PROTOCOL",
 }
 
 DOCUMENT_TYPES: Set[str] = {
@@ -144,6 +146,7 @@ FIELD_SPECS: Dict[str, FieldSpec] = {
     "thread_condition": FieldSpec(ThreadCondition),
     "thread_spec": FieldSpec(ThreadSpec),
     "call_variant": FieldSpec(CallVariant),
+    "ambient_window": FieldSpec(AmbientWindow),
     "crisis": FieldSpec(Crisis),
 }
 
@@ -168,7 +171,9 @@ SCENARIO_REQUIRED_KEYS: Set[str] = {
     "schema_version", "scenario_id", "name", "max_turns",
     "starting_variables", "crisis",
 }
-SCENARIO_ALLOWED_KEYS: Set[str] = SCENARIO_REQUIRED_KEYS | {"description"}
+SCENARIO_ALLOWED_KEYS: Set[str] = SCENARIO_REQUIRED_KEYS | {
+    "description", "ambient_windows",
+}
 
 # Seed variants (variants.json) are metadata like the scenario header, not a
 # runtime dataclass: every key is required -- a variant without overrides is

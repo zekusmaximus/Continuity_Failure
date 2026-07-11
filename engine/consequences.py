@@ -189,6 +189,24 @@ _IMMEDIATE: dict = {
             "No compensation offered; restrictions proceed over business objections.",
         ],
     },
+    "load_shedding": {
+        DecisionType.FOLLOWED: [
+            "A rotating load-management schedule is published, with hospital and water operations exempted as critical loads.",
+            "Grid margin is being spent on a schedule instead of lost to an uncontrolled failure.",
+        ],
+        DecisionType.PARTIALLY_FOLLOWED: [
+            "Load management runs overnight only; daytime service is preserved at the cost of margin.",
+        ],
+        DecisionType.MODIFIED: [
+            "The outage schedule was reshaped around political pressure rather than grid engineering.",
+        ],
+        DecisionType.DELAYED: [
+            "The load-shedding decision was deferred; the grid keeps running on shrinking margin.",
+        ],
+        DecisionType.REJECTED: [
+            "No load-management schedule issued; the next outage will be unplanned and unowned.",
+        ],
+    },
 }
 
 

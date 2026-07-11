@@ -27,6 +27,7 @@ from engine.content.validator import (
 )
 from engine.models import (
     AdviceOption,
+    AmbientWindow,
     CallDecisionProfile,
     CallVariant,
     Campaign,
@@ -306,6 +307,9 @@ def build_campaign(
         documents=_build_documents(bundle.documents),
         open_threads=_build_threads(bundle.threads),
         thread_specs=_build_thread_specs(bundle.thread_specs),
+        ambient_windows=[
+            AmbientWindow(**w) for w in scenario.get("ambient_windows", [])
+        ],
         created_at=datetime.now(timezone.utc).isoformat(),
         ruleset_version=rules.CURRENT_RULESET_VERSION,
         variant_id=variant_id,

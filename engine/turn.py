@@ -152,6 +152,17 @@ def advance_turn(
         reason="Ambient crisis pressure",
         source_type=SourceType.AMBIENT,
     )
+    # Content-authored ambient episodes (heat events, cold snaps): each window
+    # covering this turn lands as its own diff batch with its authored reason,
+    # so the causal waterfall names the episode, not a generic drift.
+    for window in campaign.ambient_windows:
+        if window.from_turn <= resolving_turn <= window.to_turn:
+            diffs += apply_diffs(
+                variables,
+                window.effects,
+                reason=window.reason,
+                source_type=SourceType.AMBIENT,
+            )
 
     # Open threads resolve or escalate before the failure check, so an
     # unaddressed standing risk can itself end the engagement.

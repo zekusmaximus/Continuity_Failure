@@ -37,7 +37,13 @@ from engine.state import clamp, humanize_variable
 # both move together, so balance tuning can never silently rewrite history.
 # ---------------------------------------------------------------------------
 
-CURRENT_RULESET_VERSION = "1"
+# Version history:
+#   "1" -- the Wave-1 rules (power_stability had no driver).
+#   "2" -- Wave 2b batch B1: power_stability gains deterministic drivers
+#          (authored ambient windows, the grid-stress thread spec, and the
+#          load-shedding advice handler below). Threshold variables are
+#          untouched: the "2" goldens differ from "1" ONLY in power_stability.
+CURRENT_RULESET_VERSION = "2"
 
 
 # An internal working draft of an NPC decision, before the public NpcDecision
@@ -377,6 +383,50 @@ def _decide_business_compensation(campaign: Campaign) -> _DecisionDraft:
     )
 
 
+def _decide_load_shedding(campaign: Campaign) -> _DecisionDraft:
+    v = campaign.world_state.variables
+    power = v.get("power_stability", 50)
+    order = v.get("public_order", 50)
+
+    if power <= 35:
+        # The grid margin is thin enough that refusing a published schedule
+        # would be indefensible after the first uncontrolled outage.
+        return _DecisionDraft(
+            DecisionType.FOLLOWED, 0.9, {},
+            deviation="None — the grid margin left no room to hedge.",
+            public_explanation=(
+                "A published rotating-outage schedule is in force, with hospital "
+                "and water operations exempted as critical loads."
+            ),
+            private_motive="An uncontrolled failure would be blamed on whoever refused the schedule.",
+            resulting_risk="A published schedule is an admission the grid is in trouble.",
+        )
+    if order <= 45:
+        # Compliance is already frail; the utility trims the schedule to the
+        # least visible hours rather than test public patience.
+        return _DecisionDraft(
+            DecisionType.PARTIALLY_FOLLOWED, 0.6,
+            {"media_pressure": 2},
+            deviation="Trimmed the outage windows to overnight hours only.",
+            public_explanation=(
+                "Limited overnight load management is in effect to protect "
+                "critical operations."
+            ),
+            private_motive="Daytime outages on top of water restrictions risked open defiance.",
+            resulting_risk="Overnight-only shedding buys less margin than the protocol assumed.",
+        )
+    return _DecisionDraft(
+        DecisionType.FOLLOWED, 0.8, {},
+        deviation="None — the load-shedding protocol was adopted on the planned scope.",
+        public_explanation=(
+            "A rotating load-management schedule has been published, with "
+            "critical facilities exempted."
+        ),
+        private_motive="A controlled, scheduled cost beat an uncontrolled failure.",
+        resulting_risk="Visible rationing feeds the narrative that the crisis is widening.",
+    )
+
+
 _ADVICE_TAG_DISPATCH = {
     "disclosure": _decide_disclosure,
     "delay": _decide_delay,
@@ -386,6 +436,7 @@ _ADVICE_TAG_DISPATCH = {
     "school_closure": _decide_school_closure,
     "hospital_priority": _decide_hospital_priority,
     "business_compensation": _decide_business_compensation,
+    "load_shedding": _decide_load_shedding,
 }
 
 

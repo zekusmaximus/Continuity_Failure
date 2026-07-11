@@ -60,10 +60,10 @@ def test_loader_builds_expected_campaign_shape():
     assert campaign.turn_number == 1
     assert len(campaign.world_state.factions) == 10
     assert len(campaign.advice_options) == 6
-    assert set(campaign.per_turn_advice) == {2, 3, 7}
+    assert set(campaign.per_turn_advice) == {2, 3, 5, 7}
     assert set(campaign.client_calls) == set(range(1, 11))
     assert len(campaign.documents) == 12
-    assert len(campaign.thread_specs) == 5
+    assert len(campaign.thread_specs) == 6
     assert campaign.world_state.active_crisis.id == "northbridge_water_crisis"
     assert len(campaign.world_state.variables) == 16
 
@@ -466,6 +466,7 @@ def test_loader_builds_thread_specs():
         "thread_contractor_precedent",
         "thread_school_standoff",
         "thread_trust_collapse",
+        "thread_grid_stress",
     ]
     concealment = campaign.thread_specs[0]
     assert concealment.open_advice_tags == ["delay"]
@@ -675,3 +676,61 @@ def test_reject_duplicate_variant_ids():
     bundle.variants[1]["id"] = bundle.variants[0]["id"]
     exc = _expect_invalid(bundle)
     assert any("duplicate variant id" in m for m in _messages(exc))
+
+
+# ---------------------------------------------------------------------------
+# Ambient windows (scenario.json ambient_windows)
+# ---------------------------------------------------------------------------
+
+def _first_window(bundle):
+    return bundle.scenario["ambient_windows"][0]
+
+
+def test_reject_window_with_unknown_variable():
+    bundle = valid_bundle()
+    _first_window(bundle)["effects"] = {"powr_stability": -6}
+    exc = _expect_invalid(bundle)
+    assert any("unknown WorldState variable 'powr_stability'" in m
+               for m in _messages(exc))
+
+
+def test_reject_window_running_backwards_or_out_of_range():
+    bundle = valid_bundle()
+    _first_window(bundle)["from_turn"] = 8
+    _first_window(bundle)["to_turn"] = 3
+    exc = _expect_invalid(bundle)
+    assert any("runs backwards" in m for m in _messages(exc))
+
+    bundle = valid_bundle()
+    _first_window(bundle)["to_turn"] = 99
+    exc = _expect_invalid(bundle)
+    assert any("to_turn 99 is outside 1..10" in m for m in _messages(exc))
+
+
+def test_reject_window_with_empty_effects_or_blank_reason():
+    bundle = valid_bundle()
+    _first_window(bundle)["effects"] = {}
+    _first_window(bundle)["reason"] = "  "
+    exc = _expect_invalid(bundle)
+    messages = _messages(exc)
+    assert any("effects must not be empty" in m for m in messages)
+    assert any("reason must be a non-empty string" in m for m in messages)
+
+
+def test_reject_window_with_unknown_field_or_duplicate_id():
+    bundle = valid_bundle()
+    _first_window(bundle)["intensity"] = "severe"
+    bundle.scenario["ambient_windows"].append(
+        dict(_first_window(bundle), intensity=None) | {"intensity": "x"}
+    )
+    exc = _expect_invalid(bundle)
+    messages = _messages(exc)
+    assert any("unknown field 'intensity'" in m for m in messages)
+    assert any("duplicate ambient window id" in m for m in messages)
+
+
+def test_reject_out_of_range_window_delta():
+    bundle = valid_bundle()
+    _first_window(bundle)["effects"] = {"power_stability": -500}
+    exc = _expect_invalid(bundle)
+    assert any("within [-100, 100]" in m for m in _messages(exc))

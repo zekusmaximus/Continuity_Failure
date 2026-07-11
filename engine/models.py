@@ -319,6 +319,23 @@ class ThreadSpec:
 
 
 @dataclass
+class AmbientWindow:
+    """A content-authored ambient pressure active over a span of turns.
+
+    Where ``rules.AMBIENT_DRIFT`` is the scenario-wide baseline pressure,
+    an ambient window is an authored episode -- a regional heat event, a
+    cold snap -- whose ``effects`` are applied as their own diff batch
+    (source ``ambient``) with the authored ``reason`` on every turn in
+    ``[from_turn, to_turn]``. Deterministic: same turns, same effects.
+    """
+    id: str
+    from_turn: int
+    to_turn: int
+    effects: Dict[str, int]
+    reason: str
+
+
+@dataclass
 class AppliedDiff:
     variable: str
     old_value: int
@@ -670,6 +687,10 @@ class Campaign:
     # starting state). Persisted so an exact replay is scenario + variant +
     # advice sequence -- replayability without randomness.
     variant_id: str = ""
+    # Content-authored ambient episodes (see AmbientWindow). Defaults to empty
+    # for snapshots persisted before the field existed: such campaigns simply
+    # have no authored episodes mid-flight.
+    ambient_windows: List[AmbientWindow] = field(default_factory=list)
 
     def is_terminal(self) -> bool:
         return self.status in (CampaignStatus.COMPLETED, CampaignStatus.FAILED)

@@ -174,6 +174,10 @@ def _validate_scenario(c: _Collector, file: str, scenario: Any) -> Optional[int]
 
     _validate_starting_variables(c, file, scenario.get("starting_variables"))
 
+    windows = scenario.get("ambient_windows")
+    if windows is not None:
+        _validate_ambient_windows(c, file, windows, max_turns)
+
     crisis = scenario.get("crisis")
     if crisis is not None and c.is_mapping(file, "crisis", crisis, "crisis"):
         c.check_fields(file, "crisis", crisis, schema.FIELD_SPECS["crisis"], "crisis")
@@ -185,6 +189,60 @@ def _validate_scenario(c: _Collector, file: str, scenario: Any) -> Optional[int]
             c.check_enum(file, "crisis.type", crisis["type"], schema.CRISIS_TYPES, "crisis type")
 
     return max_turns
+
+
+def _validate_ambient_windows(
+    c: _Collector, file: str, windows: Any, max_turns: Optional[int]
+) -> None:
+    """Validate authored ambient episodes (scenario.json `ambient_windows`)."""
+    if not c.is_list(file, "ambient_windows", windows, "ambient_windows"):
+        return
+    _collect_ids(c, file, windows, "ambient window")
+    for i, window in enumerate(windows):
+        path = f"ambient_windows[{i}]"
+        if not c.is_mapping(file, path, window, "ambient window"):
+            continue
+        c.check_fields(file, path, window,
+                       schema.FIELD_SPECS["ambient_window"], "ambient window")
+        if "id" in window:
+            c.check_nonempty_str(file, f"{path}.id", window["id"], "id")
+        # An authored episode that moves state must say why, on the record.
+        if "reason" in window:
+            c.check_nonempty_str(file, f"{path}.reason", window["reason"], "reason")
+
+        from_turn = window.get("from_turn")
+        to_turn = window.get("to_turn")
+        for key, value in (("from_turn", from_turn), ("to_turn", to_turn)):
+            if value is None:
+                continue
+            if isinstance(value, bool) or not isinstance(value, int):
+                c.add(file, f"{path}.{key}", f"{key} must be an integer")
+            elif max_turns is not None and not (1 <= value <= max_turns):
+                c.add(file, f"{path}.{key}",
+                      f"{key} {value} is outside 1..{max_turns}")
+        if (
+            isinstance(from_turn, int) and isinstance(to_turn, int)
+            and not isinstance(from_turn, bool) and not isinstance(to_turn, bool)
+            and from_turn > to_turn
+        ):
+            c.add(file, path,
+                  f"ambient window runs backwards (from_turn {from_turn} > "
+                  f"to_turn {to_turn})")
+
+        effects = window.get("effects")
+        if effects is not None and c.is_mapping(
+            file, f"{path}.effects", effects, "effects"
+        ):
+            if not effects:
+                c.add(file, f"{path}.effects",
+                      "ambient window effects must not be empty")
+            for var, delta in effects.items():
+                if var not in schema.KNOWN_VARIABLES:
+                    c.add(file, f"{path}.effects.{var}",
+                          f"unknown WorldState variable '{var}' in ambient window")
+                    continue
+                c.check_int_range(file, f"{path}.effects.{var}", delta,
+                                  schema.MIN_EFFECT_DELTA, schema.MAX_EFFECT_DELTA)
 
 
 def _validate_starting_variables(c: _Collector, file: str, variables: Any) -> None:

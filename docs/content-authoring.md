@@ -19,7 +19,7 @@ One coherent file per authored domain:
 
 | File                   | Contents                                                        |
 | ---------------------- | -------------------------------------------------------------- |
-| `scenario.json`        | `schema_version`, `scenario_id`, `name`, `max_turns`, `starting_variables`, `crisis` |
+| `scenario.json`        | `schema_version`, `scenario_id`, `name`, `max_turns`, `starting_variables`, `crisis`, optional `ambient_windows` (authored ambient episodes over a turn span) |
 | `factions.json`        | list of factions                                               |
 | `advice.json`          | the global advice options (available every turn)               |
 | `per_turn_advice.json` | `{ "<turn>": [advice, ...] }` options that only fit that call  |
@@ -93,6 +93,12 @@ one pass):
 - **Document tags** — non-empty; **freshness** (`turn_number`) in range.
 - **Threshold coverage** — every variable the failure thresholds and ambient
   drift reference has a starting value.
+- **Ambient windows** — each `scenario.json` `ambient_windows` entry needs
+  `id` (unique), `from_turn <= to_turn` within `1..max_turns`, a non-empty
+  `effects` map of known variables with bounded deltas, and a non-empty
+  `reason` (it becomes the AppliedDiff reason, so the causal waterfall names
+  the episode). Effects apply as their own `ambient` diff batch on every turn
+  in the span.
 - **Seed variants** — each `variants.json` entry needs `id`, `name`,
   `description`, and a non-empty `variable_overrides` map of known WorldState
   variables within 0–100; ids are unique; no other fields. A variant is a
