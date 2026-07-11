@@ -1439,3 +1439,38 @@ body {
   cursor: pointer;
 }
 .cd-power-label { color: var(--text-bright); font-weight: 600; }
+
+/* Local playtest data (Wave 3 A2): telemetry controls in the Case File. */
+.cd-telemetry { display: grid; gap: 10px; }
+.cd-telemetry-toggle {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  cursor: pointer;
+  color: var(--text-bright);
+}
+.cd-telemetry-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-panel-2);
+}
+.cd-telemetry-stats dt { font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.04em; }
+.cd-telemetry-stats dd { margin: 2px 0 0; color: var(--text-bright); font-weight: 600; }
+.cd-telemetry-summary-list { margin: 4px 0 0; padding-left: 18px; font-size: 13px; }
+.cd-telemetry-summary-list li { margin: 2px 0; }
+.cd-telemetry-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.cd-telemetry-confirm {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 10px;
+  border: 1px solid var(--warn);
+  border-radius: 4px;
+  font-size: 13px;
+}

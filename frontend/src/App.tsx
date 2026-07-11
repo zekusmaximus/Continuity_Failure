@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiError, api, newIdempotencyKey } from "./api/client";
 import type {
   CampaignSummary,
@@ -18,6 +18,7 @@ import GuidedTurn from "./components/GuidedTurn";
 import CaseFile from "./components/CaseFile";
 import DeskGuide, { ONBOARDING_STORAGE_KEY } from "./components/DeskGuide";
 import { DegradationBanner } from "./components/SystemStatusPanel";
+import { TelemetryProvider, useDeskTelemetry } from "./telemetry/TelemetryProvider";
 
 const CAMPAIGN_STORAGE_KEY = "continuity-failure.campaign-id";
 const SCENARIO_ID = "northbridge_water_failure";
@@ -97,6 +98,19 @@ export default function App() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [liveMessage, setLiveMessage] = useState("");
+
+  // Local playtest telemetry (Wave 3): observational, browser-only, and
+  // never part of campaign authority. The hook measures phase dwell time
+  // from these props; explicit gameplay beats are reported below.
+  const telemetry = useDeskTelemetry({
+    campaignId,
+    turnNumber: summary?.turn_number ?? null,
+    phase,
+  });
+  const reportTelemetry = telemetry.report;
+  // One terminal event per campaign, even though the terminal result stays
+  // on screen across several renders.
+  const terminalReported = useRef<Set<string>>(new Set());
 
   // Advisory memo draft for the selected advice option. AI-assist is off by
   // default, so this returns a deterministic fallback unless a live provider is
@@ -243,6 +257,7 @@ export default function App() {
       if (savedId) {
         try {
           await reopenCampaign(savedId);
+          reportTelemetry({ event_type: "campaign_resumed", campaign_id: savedId });
         } catch (e) {
           if (!cancelled) {
             clearSavedCampaignId();
@@ -259,7 +274,7 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [reopenCampaign]);
+  }, [reopenCampaign, reportTelemetry]);
 
   const handleResume = useCallback(
     async (id: string) => {
@@ -267,6 +282,7 @@ export default function App() {
       setError(null);
       try {
         await reopenCampaign(id);
+        reportTelemetry({ event_type: "campaign_resumed", campaign_id: id });
       } catch (e) {
         if (readSavedCampaignId() === id) clearSavedCampaignId();
         setError(
@@ -278,7 +294,7 @@ export default function App() {
         setLoading(false);
       }
     },
-    [reopenCampaign],
+    [reopenCampaign, reportTelemetry],
   );
 
   const startCampaign = useCallback(async () => {
@@ -297,6 +313,11 @@ export default function App() {
       const [cur] = await Promise.all([refreshCurrent(created.id), refreshHistory(created.id)]);
       setMemos([]);
       setMaxReachedIndex(0);
+      reportTelemetry({
+        event_type: "campaign_started",
+        campaign_id: created.id,
+        turn_number: cur.summary.turn_number,
+      });
       gotoPhase("CALL", "Turn 1 incoming call loaded.");
       showFirstTurnGuide(cur.summary.turn_number);
     } catch (e) {
@@ -304,7 +325,7 @@ export default function App() {
     } finally {
       setLoading(false);
     }
-  }, [gotoPhase, refreshCurrent, refreshHistory, showFirstTurnGuide, selectedVariant]);
+  }, [gotoPhase, refreshCurrent, refreshHistory, showFirstTurnGuide, selectedVariant, reportTelemetry]);
 
   const handleSendAdvice = useCallback(async () => {
     if (!campaignId || !selected || !current || !memo || submitting) return;
@@ -541,13 +562,37 @@ export default function App() {
         memos.find((item) => item.status === "draft" && item.advice_id === id) ?? null,
       );
       setMemoError(null);
+      reportTelemetry({ event_type: "advice_selected", advice_id: id });
     },
-    [memos],
+    [memos, reportTelemetry],
+  );
+
+  const handleVariantChange = useCallback(
+    (variantId: string) => {
+      setSelectedVariant(variantId);
+      reportTelemetry({
+        event_type: "variant_selected",
+        variant_id: variantId || "baseline",
+      });
+    },
+    [reportTelemetry],
   );
 
   const resolvedStatus = lastResult?.status_after ?? summary?.status;
   const terminalReason = lastResult?.failure_reason ?? summary?.failure_reason;
   const terminal = resolvedStatus === "COMPLETED" || resolvedStatus === "FAILED";
+
+  useEffect(() => {
+    if (
+      !campaignId ||
+      (resolvedStatus !== "COMPLETED" && resolvedStatus !== "FAILED") ||
+      terminalReported.current.has(campaignId)
+    ) {
+      return;
+    }
+    terminalReported.current.add(campaignId);
+    reportTelemetry({ event_type: "campaign_terminal", outcome: resolvedStatus });
+  }, [campaignId, resolvedStatus, reportTelemetry]);
   const headerSummary =
     summary && lastResult && phase === "ARCHIVE"
       ? {
@@ -560,26 +605,28 @@ export default function App() {
 
   if (phase === "INTRO") {
     return (
-      <div className="cd-app cd-app-intro">
-        <a className="cd-skip-link" href="#main-content">Skip to main content</a>
-        <IntroScreen
-          onBegin={startCampaign}
-          onResume={handleResume}
-          recentCampaigns={recentCampaigns}
-          loading={loading}
-          variants={variants}
-          selectedVariant={selectedVariant}
-          onVariantChange={setSelectedVariant}
-        />
-        {error && (
-          <div className="cd-banner-alert cd-alert cd-alert-error" role="alert">
-            <strong>System alert:</strong> {error}
+      <TelemetryProvider value={telemetry}>
+        <div className="cd-app cd-app-intro">
+          <a className="cd-skip-link" href="#main-content">Skip to main content</a>
+          <IntroScreen
+            onBegin={startCampaign}
+            onResume={handleResume}
+            recentCampaigns={recentCampaigns}
+            loading={loading}
+            variants={variants}
+            selectedVariant={selectedVariant}
+            onVariantChange={handleVariantChange}
+          />
+          {error && (
+            <div className="cd-banner-alert cd-alert cd-alert-error" role="alert">
+              <strong>System alert:</strong> {error}
+            </div>
+          )}
+          <div className="cd-sr-only" role="status" aria-live="polite" aria-atomic="true">
+            {loading ? "Opening continuity desk." : ""}
           </div>
-        )}
-        <div className="cd-sr-only" role="status" aria-live="polite" aria-atomic="true">
-          {loading ? "Opening continuity desk." : ""}
         </div>
-      </div>
+      </TelemetryProvider>
     );
   }
 
@@ -590,6 +637,7 @@ export default function App() {
       : "";
 
   return (
+    <TelemetryProvider value={telemetry}>
     <div className={`cd-app${degradedClass}`}>
       <a className="cd-skip-link" href="#main-content">Skip to main content</a>
       <ContinuityHeader
@@ -674,5 +722,6 @@ export default function App() {
             : liveMessage}
       </div>
     </div>
+    </TelemetryProvider>
   );
 }

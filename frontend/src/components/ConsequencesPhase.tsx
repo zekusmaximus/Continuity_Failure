@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { TurnResult } from "../api/client";
 import { aggregateChanges } from "../domain";
+import { useTelemetry } from "../telemetry/TelemetryProvider";
 import AppliedDiffList from "./AppliedDiffList";
 import CausalWaterfall from "./CausalWaterfall";
 
@@ -37,6 +38,17 @@ function StackSection({
  */
 export default function ConsequencesPhase({ result }: { result: TurnResult }) {
   const [showRaw, setShowRaw] = useState(false);
+  const { report } = useTelemetry();
+
+  const toggleRaw = () => {
+    const expanded = !showRaw;
+    setShowRaw(expanded);
+    report({
+      event_type: "record_detail_toggled",
+      detail_kind: "applied_diff_record",
+      expanded,
+    });
+  };
   const stack = result.consequence_stack;
   const hasReport = (result.consequence_report?.variables?.length ?? 0) > 0;
   const changes = hasReport ? [] : aggregateChanges(result.diffs);
@@ -129,7 +141,7 @@ export default function ConsequencesPhase({ result }: { result: TurnResult }) {
           <div className="cd-expandable">
             <button
               className="cd-expandable-toggle"
-              onClick={() => setShowRaw((s) => !s)}
+              onClick={toggleRaw}
               aria-expanded={showRaw}
             >
               {showRaw ? "▾" : "▸"} Authoritative applied-diff record
