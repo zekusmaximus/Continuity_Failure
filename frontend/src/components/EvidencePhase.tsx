@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import type { ClientCall, DocumentRecord } from "../api/client";
 import { useTelemetry } from "../telemetry/TelemetryProvider";
 import DocumentDetail from "./DocumentDetail";
+import GuideTopic from "./GuideTopic";
 import StatusTag from "./StatusTag";
 import {
   EvidenceTier,
@@ -19,6 +20,8 @@ interface Props {
   documents: DocumentRecord[];
   call: ClientCall | null;
   onOpenCaseFile: () => void;
+  /** The turn under review; drives the turn-1 evidence prompt (Wave 3 C1). */
+  turnNumber?: number | null;
 }
 
 function tierOf(doc: DocumentRecord, attached: boolean): EvidenceTier {
@@ -33,7 +36,12 @@ function tierOf(doc: DocumentRecord, attached: boolean): EvidenceTier {
  * grouped Critical / Relevant / Background (deterministically), each showing a
  * one-line "why it matters". Clicking opens a readable detail overlay.
  */
-export default function EvidencePhase({ documents, call, onOpenCaseFile }: Props) {
+export default function EvidencePhase({
+  documents,
+  call,
+  onOpenCaseFile,
+  turnNumber = null,
+}: Props) {
   const [openDoc, setOpenDoc] = useState<DocumentRecord | null>(null);
   const { report } = useTelemetry();
   const attachedIds = useMemo(
@@ -78,6 +86,19 @@ export default function EvidencePhase({ documents, call, onOpenCaseFile }: Props
           Priority reflects relevance to this call, not certainty.
         </p>
       </details>
+
+      {/* The first attached document teaches evidentiary weight (Wave 3 C1). */}
+      <GuideTopic topic="evidence_weight" active={attachedIds.size > 0} />
+
+      {turnNumber === 1 && attachedIds.size > 0 && (
+        // Turn-1 evidence prompt: authored-neutral, no citation required.
+        <div className="cd-callout cd-evidence-prompt">
+          <span className="cd-callout-k">Before you advise</span>
+          <span>
+            Which record can bear the sentence you are about to put in writing?
+          </span>
+        </div>
+      )}
 
       {documents.length === 0 ? (
         <p className="cd-muted">No documents available yet.</p>

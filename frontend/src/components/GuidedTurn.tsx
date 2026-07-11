@@ -137,6 +137,7 @@ export default function GuidedTurn(props: Props) {
           documents={current.documents}
           call={call}
           onOpenCaseFile={onOpenCaseFile}
+          turnNumber={current.summary.turn_number}
         />
       ) : null;
       action = (

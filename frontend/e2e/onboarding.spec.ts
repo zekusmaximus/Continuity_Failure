@@ -12,9 +12,12 @@ test.describe("desk guide and announcements", () => {
     const guide = page.getByRole("dialog", { name: "Desk operating brief" });
     await expect(guide).toBeVisible();
     await expect(guide).toContainText("You advise from inside the machinery");
-    await expect(guide).toContainText("Higher is not always better");
-    await expect(guide).toContainText("Ambient crisis pressure");
-    await expect(guide).toContainText("Next Call performs no new decision");
+    // Wave 3 C1: three promises, not a manual. Thresholds and turn semantics
+    // teach themselves in context; the complete brief stays in Help.
+    await expect(guide).toContainText("You recommend; the client decides.");
+    await expect(guide).toContainText("Every resolved turn changes state and the record.");
+    await expect(guide).toContainText("The desk will show exactly why.");
+    await expect(guide).not.toContainText("Higher is not always better");
     await expect(guide).toBeFocused();
 
     expect(await page.locator("#root").evaluate((root) => ({
@@ -37,6 +40,9 @@ test.describe("desk guide and announcements", () => {
     await reopen.focus();
     await page.keyboard.press("Enter");
     await expect(guide).toBeVisible();
+    // Reopened from Help, the COMPLETE operating brief is reachable.
+    await expect(guide).toContainText("Higher is not always better");
+    await expect(guide).toContainText("Next Call performs no new decision");
     await page.keyboard.press("Escape");
     await expect(guide).toBeHidden();
     await expect(reopen).toBeFocused();

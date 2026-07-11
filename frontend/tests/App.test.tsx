@@ -42,8 +42,12 @@ describe("first-turn desk guide", () => {
     await user.click(await screen.findByRole("button", { name: "Begin Intake" }));
     const guide = await screen.findByRole("dialog", { name: "Desk operating brief" });
     expect(guide).toHaveTextContent("You advise from inside the machinery");
-    expect(guide).toHaveTextContent("Higher is not always better");
-    expect(guide).toHaveTextContent("Next Call performs no new decision");
+    // Wave 3 C1: the first run is three promises, not a manual. Thresholds,
+    // evidence weight, and turn semantics teach themselves in context.
+    expect(guide).toHaveTextContent("You recommend; the client decides.");
+    expect(guide).toHaveTextContent("Every resolved turn changes state and the record.");
+    expect(guide).toHaveTextContent("The desk will show exactly why.");
+    expect(guide).not.toHaveTextContent("Higher is not always better");
     expect(window.localStorage.getItem(ONBOARDING_STORAGE_KEY)).toBeNull();
 
     await user.click(within(guide).getByRole("button", { name: "Acknowledge briefing" }));
@@ -52,7 +56,10 @@ describe("first-turn desk guide", () => {
 
     const reopen = within(header()).getByRole("button", { name: "Desk Guide" });
     await user.click(reopen);
-    await screen.findByRole("dialog", { name: "Desk operating brief" });
+    // Reopened from Help, the COMPLETE operating brief is available.
+    const fullGuide = await screen.findByRole("dialog", { name: "Desk operating brief" });
+    expect(fullGuide).toHaveTextContent("Higher is not always better");
+    expect(fullGuide).toHaveTextContent("Next Call performs no new decision");
     await user.keyboard("{Escape}");
     expect(reopen).toHaveFocus();
 
