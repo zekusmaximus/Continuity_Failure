@@ -9,6 +9,7 @@ import type {
 } from "../api/client";
 import { levelClass, titleCase, POWER_ALLOCATIONS, VARIABLE_META } from "../domain";
 import { useTelemetry } from "../telemetry/TelemetryProvider";
+import GuideTopic from "./GuideTopic";
 import MemoDraftPanel from "./MemoDraftPanel";
 
 interface Props {
@@ -310,6 +311,10 @@ export default function AdvicePhase({
         creates a record.
       </p>
 
+      {/* First advice comparison: adherence teaches itself here (Wave 3 C1). */}
+      <GuideTopic topic="adherence" />
+
+
       {profile && (profile.mandate || profile.priorities.length > 0) && (
         <div className="cd-callout cd-caller-weighs">
           <span className="cd-callout-k">What the {callerName} weighs</span>
@@ -434,6 +439,10 @@ export default function AdvicePhase({
             systemStatus={systemStatus}
           />
 
+          {onToggleCite && documents.length > 0 && (
+            /* First citation-capable workbench (Wave 3 C1). */
+            <GuideTopic topic="citation" />
+          )}
           {onToggleCite && documents.length > 0 && (
             <fieldset className="cd-cite-evidence">
               <legend className="cd-field-k">

@@ -1490,3 +1490,33 @@ body {
 .cd-future-hook { margin-bottom: 12px; }
 .cd-full-record { margin-top: 8px; }
 .cd-full-record > .cd-expandable-toggle { font-weight: 600; }
+
+/* Contextual guide topics (Wave 3 C1): inline, non-modal, never over an
+   action, never focus-stealing. Reopen affordances are compact link-buttons. */
+.cd-guide-topic {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: baseline;
+  justify-content: space-between;
+  border: 1px dashed var(--accent);
+  border-radius: 4px;
+  padding: 10px 12px;
+  margin: 0 0 12px;
+  background: color-mix(in srgb, var(--accent) 6%, var(--bg-panel-2));
+}
+.cd-guide-topic-body { flex: 1 1 320px; }
+.cd-guide-topic-title {
+  display: block;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--accent);
+}
+.cd-guide-topic-text { margin: 4px 0 0; font-size: 13px; }
+.cd-guide-topic-actions { display: flex; gap: 10px; align-items: center; }
+.cd-topic-reopen { font-size: 12px; margin: 0 0 8px; }
+.cd-guide-topic-strip { padding: 0 20px; }
+.cd-guide-topic-strip .cd-guide-topic { margin-top: 8px; }
+.cd-evidence-prompt { margin: 0 0 12px; }
+.cd-guide-promises li { margin: 6px 0; }

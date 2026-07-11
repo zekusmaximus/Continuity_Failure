@@ -19,6 +19,7 @@ import CaseFile from "./components/CaseFile";
 import DeskGuide, { ONBOARDING_STORAGE_KEY } from "./components/DeskGuide";
 import { DegradationBanner } from "./components/SystemStatusPanel";
 import { TelemetryProvider, useDeskTelemetry } from "./telemetry/TelemetryProvider";
+import GuideTopic, { GuideProvider } from "./components/GuideTopic";
 
 const CAMPAIGN_STORAGE_KEY = "continuity-failure.campaign-id";
 const SCENARIO_ID = "northbridge_water_failure";
@@ -638,6 +639,7 @@ export default function App() {
 
   return (
     <TelemetryProvider value={telemetry}>
+    <GuideProvider openGuide={openGuide}>
     <div className={`cd-app${degradedClass}`}>
       <a className="cd-skip-link" href="#main-content">Skip to main content</a>
       <ContinuityHeader
@@ -653,6 +655,11 @@ export default function App() {
       />
 
       <DegradationBanner status={systemStatus} />
+      {systemStatus && systemStatus.degradation_band !== "NOMINAL" && (
+        <div className="cd-guide-topic-strip">
+          <GuideTopic topic="stale_feed" />
+        </div>
+      )}
 
       {error && (
         <div className="cd-banner-alert cd-alert cd-alert-error" role="alert">
@@ -722,6 +729,7 @@ export default function App() {
             : liveMessage}
       </div>
     </div>
+    </GuideProvider>
     </TelemetryProvider>
   );
 }

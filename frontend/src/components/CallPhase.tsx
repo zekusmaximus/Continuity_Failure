@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { ClientCall, PowerAllocation, SystemStatus } from "../api/client";
+import GuideTopic from "./GuideTopic";
 import StatusTag from "./StatusTag";
 import {
   POWER_ALLOCATIONS,
@@ -54,6 +55,9 @@ export default function CallPhase({
         <span className="cd-eyebrow-dot" aria-hidden />
         Incoming call · Turn {call.turn}
       </h1>
+
+      {/* First CRITICAL pre-turn allocation teaches itself (Wave 3 C1). */}
+      <GuideTopic topic="power_allocation" active={allocationRequired} />
 
       {allocationRequired && (
         <fieldset className="cd-power-allocation cd-call-power">

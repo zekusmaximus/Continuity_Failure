@@ -4,6 +4,7 @@ import { aggregateChanges, DECISION_BADGE, titleCase } from "../domain";
 import { useTelemetry } from "../telemetry/TelemetryProvider";
 import AppliedDiffList from "./AppliedDiffList";
 import CausalWaterfall from "./CausalWaterfall";
+import GuideTopic from "./GuideTopic";
 
 function StackSection({
   title,
@@ -98,6 +99,18 @@ export default function ConsequencesPhase({ result }: { result: TurnResult }) {
       )}
 
       <p className="cd-lead">{result.aftermath_summary}</p>
+
+      {/* First scheduled thread on the record teaches deadlines (Wave 3 C1). */}
+      <GuideTopic
+        topic="thread_deadline"
+        active={
+          stack.opened_threads.length > 0 ||
+          (stack.escalated_threads ?? []).length > 0
+        }
+      />
+
+      {/* First causal lead before the audit disclosure (Wave 3 C1). */}
+      <GuideTopic topic="record_detail" active={!!lead?.headline} />
 
       <div className="cd-expandable cd-full-record">
         <button

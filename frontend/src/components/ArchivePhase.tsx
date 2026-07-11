@@ -1,5 +1,6 @@
 import type { TurnHistory, TurnResult } from "../api/client";
 import { DECISION_BADGE, threadDeadlineLabel, titleCase } from "../domain";
+import GuideTopic from "./GuideTopic";
 
 interface Props {
   result: TurnResult;
@@ -26,6 +27,12 @@ export default function ArchivePhase({ result, history }: Props) {
         <span className="cd-eyebrow-dot" aria-hidden />
         Turn archive · Turn {result.turn_number} filed
       </h1>
+
+      {/* First entry on the institutional debt ledger (Wave 3 C1). */}
+      <GuideTopic
+        topic="precedent"
+        active={(history?.debt_ledger ?? []).length > 0}
+      />
 
       <div className="cd-field">
         <div className="cd-field-k">Advice issued</div>

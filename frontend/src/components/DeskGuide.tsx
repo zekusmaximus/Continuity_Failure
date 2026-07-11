@@ -27,19 +27,6 @@ export default function DeskGuide({ open, firstRun, onClose }: Props) {
     report({ event_type: "guide_topic_shown", topic_id: "desk_operating_brief" });
   }, [open, report]);
 
-  const topic = (topicId: string, summary: string, body: ReactNode) => (
-    <details
-      onToggle={(event) => {
-        if (event.currentTarget.open) {
-          report({ event_type: "guide_topic_opened", topic_id: topicId });
-        }
-      }}
-    >
-      <summary>{summary}</summary>
-      {body}
-    </details>
-  );
-
   return (
     <AccessibleDialog
       open={open}
@@ -64,13 +51,61 @@ export default function DeskGuide({ open, firstRun, onClose }: Props) {
       </div>
 
       <div className="cd-modal-body cd-guide-body">
-        {firstRun && (
-          <p className="cd-lead">
-            You advise from inside the machinery. Northbridge officials decide
-            what is actually done—and the record preserves the difference.
-          </p>
+        {firstRun ? (
+          // Wave 3 C1: a new player gets three promises, not a manual. Every
+          // threshold, citation, thread, ledger, and degradation rule teaches
+          // itself beside its object when it first matters; the complete
+          // operating brief stays one click away under Help.
+          <>
+            <p className="cd-lead">
+              You advise from inside the machinery. Northbridge officials decide
+              what is actually done—and the record preserves the difference.
+            </p>
+            <ol className="cd-guide-summary cd-guide-promises">
+              <li><strong>You recommend; the client decides.</strong></li>
+              <li><strong>Every resolved turn changes state and the record.</strong></li>
+              <li><strong>The desk will show exactly why.</strong></li>
+            </ol>
+            <p className="cd-muted">
+              The desk explains everything else — evidence weight, adherence,
+              threads, precedents, degraded feeds — beside the real thing, the
+              first time it matters. The complete operating brief stays
+              available from Help at any point.
+            </p>
+          </>
+        ) : (
+          <FullGuideBody />
         )}
 
+        <div className="cd-guide-actions">
+          <button className="cd-btn cd-btn-primary" onClick={onClose}>
+            {firstRun ? "Acknowledge briefing" : "Return to desk"}
+          </button>
+        </div>
+      </div>
+    </AccessibleDialog>
+  );
+}
+
+/** The complete operating brief, reachable from Help after the first run. */
+function FullGuideBody() {
+  const { report } = useTelemetry();
+
+  const topic = (topicId: string, summary: string, body: ReactNode) => (
+    <details
+      onToggle={(event) => {
+        if (event.currentTarget.open) {
+          report({ event_type: "guide_topic_opened", topic_id: topicId });
+        }
+      }}
+    >
+      <summary>{summary}</summary>
+      {body}
+    </details>
+  );
+
+  return (
+    <>
         <ol className="cd-guide-summary">
           <li><strong>Read direction, not color alone.</strong> Some high values are capacity; others are risk.</li>
           <li><strong>Read the record before the recommendation.</strong> Turn, source, reliability, and public status qualify every document.</li>
@@ -127,13 +162,6 @@ export default function DeskGuide({ open, firstRun, onClose }: Props) {
             </p>,
           )}
         </div>
-
-        <div className="cd-guide-actions">
-          <button className="cd-btn cd-btn-primary" onClick={onClose}>
-            {firstRun ? "Acknowledge briefing" : "Return to desk"}
-          </button>
-        </div>
-      </div>
-    </AccessibleDialog>
+    </>
   );
 }
