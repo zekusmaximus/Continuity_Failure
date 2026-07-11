@@ -194,6 +194,27 @@ class ClientCall:
 
 
 @dataclass
+class CallVariant:
+    """An authored alternate opening for one turn's client call.
+
+    A call slot may carry variants selected by deterministic conditions over
+    world state and faction fields (the same ``ThreadCondition`` shape threads
+    use). The first variant in authored order whose ``conditions`` ALL hold at
+    the moment the call is resolved replaces the base call entirely -- its own
+    ask, primary options, and decision profile flow into the NPC decision seam
+    unchanged. Selection lives in ``engine/calls.py`` and is evaluated once per
+    turn, before any of the turn's mutations.
+
+    ``call`` is a complete ``ClientCall`` body: its ``turn`` must equal the
+    slot's turn and its ``id`` must equal the variant ``id`` (one name for the
+    thing on the record). Variants cannot nest.
+    """
+    id: str
+    conditions: List[ThreadCondition]
+    call: "ClientCall"
+
+
+@dataclass
 class Document:
     """An in-world artifact on the Evidence Board.
 
@@ -216,10 +237,17 @@ class Document:
 
 @dataclass
 class ThreadCondition:
-    """A legible resolution threshold, mirroring the FAILURE_THRESHOLDS shape."""
+    """A legible deterministic threshold, mirroring the FAILURE_THRESHOLDS shape.
+
+    By default ``variable`` names a WorldState variable. When ``faction_id`` is
+    set, the condition is faction-scoped instead: ``variable`` names a numeric
+    faction field (one of ``engine.conditions.FACTION_CONDITION_FIELDS``)
+    evaluated against that faction. Evaluation lives in ``engine/conditions.py``.
+    """
     variable: str
     op: str                 # "<=" / ">="
     threshold: int
+    faction_id: Optional[str] = None
 
 
 @dataclass
@@ -566,6 +594,9 @@ class TurnResult:
     # Faction relationship moves this turn (trust / influence / pressure),
     # recorded like diffs: old -> new with a legible reason.
     faction_shifts: List["FactionShift"] = field(default_factory=list)
+    # When an authored call variant (not the base call) was on the line this
+    # turn, its id -- so the record always shows which opening the caller used.
+    call_variant_id: Optional[str] = None
 
 
 @dataclass
@@ -632,12 +663,20 @@ class Campaign:
     # snapshots persisted before the field existed: such campaigns keep their
     # already-open threads but stop opening NEW dynamic threads mid-campaign.
     thread_specs: List[ThreadSpec] = field(default_factory=list)
+    # Authored call variants per turn (see CallVariant). Engine-internal: the
+    # API always presents the RESOLVED call, never the variant table.
+    call_variants: Dict[int, List[CallVariant]] = field(default_factory=dict)
 
     def is_terminal(self) -> bool:
         return self.status in (CampaignStatus.COMPLETED, CampaignStatus.FAILED)
 
     def current_call(self) -> Optional[ClientCall]:
-        return self.client_calls.get(self.turn_number)
+        """The call on the line this turn -- variant-aware (engine/calls.py)."""
+        # Local import: engine.calls imports these models, so a module-level
+        # import here would be circular. First-party, so the stdlib AST scan
+        # is unaffected.
+        from engine.calls import resolve_call
+        return resolve_call(self, self.turn_number)
 
     def available_advice(self) -> List[AdviceOption]:
         """Global options plus any advice specific to the current turn's call."""

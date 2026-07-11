@@ -190,6 +190,7 @@ describe("ClientDecisionPhase explanation payload", () => {
     sent_memo: null,
     consequence_report: { variables: [] },
     faction_shifts: [],
+    call_variant_id: null,
   };
 
   test("renders human-labeled adherence factors, conflicts, and outcome reason", () => {

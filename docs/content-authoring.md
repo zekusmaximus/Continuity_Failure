@@ -23,7 +23,7 @@ One coherent file per authored domain:
 | `factions.json`        | list of factions                                               |
 | `advice.json`          | the global advice options (available every turn)               |
 | `per_turn_advice.json` | `{ "<turn>": [advice, ...] }` options that only fit that call  |
-| `calls.json`           | one client call per turn (`1..max_turns`), any order           |
+| `calls.json`           | one client call per turn (`1..max_turns`), any order; a call may carry `variants` (branchable/faction-gated openings) |
 | `documents.json`       | evidence-board documents; `turn_number` is the freshness/available-from turn |
 | `threads.json`         | open threads seeded at engagement start                        |
 | `thread_specs.json`    | dynamic-thread rules: when the engine opens a consequence thread mid-game, and the schedule it carries |
@@ -92,6 +92,18 @@ one pass):
 - **Document tags** — non-empty; **freshness** (`turn_number`) in range.
 - **Threshold coverage** — every variable the failure thresholds and ambient
   drift reference has a starting value.
+- **Call variants** — a call's `variants` list holds authored alternate
+  openings: `{id, conditions, call}`. Each variant `call` is a complete call
+  body validated by every base-call rule (same `turn` as its slot, `id` equal
+  to the variant id, 3–5 valid `primary_advice_ids`, a `decision_profile`, no
+  nested `variants`); `conditions` must be non-empty (an unconditioned variant
+  would always shadow the base call) and use the `ThreadCondition` shape —
+  world-scoped by default, or faction-scoped with `faction_id` set, where
+  `variable` must be one of `trust_in_player` / `influence` /
+  `current_pressure` / `risk_tolerance`. Call and variant ids share one
+  namespace. Selection is deterministic: first variant in authored order whose
+  conditions ALL hold, evaluated once per turn before the decision seam
+  (`engine/calls.py`); the resolved turn records `call_variant_id`.
 - **Thread specs** — every spec has a non-empty opening trigger (at least one
   of `open_conditions_all`, `open_conditions_any`, `open_advice_tags`,
   `open_decision_types`); conditions reference known variables with `<=`/`>=`

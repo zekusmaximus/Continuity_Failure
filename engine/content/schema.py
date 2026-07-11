@@ -19,9 +19,11 @@ from dataclasses import MISSING, fields
 from typing import Dict, Set
 
 from engine import rules
+from engine.conditions import FACTION_CONDITION_FIELDS
 from engine.models import (
     AdviceOption,
     CallDecisionProfile,
+    CallVariant,
     ClientCall,
     Crisis,
     DecisionType,
@@ -141,8 +143,13 @@ FIELD_SPECS: Dict[str, FieldSpec] = {
     "thread": FieldSpec(OpenThread),
     "thread_condition": FieldSpec(ThreadCondition),
     "thread_spec": FieldSpec(ThreadSpec),
+    "call_variant": FieldSpec(CallVariant),
     "crisis": FieldSpec(Crisis),
 }
+
+# FACTION_CONDITION_FIELDS (imported above from engine/conditions.py, the
+# single evaluator) is part of this module's public schema surface so the
+# validator and runtime can never disagree on the allowed faction fields.
 
 # Thread lifecycle fields the engine owns at runtime. Authored content must not
 # set them: a scenario that ships a pre-escalated or pre-resolved thread would

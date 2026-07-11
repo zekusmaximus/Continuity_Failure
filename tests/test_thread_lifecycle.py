@@ -318,6 +318,7 @@ def _decision(decision_type):
 def test_spec_advice_tag_and_decision_type_are_an_or():
     """The concealment shape: primary tag OR decision type, plus conditions."""
     campaign = _fresh_campaign()
+    factions = {}
     spec = _spec(
         open_advice_tags=["delay"],
         open_decision_types=[DecisionType.DELAYED],
@@ -328,22 +329,28 @@ def test_spec_advice_tag_and_decision_type_are_an_or():
     other_advice = _find_advice(campaign, "controlled_disclosure")
 
     # Tag branch: delay advice, even when the client pivoted (MODIFIED).
-    assert _spec_triggers(spec, delay_advice, _decision(DecisionType.MODIFIED), variables)
+    assert _spec_triggers(
+        spec, delay_advice, _decision(DecisionType.MODIFIED), variables, factions
+    )
     # Decision branch: any advice the client DELAYED.
-    assert _spec_triggers(spec, other_advice, _decision(DecisionType.DELAYED), variables)
+    assert _spec_triggers(
+        spec, other_advice, _decision(DecisionType.DELAYED), variables, factions
+    )
     # Neither branch: on-tag/on-type miss means no thread.
     assert not _spec_triggers(
-        spec, other_advice, _decision(DecisionType.FOLLOWED), variables
+        spec, other_advice, _decision(DecisionType.FOLLOWED), variables, factions
     )
     # Conditions still gate the tag branch.
     assert not _spec_triggers(
-        spec, delay_advice, _decision(DecisionType.DELAYED), {"media_pressure": 44}
+        spec, delay_advice, _decision(DecisionType.DELAYED),
+        {"media_pressure": 44}, factions,
     )
 
 
 def test_spec_conditions_any_is_an_or_over_thresholds():
     """The school-standoff shape: either threshold alone opens the thread."""
     campaign = _fresh_campaign()
+    factions = {}
     spec = _spec(
         open_conditions_any=[
             ThreadCondition("school_disruption", ">=", 55),
@@ -353,9 +360,9 @@ def test_spec_conditions_any_is_an_or_over_thresholds():
     advice = _find_advice(campaign, "controlled_disclosure")
     decision = _decision(DecisionType.FOLLOWED)
 
-    assert _spec_triggers(spec, advice, decision, {"school_disruption": 55, "public_trust": 60})
-    assert _spec_triggers(spec, advice, decision, {"school_disruption": 10, "public_trust": 44})
-    assert not _spec_triggers(spec, advice, decision, {"school_disruption": 54, "public_trust": 45})
+    assert _spec_triggers(spec, advice, decision, {"school_disruption": 55, "public_trust": 60}, factions)
+    assert _spec_triggers(spec, advice, decision, {"school_disruption": 10, "public_trust": 44}, factions)
+    assert not _spec_triggers(spec, advice, decision, {"school_disruption": 54, "public_trust": 45}, factions)
 
 
 def test_spec_never_reopens_an_id_already_on_the_record():

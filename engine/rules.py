@@ -122,14 +122,13 @@ AMBIENT_DRIFT: Dict[str, int] = {
 DECIDER = "Town Manager's Office"
 
 
-def _resolve_decider(campaign: Campaign) -> str:
+def _resolve_decider(call) -> str:
     """The NPC client that acts on the advice this turn.
 
     Every turn is anchored to a client call, so the decider is the caller's
     display name (Hospital, Contractor, State Liaison, ...). Falls back to the
     Town Manager's Office only if a turn has no call on the line.
     """
-    call = campaign.current_call()
     if call is not None and call.caller:
         return call.caller
     return DECIDER
@@ -833,6 +832,7 @@ def decide(
     campaign: Campaign,
     advice: AdviceOption,
     citations: Optional[List] = None,
+    call: Optional[ClientCall] = None,
 ) -> NpcDecision:
     """Resolve how the NPC client uses the player's chosen advice.
 
@@ -844,6 +844,11 @@ def decide(
     ``modifications`` are extra deltas the NPC imposed; ``off_brief_adjustments``
     are the deterministic off-brief/red-line cost (applied as their own diffs);
     ``explanation`` is the human-labeled account for the aftermath.
+
+    ``call`` is the resolved call on the line. The turn resolver passes it
+    explicitly (resolved once, before any mutation -- see ``engine/calls.py``);
+    direct callers may omit it and get the campaign's current (variant-aware)
+    call.
     """
     draft: _DecisionDraft
     handler = None
@@ -867,8 +872,9 @@ def decide(
     media = v.get("media_pressure", 0)
     trust = v.get("public_trust", 50)
 
-    call = campaign.current_call()
-    decider = _resolve_decider(campaign)
+    if call is None:
+        call = campaign.current_call()
+    decider = _resolve_decider(call)
 
     (decision_type, adherence, modifications, off_brief,
      adjustments, cost_reason, citation_weight, explanation) = _modulate(

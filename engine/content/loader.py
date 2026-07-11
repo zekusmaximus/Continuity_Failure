@@ -28,6 +28,7 @@ from engine.content.validator import (
 from engine.models import (
     AdviceOption,
     CallDecisionProfile,
+    CallVariant,
     Campaign,
     CampaignStatus,
     ClientCall,
@@ -175,15 +176,35 @@ def _build_per_turn_advice(raw: Dict[str, list]) -> Dict[int, List[AdviceOption]
     return {int(turn): _build_advice(options) for turn, options in raw.items()}
 
 
-def _build_calls(raw: List[dict]) -> Dict[int, ClientCall]:
-    calls = []
+def _build_call(data: dict) -> ClientCall:
+    data = dict(data)
+    profile = data.get("decision_profile")
+    if isinstance(profile, dict):
+        data["decision_profile"] = CallDecisionProfile(**profile)
+    return ClientCall(**data)
+
+
+def _build_calls(
+    raw: List[dict],
+) -> tuple[Dict[int, ClientCall], Dict[int, List[CallVariant]]]:
+    """Build the base call per turn plus any authored variants for that turn."""
+    calls: Dict[int, ClientCall] = {}
+    variants: Dict[int, List[CallVariant]] = {}
     for c in raw:
         data = dict(c)
-        profile = data.get("decision_profile")
-        if isinstance(profile, dict):
-            data["decision_profile"] = CallDecisionProfile(**profile)
-        calls.append(ClientCall(**data))
-    return {call.turn: call for call in calls}
+        raw_variants = data.pop("variants", None) or []
+        call = _build_call(data)
+        calls[call.turn] = call
+        if raw_variants:
+            variants[call.turn] = [
+                CallVariant(
+                    id=v["id"],
+                    conditions=[ThreadCondition(**cond) for cond in v["conditions"]],
+                    call=_build_call(v["call"]),
+                )
+                for v in raw_variants
+            ]
+    return calls, variants
 
 
 def _build_documents(raw: List[dict]) -> List[Document]:
@@ -228,6 +249,7 @@ def build_campaign(bundle: RawContent, campaign_id: str = "", name: str = "") ->
     campaign_id = campaign_id or uuid.uuid4().hex[:8]
     name = name or scenario["name"]
 
+    client_calls, call_variants = _build_calls(bundle.calls)
     crisis_raw = scenario["crisis"]
     world_state = WorldState(
         turn_number=1,
@@ -246,7 +268,8 @@ def build_campaign(bundle: RawContent, campaign_id: str = "", name: str = "") ->
         world_state=world_state,
         advice_options=_build_advice(bundle.advice),
         per_turn_advice=_build_per_turn_advice(bundle.per_turn_advice),
-        client_calls=_build_calls(bundle.calls),
+        client_calls=client_calls,
+        call_variants=call_variants,
         documents=_build_documents(bundle.documents),
         open_threads=_build_threads(bundle.threads),
         thread_specs=_build_thread_specs(bundle.thread_specs),

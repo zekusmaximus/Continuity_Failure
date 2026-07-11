@@ -106,14 +106,20 @@ def update_faction_relations(
     advice: AdviceOption,
     decision: NpcDecision,
     diffs: List[AppliedDiff],
+    call=None,
 ) -> List[FactionShift]:
     """Update the caller's trust and every faction's influence. Deterministic.
 
     Wave-1 scope keeps trust moves to the caller only; cross-faction trust
     propagation is roadmap work alongside branchable calls.
+
+    ``call`` is the resolved call that was on the line (the turn resolver
+    passes it; a variant's decision profile must drive these shifts, not the
+    base call's). The fallback fetch exists only for direct callers.
     """
     shifts: List[FactionShift] = []
-    call = campaign.client_calls.get(decision_turn(campaign, decision))
+    if call is None:
+        call = campaign.client_calls.get(decision_turn(campaign, decision))
     caller = None
     if call is not None:
         caller = next(

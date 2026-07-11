@@ -221,6 +221,7 @@ def _immediate_for(
     advice: AdviceOption,
     decision: NpcDecision,
     resolving_turn: int,
+    call,
 ) -> List[str]:
     """Immediate-consequence lines for the turn.
 
@@ -229,6 +230,12 @@ def _immediate_for(
     situation) and the engagement phase, so choosing the same advice tag on a
     later turn no longer produces identical text. Pure function of
     (advice, decision, state, turn) -- no randomness.
+
+    ``call`` is the call that was actually on the line, resolved ONCE at the
+    top of ``advance_turn`` -- never re-derived here, because by the time
+    consequences are built the turn's diffs have been applied and re-running
+    variant selection against the mutated state could name a different call
+    than the one that decided.
     """
     tag = _primary_tag(advice)
     pool = _IMMEDIATE.get(tag, {})
@@ -238,10 +245,6 @@ def _immediate_for(
             f"The {decision.decider} responded to the advice ({decision.decision_type})."
         )
 
-    # Fetch by resolving_turn: by the time consequences are built the campaign's
-    # turn counter has already advanced, so current_call() would point at the
-    # *next* call. The seed guarantees a call for every turn 1..max_turns.
-    call = campaign.client_calls.get(resolving_turn)
     if call is not None:
         phase = _PHASE_LABEL[_turn_phase(resolving_turn)]
         lines.insert(
@@ -403,13 +406,14 @@ def _legal_fallout(variables, advice: AdviceOption, decision: NpcDecision) -> Li
 # ---------------------------------------------------------------------------
 
 def _spec_triggers(
-    spec: ThreadSpec, advice: AdviceOption, decision: NpcDecision, variables
+    spec: ThreadSpec, advice: AdviceOption, decision: NpcDecision,
+    variables, factions_by_id,
 ) -> bool:
     """Whether an authored thread spec's opening trigger holds this turn."""
-    if not conditions.all_hold(spec.open_conditions_all, variables):
+    if not conditions.all_hold(spec.open_conditions_all, variables, factions_by_id):
         return False
     if spec.open_conditions_any and not conditions.any_holds(
-        spec.open_conditions_any, variables
+        spec.open_conditions_any, variables, factions_by_id
     ):
         return False
     if spec.open_advice_tags or spec.open_decision_types:
@@ -426,11 +430,12 @@ def _threads_for_turn(
     variables, resolving_turn: int,
 ) -> List[OpenThread]:
     existing = {t.id for t in campaign.open_threads}
+    factions_by_id = {f.id: f for f in campaign.world_state.factions}
     new: List[OpenThread] = []
     for spec in campaign.thread_specs:
         if spec.id in existing:
             continue
-        if not _spec_triggers(spec, advice, decision, variables):
+        if not _spec_triggers(spec, advice, decision, variables, factions_by_id):
             continue
         new.append(OpenThread(
             id=spec.id,
@@ -462,18 +467,24 @@ def build_consequence_stack(
     decision: NpcDecision,
     diffs: List,
     resolving_turn: int,
+    call=None,
 ) -> Tuple[ConsequenceStack, List[OpenThread]]:
     """Build a deterministic ConsequenceStack plus any threads opened this turn.
 
     ``diffs`` are the authoritative applied diffs for the turn; this function
     only *reads* campaign state to narrate them -- it never mutates state.
+    ``call`` is the resolved call that was on the line (see ``_immediate_for``);
+    the base-call fallback exists only for direct callers outside the turn
+    resolver, where no variant table is in play.
     """
     variables = campaign.world_state.variables
+    if call is None:
+        call = campaign.client_calls.get(resolving_turn)
 
     new_threads = _threads_for_turn(campaign, advice, decision, variables, resolving_turn)
 
     stack = ConsequenceStack(
-        immediate=_immediate_for(campaign, advice, decision, resolving_turn),
+        immediate=_immediate_for(campaign, advice, decision, resolving_turn, call),
         second_order=_second_order(variables),
         faction_reactions=_faction_reactions(campaign),
         media_framing=_media_framing(variables, decision),

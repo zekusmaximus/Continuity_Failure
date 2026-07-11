@@ -94,6 +94,7 @@ export interface ThreadCondition {
   variable: string;
   op: string;
   threshold: number;
+  faction_id: string | null;
 }
 
 export interface OpenThread {
@@ -348,6 +349,7 @@ export interface TurnResult {
   sent_memo: SentMemoSnapshot | null;
   consequence_report: ConsequenceReport;
   faction_shifts: FactionShift[];
+  call_variant_id: string | null;
 }
 
 export interface SystemStatus {

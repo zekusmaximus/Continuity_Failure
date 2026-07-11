@@ -53,10 +53,10 @@ class ThreadEvent:
     note: str
 
 
-def _conditions_hold(thread: OpenThread, variables) -> bool:
+def _conditions_hold(thread: OpenThread, variables, factions_by_id) -> bool:
     if not thread.resolve_conditions:
         return False
-    return conditions.all_hold(thread.resolve_conditions, variables)
+    return conditions.all_hold(thread.resolve_conditions, variables, factions_by_id)
 
 
 def _resolved_by_advice(
@@ -83,6 +83,7 @@ def process_threads(
     yet, so a new thread never escalates on the turn it opens.
     """
     variables = campaign.world_state.variables
+    factions_by_id = {f.id: f for f in campaign.world_state.factions}
     diffs: List[AppliedDiff] = []
     events: List[ThreadEvent] = []
 
@@ -91,7 +92,7 @@ def process_threads(
             continue
 
         if _resolved_by_advice(thread, advice, decision) or _conditions_hold(
-            thread, variables
+            thread, variables, factions_by_id
         ):
             thread.status = ThreadStatus.RESOLVED
             thread.turn_resolved = resolving_turn

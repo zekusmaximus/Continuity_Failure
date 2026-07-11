@@ -501,7 +501,9 @@ def submit_advice(
 
         memo.status = MemoStatus.SENT
         memo.turn_number = result.turn_number
-        memo.call_id = memo.call_id or (
+        # The memo links to the call that was actually on the line: a variant's
+        # id when one fired (recorded on the result), else the base call's.
+        memo.call_id = memo.call_id or result.call_variant_id or (
             campaign.client_calls.get(result.turn_number).id
             if campaign.client_calls.get(result.turn_number)
             else None

@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import List, Optional
 
-from engine import factions, rules
+from engine import calls, factions, rules
 from engine.consequences import build_consequence_report, build_consequence_stack
 from engine.diffs import apply_diffs
 from engine.ledger import record_precedents
@@ -93,8 +93,13 @@ def advance_turn(
     world_state = campaign.world_state
     variables = world_state.variables
 
+    # Resolve the call on the line exactly ONCE, before any mutation, and pass
+    # it down. Variant selection reads world/faction state; re-selecting after
+    # diffs apply could name a different call than the one that decided.
+    call, call_variant_id = calls.resolve_call_with_variant(campaign, resolving_turn)
+
     citations = _resolve_citations(campaign, cited_document_ids, resolving_turn)
-    decision = rules.decide(campaign, advice, citations)
+    decision = rules.decide(campaign, advice, citations, call=call)
 
     # Snapshot the pre-turn values so the consequence report can reconcile
     # start -> attributed deltas -> final for every touched variable.
@@ -159,7 +164,7 @@ def advance_turn(
     # served the caller, influence follows sustained pressure, and a faction
     # out of trust and under pressure may leak a private record this turn.
     faction_shifts = factions.update_faction_relations(
-        campaign, advice, decision, diffs
+        campaign, advice, decision, diffs, call=call
     )
     leak_diffs, leak_media_lines, leak_canon = factions.process_leaks(
         campaign, resolving_turn
@@ -190,7 +195,7 @@ def advance_turn(
 
     # Build the deterministic consequence stack and any threads it opens.
     consequence_stack, new_threads = build_consequence_stack(
-        campaign, advice, decision, diffs, resolving_turn,
+        campaign, advice, decision, diffs, resolving_turn, call=call,
     )
     campaign.open_threads.extend(new_threads)
     consequence_stack.escalated_threads = [
@@ -253,6 +258,7 @@ def advance_turn(
             start_values, diffs, advice, decision
         ),
         faction_shifts=faction_shifts,
+        call_variant_id=call_variant_id,
     )
     campaign.turn_history.append(turn_result)
     return turn_result

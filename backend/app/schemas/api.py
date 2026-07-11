@@ -124,6 +124,9 @@ class ThreadConditionModel(BaseModel):
     variable: str
     op: str = Field(pattern=r"^(<=|>=)$")
     threshold: int = Field(ge=0, le=100)
+    # When set, the condition is faction-scoped: ``variable`` names a numeric
+    # faction field evaluated against this faction (engine/conditions.py).
+    faction_id: Optional[str] = None
 
 
 class OpenThreadModel(BaseModel):
@@ -526,6 +529,9 @@ class TurnResultModel(BaseModel):
     # validate; every freshly resolved turn carries the populated report.
     consequence_report: ConsequenceReportModel = Field(default_factory=ConsequenceReportModel)
     faction_shifts: List[FactionShiftModel] = Field(default_factory=list)
+    # The authored call variant that was on the line this turn, when one fired
+    # (None = the base call). Defaulted so pre-variant replays still validate.
+    call_variant_id: Optional[str] = None
 
 
 class SystemStatusModel(BaseModel):

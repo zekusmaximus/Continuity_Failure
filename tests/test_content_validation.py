@@ -536,3 +536,98 @@ def test_reject_unknown_thread_spec_field():
     bundle.thread_specs[0]["opens_when"] = "media is high"
     exc = _expect_invalid(bundle)
     assert any("unknown field 'opens_when'" in m for m in _messages(exc))
+
+
+# ---------------------------------------------------------------------------
+# Call variants (branchable / faction-gated calls, authored in calls.json)
+# ---------------------------------------------------------------------------
+
+def _call_with_variants(bundle):
+    call = next(c for c in bundle.calls if c.get("variants"))
+    return call, call["variants"][0]
+
+
+def test_shipped_variants_load_and_validate():
+    bundle = valid_bundle()
+    call, variant = _call_with_variants(bundle)
+    assert variant["call"]["turn"] == call["turn"]
+    validate_bundle(bundle)
+
+
+def test_reject_variant_condition_referencing_unknown_faction():
+    bundle = valid_bundle()
+    _, variant = _call_with_variants(bundle)
+    variant["conditions"] = [
+        {"variable": "trust_in_player", "op": "<=", "threshold": 25,
+         "faction_id": "ministry_of_typos"}
+    ]
+    exc = _expect_invalid(bundle)
+    assert any("references unknown faction 'ministry_of_typos'" in m
+               for m in _messages(exc))
+
+
+def test_reject_variant_condition_on_disallowed_faction_field():
+    bundle = valid_bundle()
+    _, variant = _call_with_variants(bundle)
+    variant["conditions"] = [
+        {"variable": "posture", "op": "<=", "threshold": 25,
+         "faction_id": "utility_contractor"}
+    ]
+    exc = _expect_invalid(bundle)
+    assert any("not a faction condition field" in m for m in _messages(exc))
+
+
+def test_reject_variant_with_empty_conditions():
+    bundle = valid_bundle()
+    _, variant = _call_with_variants(bundle)
+    variant["conditions"] = []
+    exc = _expect_invalid(bundle)
+    assert any("at least one condition" in m for m in _messages(exc))
+
+
+def test_reject_variant_call_turn_mismatch():
+    bundle = valid_bundle()
+    _, variant = _call_with_variants(bundle)
+    variant["call"]["turn"] = variant["call"]["turn"] + 1
+    exc = _expect_invalid(bundle)
+    assert any("must equal the base call's turn" in m for m in _messages(exc))
+
+
+def test_reject_variant_call_id_differing_from_variant_id():
+    bundle = valid_bundle()
+    _, variant = _call_with_variants(bundle)
+    variant["call"]["id"] = "some_other_name"
+    exc = _expect_invalid(bundle)
+    assert any("must equal the variant id" in m for m in _messages(exc))
+
+
+def test_reject_variant_id_colliding_with_a_base_call_id():
+    bundle = valid_bundle()
+    call, variant = _call_with_variants(bundle)
+    other_call_id = next(
+        c["id"] for c in bundle.calls if c["id"] != call["id"]
+    )
+    variant["id"] = other_call_id
+    variant["call"]["id"] = other_call_id
+    exc = _expect_invalid(bundle)
+    assert any(f"duplicate call/variant id '{other_call_id}'" in m
+               for m in _messages(exc))
+
+
+def test_reject_nested_variants():
+    bundle = valid_bundle()
+    _, variant = _call_with_variants(bundle)
+    variant["call"]["variants"] = []
+    exc = _expect_invalid(bundle)
+    assert any("unknown field 'variants'" in m for m in _messages(exc))
+
+
+def test_variant_call_is_validated_as_a_full_call():
+    bundle = valid_bundle()
+    _, variant = _call_with_variants(bundle)
+    del variant["call"]["decision_profile"]
+    variant["call"]["primary_advice_ids"] = ["not_a_real_option"]
+    exc = _expect_invalid(bundle)
+    messages = _messages(exc)
+    assert any("decision_profile" in m for m in messages)
+    assert any("not_a_real_option" in m for m in messages)
