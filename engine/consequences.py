@@ -28,6 +28,7 @@ from engine.models import (
     NpcDecision,
     OpenThread,
     SourceType,
+    ThreadCondition,
     VariableConsequence,
 )
 from engine.state import humanize_variable, variable_direction
@@ -382,7 +383,68 @@ def _legal_fallout(variables, advice: AdviceOption, decision: NpcDecision) -> Li
 
 # ---------------------------------------------------------------------------
 # Open threads opened or escalated by this turn.
+#
+# Every dynamically opened thread carries a deterministic schedule: how many
+# turns until it escalates if unaddressed, what the escalation costs, and what
+# resolves it. ``due_in`` is relative to the turn the thread opens. Keeping the
+# specs here (rather than in scenario content) is deliberate for now: these
+# threads are consequences of the deterministic rules above, not authored
+# story beats; moving them into content is wave-2 work alongside branchable
+# calls.
 # ---------------------------------------------------------------------------
+
+_DYNAMIC_THREAD_SPECS: dict = {
+    "thread_concealment_narrative": dict(
+        due_in=2, repeat_every=2,
+        escalation_effects={"public_trust": -3, "media_pressure": +3},
+        escalation_note=(
+            "The concealment frame hardened another cycle without a full "
+            "public accounting."
+        ),
+        resolve_tags=["disclosure"],
+        resolution_note="A full public accounting broke the concealment frame.",
+    ),
+    "thread_oversight_designation": dict(
+        due_in=2, repeat_every=2,
+        escalation_effects={"state_oversight_risk": +4},
+        escalation_note=(
+            "The oversight review file thickened while local metrics kept sliding."
+        ),
+        resolve_conditions=[ThreadCondition("state_oversight_risk", "<=", 45)],
+        resolution_note="Oversight risk fell back below the designation threshold.",
+    ),
+    "thread_contractor_precedent": dict(
+        due_in=2, repeat_every=2,
+        escalation_effects={"legal_exposure": +4, "state_oversight_risk": +3},
+        escalation_note=(
+            "The sole-source emergency terms were cited as precedent again; "
+            "procurement-law exposure and state attention both deepened."
+        ),
+        resolve_conditions=[ThreadCondition("contractor_dependency", "<=", 50)],
+        resolution_note="Dependency fell far enough to renegotiate on normal terms.",
+    ),
+    "thread_school_standoff": dict(
+        due_in=2, repeat_every=2,
+        escalation_effects={"school_disruption": +3, "public_trust": -2},
+        escalation_note=(
+            "Another cycle without a published closure threshold kept parents "
+            "improvising and the superintendent exposed."
+        ),
+        resolve_tags=["school_closure"],
+        resolution_note="A published closure protocol ended the standoff.",
+    ),
+    "thread_trust_collapse": dict(
+        due_in=2, repeat_every=2,
+        escalation_effects={"public_order": -3},
+        escalation_note=(
+            "With consent eroded, compliance with emergency measures slipped "
+            "further."
+        ),
+        resolve_conditions=[ThreadCondition("public_trust", ">=", 45)],
+        resolution_note="Trust recovered enough for emergency measures to hold.",
+    ),
+}
+
 
 def _threads_for_turn(
     campaign: Campaign, advice: AdviceOption, decision: NpcDecision,
@@ -399,9 +461,13 @@ def _threads_for_turn(
 
     def maybe(tid, title, summary, ttags):
         if tid not in existing:
+            spec = dict(_DYNAMIC_THREAD_SPECS.get(tid, {}))
+            due_in = spec.pop("due_in", None)
+            due_turn = resolving_turn + due_in if due_in is not None else None
             new.append(OpenThread(
                 id=tid, title=title, summary=summary,
                 turn_opened=resolving_turn, tags=ttags,
+                due_turn=due_turn, **spec,
             ))
             existing.add(tid)
 
@@ -419,7 +485,7 @@ def _threads_for_turn(
             "Late notification and sliding metrics put a formal oversight review in play.",
             ["state", "oversight", "intervention"],
         )
-    if (tag == "contractor") and dependency >= 60:
+    if (tag == "contractor") and dependency >= 70:
         maybe(
             "thread_contractor_precedent",
             "Sole-source contractor precedent",

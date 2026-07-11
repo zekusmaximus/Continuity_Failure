@@ -8,7 +8,18 @@
       "disclosure",
       "legal",
       "narrative"
-    ]
+    ],
+    "due_turn": 4,
+    "repeat_every": 2,
+    "escalation_effects": {
+      "legal_exposure": 4,
+      "media_pressure": 3
+    },
+    "escalation_note": "The disclosure-timing record grew another cycle: the town knew, and the public statement still had not caught up.",
+    "resolve_tags": [
+      "disclosure"
+    ],
+    "resolution_note": "The findings went on the public record before the timing record became indefensible."
   },
   {
     "id": "thread_contractor_leverage",
@@ -19,6 +30,23 @@
       "contractor",
       "procurement",
       "dependency"
-    ]
+    ],
+    "due_turn": 3,
+    "repeat_every": 3,
+    "escalation_effects": {
+      "contractor_dependency": 3
+    },
+    "escalation_note": "Marquotte priced another change order into its leverage; structural dependency on the sole certified firm deepened.",
+    "resolve_tags": [
+      "contractor"
+    ],
+    "resolve_conditions": [
+      {
+        "variable": "contractor_dependency",
+        "op": "<=",
+        "threshold": 30
+      }
+    ],
+    "resolution_note": "A credible squeeze on Marquotte broke the assumption that the town would pay any change order."
   }
 ]

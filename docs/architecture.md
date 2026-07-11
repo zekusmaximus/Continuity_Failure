@@ -56,9 +56,18 @@ memory/     versioned SQLite repository (campaigns/memos, immutable snapshots, m
   harms, legal/political/operational risk, affected factions), 10 per-turn
   client calls forming a cascade, ambient crisis drift, NPC decision logic with
   visible mediation, applied diffs for every change, deterministic consequence
-  stacks, open-thread tracking, failure thresholds, and 10-turn completion.
+  stacks, failure thresholds, and 10-turn completion.
   The engine also ships a framework-free Markdown dossier builder
   (`engine/dossier.py`).
+* Open-thread lifecycle (`engine/threads.py`): threads carry deterministic
+  schedules — a `due_turn`, `escalation_effects` applied as their own diff
+  batch (source `thread`, legible reason), an optional `repeat_every` re-arm,
+  and resolution via matching advice the client acted on (`resolve_tags`) or
+  explicit world-state thresholds (`resolve_conditions`). Escalations run
+  before the failure check, so an unaddressed standing risk can end the
+  engagement. Seed-thread schedules are authored in `threads.json`; threads
+  opened by the rules get their schedules from
+  `engine/consequences.py:_DYNAMIC_THREAD_SPECS`.
 * FastAPI endpoints: `GET /health`, `POST /api/campaigns`,
   `GET /api/campaigns` (recent resume metadata),
   `GET /api/campaigns/{id}`, `GET /api/campaigns/{id}/current`,

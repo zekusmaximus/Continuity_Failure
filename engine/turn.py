@@ -13,6 +13,7 @@ from typing import List
 from engine import rules
 from engine.consequences import build_consequence_report, build_consequence_stack
 from engine.diffs import apply_diffs
+from engine.threads import process_threads
 from engine.models import (
     AdviceOption,
     AppliedDiff,
@@ -106,6 +107,13 @@ def advance_turn(campaign: Campaign, advice_id: str) -> TurnResult:
         source_type=SourceType.AMBIENT,
     )
 
+    # Open threads resolve or escalate before the failure check, so an
+    # unaddressed standing risk can itself end the engagement.
+    thread_diffs, thread_events = process_threads(
+        campaign, advice, decision, resolving_turn
+    )
+    diffs += thread_diffs
+
     rules.update_faction_postures(campaign)
     rules.update_crisis_severity(campaign)
 
@@ -133,6 +141,12 @@ def advance_turn(campaign: Campaign, advice_id: str) -> TurnResult:
         campaign, advice, decision, diffs, resolving_turn,
     )
     campaign.open_threads.extend(new_threads)
+    consequence_stack.escalated_threads = [
+        f"{e.title} — {e.note}" for e in thread_events if e.kind == "escalated"
+    ]
+    consequence_stack.resolved_threads = [
+        f"{e.title} — {e.note}" for e in thread_events if e.kind == "resolved"
+    ]
 
     canon_entry = CanonEntry(
         id=f"canon_turn_{resolving_turn}",

@@ -8,7 +8,7 @@
       "involved_factions": [
         "Town Manager's Office"
       ],
-      "memo_id": "memo_105581b97ec64ce9aa3e20010d6b217b",
+      "memo_id": "memo_80cf3c04d90b42b9a8117326331644de",
       "public_status": "public",
       "source": "Town Manager's Office",
       "tags": [
@@ -26,7 +26,7 @@
       "involved_factions": [
         "Northbridge Public Schools"
       ],
-      "memo_id": "memo_b2407d2093d3462f80124faef9a093bf",
+      "memo_id": "memo_24e43adafa174258b1d00102a50facb6",
       "public_status": "public",
       "source": "Northbridge Public Schools",
       "tags": [
@@ -39,8 +39,21 @@
   ],
   "open_threads": [
     {
+      "due_turn": null,
+      "escalation_count": 0,
+      "escalation_effects": {
+        "legal_exposure": 4,
+        "media_pressure": 3
+      },
+      "escalation_note": "The disclosure-timing record grew another cycle: the town knew, and the public statement still had not caught up.",
       "id": "thread_disclosure_clock",
-      "status": "open",
+      "repeat_every": 2,
+      "resolution_note": "The findings went on the public record before the timing record became indefensible.",
+      "resolve_conditions": [],
+      "resolve_tags": [
+        "disclosure"
+      ],
+      "status": "resolved",
       "summary": "A preliminary sample sits above the advisory threshold; the confirmatory result is pending. Every turn of delay adds legal and narrative risk.",
       "tags": [
         "disclosure",
@@ -48,10 +61,29 @@
         "narrative"
       ],
       "title": "Disclosure clock on a preliminary, contested lab result",
-      "turn_opened": 1
+      "turn_opened": 1,
+      "turn_resolved": 1
     },
     {
+      "due_turn": 3,
+      "escalation_count": 0,
+      "escalation_effects": {
+        "contractor_dependency": 3
+      },
+      "escalation_note": "Marquotte priced another change order into its leverage; structural dependency on the sole certified firm deepened.",
       "id": "thread_contractor_leverage",
+      "repeat_every": 3,
+      "resolution_note": "A credible squeeze on Marquotte broke the assumption that the town would pay any change order.",
+      "resolve_conditions": [
+        {
+          "op": "<=",
+          "threshold": 30,
+          "variable": "contractor_dependency"
+        }
+      ],
+      "resolve_tags": [
+        "contractor"
+      ],
       "status": "open",
       "summary": "Only Marquotte Utilities is certified for the failing valves. Indemnity demands and premium change orders compound dependency.",
       "tags": [
@@ -60,11 +92,12 @@
         "dependency"
       ],
       "title": "Sole-source contractor leverage over the repair",
-      "turn_opened": 1
+      "turn_opened": 1,
+      "turn_resolved": null
     }
   ],
   "summary": {
-    "created_at": "2026-07-10T23:31:02.756286+00:00",
+    "created_at": "2026-07-11T01:06:00.448921+00:00",
     "failure_reason": null,
     "id": "test-campaign",
     "max_turns": 10,
@@ -86,7 +119,7 @@
         "involved_factions": [
           "Town Manager's Office"
         ],
-        "memo_id": "memo_105581b97ec64ce9aa3e20010d6b217b",
+        "memo_id": "memo_80cf3c04d90b42b9a8117326331644de",
         "public_status": "public",
         "source": "Town Manager's Office",
         "tags": [
@@ -390,6 +423,7 @@
         "canonized_events": [
           "Turn 1: PARTIALLY_FOLLOWED on Full disclosure and emergency conservation order"
         ],
+        "escalated_threads": [],
         "faction_reactions": [
           {
             "faction_id": "council_opposition",
@@ -430,6 +464,9 @@
           "Headline frame: 'town responds' -- coverage follows the official line for now."
         ],
         "opened_threads": [],
+        "resolved_threads": [
+          "Disclosure clock on a preliminary, contested lab result — The findings went on the public record before the timing record became indefensible."
+        ],
         "second_order": [
           "No single variable is at a breaking point, but several are trending the wrong way."
         ]
@@ -477,7 +514,7 @@
           ],
           "outcome_reason": "On-brief: Full disclosure and emergency conservation order was one of the options the Town Manager's Office asked about; the Town Manager's Office acted on it per its own risk posture."
         },
-        "memo_id": "memo_105581b97ec64ce9aa3e20010d6b217b",
+        "memo_id": "memo_80cf3c04d90b42b9a8117326331644de",
         "memo_revision": 1,
         "modifications": {},
         "off_brief": false,
@@ -615,7 +652,7 @@
         "classification": "proposed",
         "content": "RECOMMENDATION\nRelease the preliminary result with a conservation order, notify the state agency in writing, and publish the response timeline.\n\nRATIONALE\nMinimizes legal exposure and protects information integrity.\n\nOPERATIONAL STEPS\n- Transmit the preliminary result and response timeline to the state liaison in writing.\n- Issue the conservation order with separate hospital and school operating instructions.\n- Publish the source report, known uncertainties, and the next verification deadline together.\n\nCOMMUNICATIONS\nFrame public communications around Full disclosure and emergency conservation order. State only what the record supports.\n\nLIKELY OPPOSITION\nExpect review or resistance from: Town Manager's Office, Local Media / Rumor Network, Parent and Resident Coalition, Local Business Alliance.\n\nSECOND-ORDER RISKS\n- Short-term public-order shock and media amplification.\n- Business and school disruption spike before mitigation lands.\n\nFALLBACK PLAN\nIf the client deviates from this advice, preserve the written advice of record and revisit at the next call.",
         "content_digest": "95bd13bbef8d5c824567a6575e58be5b73db32ad6e5fa59a33d69f95c1ef5117",
-        "memo_id": "memo_105581b97ec64ce9aa3e20010d6b217b",
+        "memo_id": "memo_80cf3c04d90b42b9a8117326331644de",
         "name": "Advice of record — Full disclosure and emergency conservation order",
         "provenance": {
           "fallback_used": true,
@@ -627,7 +664,7 @@
           "workflow": "deterministic_fallback"
         },
         "revision": 1,
-        "sent_at": "2026-07-10T23:31:02.867086+00:00",
+        "sent_at": "2026-07-11T01:06:00.529637+00:00",
         "source": "system"
       },
       "status_after": "ACTIVE",
@@ -645,7 +682,7 @@
         "involved_factions": [
           "Northbridge Public Schools"
         ],
-        "memo_id": "memo_b2407d2093d3462f80124faef9a093bf",
+        "memo_id": "memo_24e43adafa174258b1d00102a50facb6",
         "public_status": "public",
         "source": "Northbridge Public Schools",
         "tags": [
@@ -949,6 +986,7 @@
         "canonized_events": [
           "Turn 2: PARTIALLY_FOLLOWED on Full disclosure and emergency conservation order"
         ],
+        "escalated_threads": [],
         "faction_reactions": [
           {
             "faction_id": "council_opposition",
@@ -989,6 +1027,7 @@
           "Headline frame: 'water worries mount' -- reactive, not yet dominant."
         ],
         "opened_threads": [],
+        "resolved_threads": [],
         "second_order": [
           "No single variable is at a breaking point, but several are trending the wrong way."
         ]
@@ -1035,7 +1074,7 @@
           ],
           "outcome_reason": "On-brief: Full disclosure and emergency conservation order was one of the options the Northbridge Public Schools asked about; the Northbridge Public Schools acted on it per its own risk posture."
         },
-        "memo_id": "memo_b2407d2093d3462f80124faef9a093bf",
+        "memo_id": "memo_24e43adafa174258b1d00102a50facb6",
         "memo_revision": 1,
         "modifications": {},
         "off_brief": false,
@@ -1173,7 +1212,7 @@
         "classification": "proposed",
         "content": "RECOMMENDATION\nRelease the preliminary result with a conservation order, notify the state agency in writing, and publish the response timeline.\n\nRATIONALE\nMinimizes legal exposure and protects information integrity.\n\nOPERATIONAL STEPS\n- Transmit the preliminary result and response timeline to the state liaison in writing.\n- Issue the conservation order with separate hospital and school operating instructions.\n- Publish the source report, known uncertainties, and the next verification deadline together.\n\nCOMMUNICATIONS\nFrame public communications around Full disclosure and emergency conservation order. State only what the record supports.\n\nLIKELY OPPOSITION\nExpect review or resistance from: Town Manager's Office, Local Media / Rumor Network, Parent and Resident Coalition, Local Business Alliance.\n\nSECOND-ORDER RISKS\n- Short-term public-order shock and media amplification.\n- Business and school disruption spike before mitigation lands.\n\nFALLBACK PLAN\nIf the client deviates from this advice, preserve the written advice of record and revisit at the next call.",
         "content_digest": "95bd13bbef8d5c824567a6575e58be5b73db32ad6e5fa59a33d69f95c1ef5117",
-        "memo_id": "memo_b2407d2093d3462f80124faef9a093bf",
+        "memo_id": "memo_24e43adafa174258b1d00102a50facb6",
         "name": "Advice of record — Full disclosure and emergency conservation order",
         "provenance": {
           "fallback_used": true,
@@ -1185,7 +1224,7 @@
           "workflow": "deterministic_fallback"
         },
         "revision": 1,
-        "sent_at": "2026-07-10T23:31:02.947441+00:00",
+        "sent_at": "2026-07-11T01:06:00.593562+00:00",
         "source": "system"
       },
       "status_after": "ACTIVE",

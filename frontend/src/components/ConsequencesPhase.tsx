@@ -62,6 +62,16 @@ export default function ConsequencesPhase({ result }: { result: TurnResult }) {
         <StackSection title="Legal / procedural fallout" items={stack.legal_fallout} tone="legal" />
         <StackSection title="Canonized events" items={stack.canonized_events} tone="canon" />
         <StackSection title="Open threads" items={stack.opened_threads} tone="thread" />
+        <StackSection
+          title="Threads escalated"
+          items={stack.escalated_threads ?? []}
+          tone="thread-escalated"
+        />
+        <StackSection
+          title="Threads resolved"
+          items={stack.resolved_threads ?? []}
+          tone="thread-resolved"
+        />
       </div>
 
       <div className="cd-changes">

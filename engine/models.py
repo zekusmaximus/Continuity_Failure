@@ -34,6 +34,7 @@ class SourceType:
     NPC_MODIFICATION = "npc_modification"
     AMBIENT = "ambient"
     DECISION = "decision"
+    THREAD = "thread"
 
 
 class FactClassification:
@@ -213,14 +214,41 @@ class Document:
 
 
 @dataclass
+class ThreadCondition:
+    """A legible resolution threshold, mirroring the FAILURE_THRESHOLDS shape."""
+    variable: str
+    op: str                 # "<=" / ">="
+    threshold: int
+
+
+@dataclass
 class OpenThread:
-    """An unresolved risk, promise, or storyline tracked across turns."""
+    """An unresolved risk, promise, or storyline tracked across turns.
+
+    A thread with a ``due_turn`` is a scheduled deterministic consequence: if it
+    is still unresolved when that turn resolves, ``escalation_effects`` are
+    applied as their own diff batch (source ``thread``) and, when
+    ``repeat_every`` is set, the deadline re-arms. Threads resolve either when
+    the player's advice carries one of ``resolve_tags`` and the client acted on
+    it, or when every ``resolve_conditions`` threshold holds.
+    """
     id: str
     title: str
     summary: str
     turn_opened: int
     status: str = ThreadStatus.OPEN
     tags: List[str] = field(default_factory=list)
+    # --- Deterministic schedule (all optional; a bare thread is just a note) ---
+    due_turn: Optional[int] = None
+    escalation_effects: Dict[str, int] = field(default_factory=dict)
+    escalation_note: str = ""
+    repeat_every: int = 0                   # 0 = fire once; N = re-arm at +N turns
+    resolve_conditions: List[ThreadCondition] = field(default_factory=list)
+    resolve_tags: List[str] = field(default_factory=list)
+    resolution_note: str = ""
+    # --- Runtime lifecycle record (never authored in content) ---
+    turn_resolved: Optional[int] = None
+    escalation_count: int = 0
 
 
 @dataclass
@@ -451,6 +479,8 @@ class ConsequenceStack:
     legal_fallout: List[str] = field(default_factory=list)
     canonized_events: List[str] = field(default_factory=list)
     opened_threads: List[str] = field(default_factory=list)
+    escalated_threads: List[str] = field(default_factory=list)
+    resolved_threads: List[str] = field(default_factory=list)
 
 
 @dataclass

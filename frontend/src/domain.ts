@@ -113,6 +113,7 @@ export const SOURCE_LABEL: Record<string, string> = {
   npc_modification: "NPC",
   ambient: "Drift",
   decision: "Decision",
+  thread: "Thread",
 };
 
 // Player-facing source attribution for the causal waterfall. Same vocabulary
@@ -124,6 +125,7 @@ export const CAUSAL_SOURCE_LABEL: Record<string, string> = {
   npc_modification: "Client action",
   decision: "Decision cost",
   ambient: "Ambient drift",
+  thread: "Open thread",
 };
 
 // Direction-aware reading of a delta: on a higher-is-worse variable a negative
@@ -271,3 +273,24 @@ export const KEY_INDICATORS: string[] = [
   "legal_exposure",
   "hospital_stability",
 ];
+
+// Deadline chip for an open thread's deterministic schedule. Returns null for
+// a bare narrative thread with no lifecycle to report.
+export function threadDeadlineLabel(t: {
+  status: string;
+  due_turn: number | null;
+  escalation_count: number;
+  turn_resolved: number | null;
+}): string | null {
+  if (t.status === "resolved") {
+    return t.turn_resolved != null ? `Resolved turn ${t.turn_resolved}` : "Resolved";
+  }
+  const parts: string[] = [];
+  if (t.escalation_count > 0) {
+    parts.push(`Escalated ×${t.escalation_count}`);
+  }
+  if (t.due_turn != null) {
+    parts.push(`${t.escalation_count > 0 ? "next" : "escalates"} turn ${t.due_turn}`);
+  }
+  return parts.length > 0 ? parts.join(" · ") : null;
+}

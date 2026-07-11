@@ -986,6 +986,7 @@ body {
 .cd-src-advice .cd-diff-var { border-left: 2px solid var(--accent); padding-left: 6px; }
 .cd-src-npc_modification .cd-diff-var { border-left: 2px solid var(--warn); padding-left: 6px; }
 .cd-src-ambient .cd-diff-var { border-left: 2px solid var(--text-dim); padding-left: 6px; }
+.cd-src-thread .cd-diff-var { border-left: 2px solid var(--crit); padding-left: 6px; }
 
 /* ============================ Canon & threads (Case File) ============================ */
 .cd-canon-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 9px; }
@@ -1005,6 +1006,15 @@ body {
 .cd-ts-stabilizing { color: var(--info); }
 .cd-ts-resolved { color: var(--good); }
 .cd-thread-summary { margin: 2px 0; font-size: 11.5px; color: var(--text-dim); }
+.cd-thread-deadline {
+  font-family: var(--mono); font-size: 10px; letter-spacing: 0.04em;
+  color: var(--warn); white-space: nowrap;
+}
+.cd-thread-item.cd-thread-resolved { border-left-color: var(--good); }
+.cd-thread-item.cd-thread-resolved .cd-thread-deadline { color: var(--good); }
+.cd-thread-esc-note { color: var(--crit); }
+.cd-stack-thread-escalated .cd-subhead { color: var(--crit); }
+.cd-stack-thread-resolved .cd-subhead { color: var(--good); }
 
 /* ============================ Turn history (Case File) ============================ */
 .cd-turn-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }

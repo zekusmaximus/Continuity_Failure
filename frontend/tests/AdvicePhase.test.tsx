@@ -177,6 +177,8 @@ describe("ClientDecisionPhase explanation payload", () => {
       legal_fallout: [],
       canonized_events: [],
       opened_threads: [],
+      escalated_threads: [],
+      resolved_threads: [],
     },
     failure_reason: null,
     sent_memo: null,

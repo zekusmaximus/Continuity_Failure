@@ -210,3 +210,58 @@ def test_transaction_rolls_back_every_write_on_failure(tmp_path):
     assert restored.turn_number == 1
     assert restored.turn_history == []
     assert repository.snapshot_json(campaign.id, 1) is None
+
+
+def test_snapshot_written_before_model_gained_fields_still_resaves(tmp_path):
+    """Additive engine-model fields must not read as history tampering.
+
+    A snapshot stored before a dataclass gained a defaulted field lacks that
+    key. The immutability check normalizes the stored dict through the typed
+    rebuilder, so the re-save succeeds; a genuine value change still fails
+    (covered by test_existing_turn_history_cannot_be_changed_by_resave).
+    """
+    import json
+
+    repository = SQLiteRepository(tmp_path / "additive.sqlite3")
+    campaign = seed_data.create_northbridge_campaign()
+    repository.put(campaign)
+    _resolve_and_save(repository, campaign, "controlled_disclosure")
+
+    # Simulate a pre-upgrade database: strip defaulted fields from BOTH the
+    # stored snapshot and the live campaign payload, exactly as an older build
+    # would have written them before the model gained the fields.
+    def _strip(stored_campaign):
+        stack = stored_campaign["turn_history"][-1]["consequence_stack"]
+        stack.pop("escalated_threads", None)
+        stack.pop("resolved_threads", None)
+        stored_campaign["canon"][0].pop("tags", None)
+
+    with repository._connect() as connection:  # noqa: SLF001 - test hook
+        row = connection.execute(
+            "SELECT snapshot_json FROM turn_snapshots "
+            "WHERE campaign_id = ? AND turn_number = 1",
+            (campaign.id,),
+        ).fetchone()
+        document = json.loads(row["snapshot_json"])
+        _strip(document["data"]["campaign"])
+        connection.execute(
+            "UPDATE turn_snapshots SET snapshot_json = ? "
+            "WHERE campaign_id = ? AND turn_number = 1",
+            (json.dumps(document), campaign.id),
+        )
+        row = connection.execute(
+            "SELECT payload_json FROM campaigns WHERE id = ?", (campaign.id,)
+        ).fetchone()
+        payload = json.loads(row["payload_json"])
+        _strip(payload["data"])
+        connection.execute(
+            "UPDATE campaigns SET payload_json = ? WHERE id = ?",
+            (json.dumps(payload), campaign.id),
+        )
+        connection.commit()
+
+    # Restart against the "old" database; the next turn must save cleanly.
+    restarted = SQLiteRepository(repository.path)
+    reopened = restarted.get(campaign.id)
+    _resolve_and_save(restarted, reopened, "contractor_pressure")
+    assert len(restarted.get(campaign.id).turn_history) == 2

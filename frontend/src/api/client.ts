@@ -90,6 +90,12 @@ export interface DocumentRecord {
   tags: string[];
 }
 
+export interface ThreadCondition {
+  variable: string;
+  op: string;
+  threshold: number;
+}
+
 export interface OpenThread {
   id: string;
   title: string;
@@ -97,6 +103,15 @@ export interface OpenThread {
   turn_opened: number;
   status: string;
   tags: string[];
+  due_turn: number | null;
+  escalation_effects: Record<string, number>;
+  escalation_note: string;
+  repeat_every: number;
+  resolve_conditions: ThreadCondition[];
+  resolve_tags: string[];
+  resolution_note: string;
+  turn_resolved: number | null;
+  escalation_count: number;
 }
 
 export interface WorldState {
@@ -249,11 +264,13 @@ export interface ConsequenceStack {
   legal_fallout: string[];
   canonized_events: string[];
   opened_threads: string[];
+  escalated_threads: string[];
+  resolved_threads: string[];
 }
 
 /** One attributed step in a variable's start → final reconciliation. */
 export interface ConsequenceDelta {
-  source_type: string; // "advice" | "npc_modification" | "ambient" | "decision"
+  source_type: string; // "advice" | "npc_modification" | "ambient" | "decision" | "thread"
   delta: number; // effective (post-clamp) change, never zero
   reason: string;
   value_before: number;

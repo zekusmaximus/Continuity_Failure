@@ -18,7 +18,7 @@ PUBLIC_STATUS_PATTERN = r"^(public|private|leaked|sealed|disputed|unknown)$"
 RELIABILITY_PATTERN = r"^(high|medium|low|unknown|contested)$"
 CAMPAIGN_STATUS_PATTERN = r"^(ACTIVE|COMPLETED|FAILED)$"
 DECISION_TYPE_PATTERN = r"^(FOLLOWED|PARTIALLY_FOLLOWED|MODIFIED|DELAYED|REJECTED)$"
-SOURCE_TYPE_PATTERN = r"^(advice|npc_modification|ambient|decision)$"
+SOURCE_TYPE_PATTERN = r"^(advice|npc_modification|ambient|decision|thread)$"
 FACT_CLASSIFICATION_PATTERN = r"^(canon|proposed|rejected|rumor|unverified|contradicted)$"
 MEMO_ID_PATTERN = r"^memo_[a-f0-9]{32}$"
 
@@ -120,6 +120,12 @@ class DocumentModel(BaseModel):
     tags: List[str] = Field(default_factory=list)
 
 
+class ThreadConditionModel(BaseModel):
+    variable: str
+    op: str = Field(pattern=r"^(<=|>=)$")
+    threshold: int = Field(ge=0, le=100)
+
+
 class OpenThreadModel(BaseModel):
     id: str
     title: str
@@ -127,6 +133,15 @@ class OpenThreadModel(BaseModel):
     turn_opened: int = Field(ge=1)
     status: str = Field(default="open", pattern=r"^(open|escalating|stabilizing|resolved)$")
     tags: List[str] = Field(default_factory=list)
+    due_turn: Optional[int] = Field(default=None, ge=1)
+    escalation_effects: Dict[str, int] = Field(default_factory=dict)
+    escalation_note: str = ""
+    repeat_every: int = Field(default=0, ge=0)
+    resolve_conditions: List[ThreadConditionModel] = Field(default_factory=list)
+    resolve_tags: List[str] = Field(default_factory=list)
+    resolution_note: str = ""
+    turn_resolved: Optional[int] = Field(default=None, ge=1)
+    escalation_count: int = Field(default=0, ge=0)
 
 
 class WorldStateModel(BaseModel):
@@ -414,6 +429,8 @@ class ConsequenceStackModel(BaseModel):
     legal_fallout: List[str] = Field(default_factory=list)
     canonized_events: List[str] = Field(default_factory=list)
     opened_threads: List[str] = Field(default_factory=list)
+    escalated_threads: List[str] = Field(default_factory=list)
+    resolved_threads: List[str] = Field(default_factory=list)
 
 
 class ConsequenceDeltaModel(BaseModel):

@@ -1,5 +1,5 @@
 import type { TurnHistory, TurnResult } from "../api/client";
-import { DECISION_BADGE, titleCase } from "../domain";
+import { DECISION_BADGE, threadDeadlineLabel, titleCase } from "../domain";
 
 interface Props {
   result: TurnResult;
@@ -78,11 +78,17 @@ export default function ArchivePhase({ result, history }: Props) {
         <div className="cd-field">
           <div className="cd-field-k">New / updated open threads</div>
           <ul className="cd-facts cd-facts-risk">
-            {openThreads.map((t) => (
-              <li key={t.id}>
-                {t.title} — {t.summary}
-              </li>
-            ))}
+            {openThreads.map((t) => {
+              const deadline = threadDeadlineLabel(t);
+              return (
+                <li key={t.id}>
+                  {t.title} — {t.summary}
+                  {deadline && (
+                    <span className="cd-thread-deadline"> {deadline}</span>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         </div>
       )}

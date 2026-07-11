@@ -34,6 +34,7 @@ from engine.models import (
     Document,
     Faction,
     OpenThread,
+    ThreadCondition,
     WorldState,
 )
 
@@ -186,7 +187,16 @@ def _build_documents(raw: List[dict]) -> List[Document]:
 
 
 def _build_threads(raw: List[dict]) -> List[OpenThread]:
-    return [OpenThread(**t) for t in raw]
+    threads = []
+    for t in raw:
+        data = dict(t)
+        conditions = data.get("resolve_conditions")
+        if isinstance(conditions, list):
+            data["resolve_conditions"] = [
+                ThreadCondition(**cond) for cond in conditions
+            ]
+        threads.append(OpenThread(**data))
+    return threads
 
 
 def _last_verified(turn: int) -> str:

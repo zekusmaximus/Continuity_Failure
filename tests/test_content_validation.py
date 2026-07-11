@@ -389,3 +389,65 @@ def test_validate_module_scans_shipped_scenarios():
     # The developer command entry point validates the real content directory.
     import engine.content.__main__ as cli
     assert cli.main(["validate"]) == 0
+
+
+# ---------------------------------------------------------------------------
+# Thread lifecycle schedule fields
+# ---------------------------------------------------------------------------
+
+def test_reject_thread_due_turn_out_of_range():
+    bundle = valid_bundle()
+    bundle.threads[0]["due_turn"] = 99
+    exc = _expect_invalid(bundle)
+    assert any("due_turn" in m for m in _messages(exc))
+
+
+def test_reject_unknown_variable_in_escalation_effects():
+    bundle = valid_bundle()
+    bundle.threads[0]["escalation_effects"] = {"not_a_variable": 5}
+    exc = _expect_invalid(bundle)
+    assert any("unknown WorldState variable 'not_a_variable'" in m for m in _messages(exc))
+
+
+def test_reject_escalation_effects_without_note():
+    bundle = valid_bundle()
+    bundle.threads[0]["escalation_effects"] = {"legal_exposure": 4}
+    bundle.threads[0]["escalation_note"] = ""
+    exc = _expect_invalid(bundle)
+    assert any("escalation_note" in m for m in _messages(exc))
+
+
+def test_reject_unknown_resolve_tag():
+    bundle = valid_bundle()
+    bundle.threads[0]["resolve_tags"] = ["not_a_tag"]
+    exc = _expect_invalid(bundle)
+    assert any("resolve tag 'not_a_tag'" in m for m in _messages(exc))
+
+
+def test_reject_bad_resolve_condition():
+    bundle = valid_bundle()
+    bundle.threads[0]["resolve_conditions"] = [
+        {"variable": "nope", "op": "==", "threshold": 500}
+    ]
+    exc = _expect_invalid(bundle)
+    messages = _messages(exc)
+    assert any("unknown WorldState variable 'nope'" in m for m in messages)
+    assert any("op must be one of" in m for m in messages)
+    assert any("threshold" in m for m in messages)
+
+
+def test_reject_authored_runtime_thread_fields():
+    bundle = valid_bundle()
+    bundle.threads[0]["escalation_count"] = 2
+    bundle.threads[0]["turn_resolved"] = 3
+    bundle.threads[0]["status"] = "escalating"
+    exc = _expect_invalid(bundle)
+    messages = _messages(exc)
+    assert sum("engine-owned runtime state" in m for m in messages) == 3
+
+
+def test_reject_negative_repeat_every():
+    bundle = valid_bundle()
+    bundle.threads[0]["repeat_every"] = -1
+    exc = _expect_invalid(bundle)
+    assert any("repeat_every" in m for m in _messages(exc))
