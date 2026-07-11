@@ -305,10 +305,10 @@ When making changes:
 
 ## Current Priority
 
-The deterministic Northbridge MVP is implemented, playable, and tested (212
-tests as of this commit — always re-derive the count with `pytest -q` rather
-than trusting this number). A dormant, validation-gated AI-assist layer (memo
-drafter + `ModelRun` logging) is wired end to end and off by default. Durable
+The deterministic Northbridge MVP is implemented, playable, and tested (485
+tests verified on 2026-07-11 — always re-derive the count with `pytest -q`
+rather than trusting this number). A dormant, validation-gated AI-assist layer
+(memo drafter + `ModelRun` logging) is wired end to end and off by default. Durable
 SQLite persistence and atomic, idempotent turn resolution are in place. Build
 out the remaining read-only AI tools before implementing autonomous
 multi-agent behavior.
@@ -321,4 +321,5 @@ The first technical milestone (met):
 The next milestone:
 
 > The AI-assist layer covers the read-only research/drafting tools behind the
-> validation boundary, with in-world tool costs, before durability is added.
+> validation boundary, with in-world tool costs and the existing durable record
+> preserving every advisory artifact and authoritative acceptance decision.

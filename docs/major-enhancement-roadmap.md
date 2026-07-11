@@ -34,7 +34,7 @@ with a legible reason, AI never mutates state, snapshots stay append-only.
 | 4e | Deadline budget (HO#6) | Wave 1 citations |
 | 5 | Additional read-only AI tools (ME#7) | everything above (per the review) |
 
-> **Wave 2 is complete** (2026-07-11, batches A1–A4 + B1–B4 on this branch;
+> **Wave 2 is complete** (2026-07-11, batches A1–A4 + B1–B4 merged by PR #4;
 > plan: `docs/wave-2-implementation-plan.md`). Shipped: ruleset_version with
 > golden-trace pinning, content-authored thread specs, faction-gated call
 > variants, seed variants, power_stability drivers (ruleset "2"),
@@ -54,6 +54,58 @@ with a legible reason, AI never mutates state, snapshots stay append-only.
 >    seeded low-power scenario variant would make this e2e cheap.
 > 4. *Comms degradation affecting adherence/decisions* — belongs with Wave
 >    5's AI tools, where model access has in-world costs to degrade.
+
+### Post-Wave-2 gates (fix before adding more systems)
+
+The merge is technically green, but the post-merge adversarial review found
+three reachability/choice defects that must precede Wave 3 feature work:
+
+1. Make the turn-4 contractor variant naturally reachable (the exact minimum
+   pre-turn trust is 40; its authored gate is 25), or rewrite the trigger around
+   a state the first three turns can actually produce.
+2. Make CRITICAL play reachable through an authored, balanced route (the lowest
+   current path is `hot_summer` at power 28), then add the trimmed Playwright
+   journey. Do not merely add a dev-only low-power switch and call the feature
+   playable.
+3. Bind auxiliary power to a decision window. Today a persistent memo can be
+   drafted under provisional `MODEL_ACCESS`, then sent under `LIVE_DATA` with
+   citations; `COMMUNICATIONS` also reveals nothing before the player chooses.
+   Preserve the one-subsystem fiction in both workflow and record.
+
+Also correct the stale-evidence contradiction (documents authored after
+`last_live_turn` currently appear under an earlier “last verified” stamp), keep
+call variant/allocation facts visible in the dossier, and align content/API id
+validation before expanding authored packages.
+
+## Remaining §16–17 ledger
+
+This is the truthful remainder of the 2026-07-09 review after Waves 1 and 2.
+The original ten Quick Wins and ten Medium Improvements are implemented: frozen
+turn presentation; synchronized cursors/freshness; corrected copy; directional
+state indicators; restart/resume; operational memo fallbacks; strict requests;
+focus/reduced motion; humanized variables; **Close Turn**; SQLite; atomic
+idempotency; the desk guide; accessible phase/dialog navigation; contextual
+advice; memo artifacts; the causal waterfall; split validated content; frontend
+E2E; and structured request logs. The only medium-layer coverage debt is the
+trimmed natural degraded/CRITICAL Playwright journey, which is blocked by the
+reachability defect above rather than by test infrastructure.
+
+| Review item still open | Why it waits |
+| --- | --- |
+| **3a / ME#5 — identity and security** | Local single-player has no ownership boundary. Implement when a shared playtest/deployment is scheduled, so the account/token model, quotas, CORS/CSP, and audit policy are designed for a real threat model. |
+| **3b / HO#10 — comprehension telemetry** | Instrument only after the immediate loop/pacing hypotheses in `player-experience-plan.md` are named. Keep collection local-first and export opt-in; shared aggregation depends on 3a. |
+| **4a / HO#1 — record as a playable object** | Needs the Wave-2 record defects fixed first so what the player seals or omits is the same fact the archive preserves. This is the highest-value record-centered feature. |
+| **4b / HO#3 — counterfactual dossier** | Ruleset/variant stamping now exists, but old-version execution does not. Define replay compatibility and simulation-not-canon labeling before presenting a road not taken as trustworthy. Faction-field seed overrides return here only if they materially improve comparisons. |
+| **4c / HO#4 — consultant ethics profile** | Endings and ledger inputs exist, but verdict/band reachability needs tuning first; otherwise the profile will infer identity from axes players cannot move into all intended ranges. |
+| **4d / HO#5 — evidence contradiction graph** | Citation plumbing exists. It waits on a small authored edge vocabulary and UX that makes contradictions actionable rather than adding another library view. |
+| **4e / HO#6 — deadline budget** | Add only after measuring first-run reading burden and evidence use. A research budget should create civic pressure, not punish players for learning an already dense interface. |
+| **5 / ME#7 — read-only AI tools** | Research, rumor classification, and scenario analysis require evidence provenance, retention rules, 4e costs, and a degradation choice that cannot be bypassed. The model remains advisory and outside authoritative state. |
+
+Wave-2 trims remain open as follows: faction-field variant overrides wait for
+4b; numeric allocation costs wait for a reachable choice and balance pass; the
+degraded Playwright path follows the reachability fix; communications effects on
+NPC adherence wait for Wave 5, while communications *presentation timing* is an
+immediate workflow correction rather than a future AI feature.
 
 ## Wave 2a — Versioned scenario/rules engine completion (ME#4 remainder)
 

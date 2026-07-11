@@ -1,12 +1,41 @@
 # Wave 2 Implementation Plan — Versioned Engine (2a) + Diegetic Degradation (2b)
 
-**Status:** PLAN — awaiting approval. No feature code has been written.
+**Status:** COMPLETE — merged to `main` in PR #4 (2026-07-11). The plan below
+is retained as the pre-implementation design record; the completion addendum
+records what actually shipped and the post-merge review caveats.
 **Date:** 2026-07-11
 **Scope source:** `docs/major-enhancement-roadmap.md` Waves 2a/2b, tracing to
 `docs/comprehensive-engineering-ux-review-2026-07-09.md` §16 ME#4/ME#6 and §17 HO#8.
 **Binding constraints:** every design invariant in `AGENTS.md` (stdlib-only
 deterministic engine, all mutations via `engine/diffs.apply_diffs` with legible
 reasons, AI never mutates state, terminal stays terminal, append-only snapshots).
+
+---
+
+## Completion addendum (post-merge truth pass)
+
+Verified after merge on 2026-07-11: **485 pytest**, content validation, TypeScript
+typecheck, **46 Vitest**, and **24 Playwright** checks pass. The Playwright run
+uses the production frontend build and a real FastAPI/SQLite backend. A
+post-merge adversarial sweep also exercised 4,212 strategies across baseline,
+`hot_summer`, and `strained_finances`; it did not modify engine behavior or the
+golden traces.
+
+| Batch | Completion and deviations from this plan |
+| --- | --- |
+| A1 | **Done.** Ruleset stamping, version-keyed goldens, and `balance_trace.py` shipped. `RecentCampaign` deliberately remains a smaller SQL/TS projection (`Omit<>`) without ruleset or variant metadata. The Playwright executable escape hatch was an additional test-infrastructure change. Caveat: the version is metadata, not a rules dispatcher; a pre-Wave-2 active row default-loads as ruleset `"1"` but continues under the current engine with default-empty new content fields. Historical golden entries are retained by convention, while only the current version is replayed by the test. |
+| A2 | **Done.** Dynamic thread rules moved to `thread_specs.json` and share `engine/conditions.py`. The accepted compatibility seam remains: older active campaigns default to no thread specs and cannot open new dynamic threads. The validator still accepts an escalation schedule with effects but no `due_in`; such a loaded thread opens with `due_turn=None` and can never escalate. |
+| A3 | **Done.** Faction/world-gated variants, one-shot pre-mutation call resolution, record field, validation, and two authored calls shipped. The one-shot claim survives a threshold-crossing probe. Reachability does not: exhaustive legal prefixes through turn 3 put Utility Contractor trust no lower than **40**, so the turn-4 `<=25` ultimatum is test-force-only. The turn-6 oversight variant is naturally reachable (pre-call oversight reached 63). |
+| A4 | **Done.** Baseline plus `hot_summer` and `strained_finances`, API metadata, persistence, and intake selector shipped. The documented strained-finances alternate closeout is completable. Validator/API vocabulary is not fully aligned: content accepts an id such as `hot-summer`, while `CreateCampaignRequest` rejects it because the public id pattern permits underscores but not hyphens. |
+| B1 | **Done.** Heat window, grid-stress thread, load-shedding counter, and ruleset `"2"` shipped. Tuning changed load shedding from the planned **+10** to **+14** power. The pinned ruleset-2 goldens differ from ruleset 1 only in `power_stability`; canonical survival still ends with budget 2 and ignored power at 40. |
+| B2 | **Done.** Derived degradation bands, last-live reconstruction, system status, stale stamp, and diegetic drafting gate shipped. The `DEGRADED`/`CRITICAL` behavior follows the documented auxiliary-switchover fiction. Caveat: later-turn authored documents still enter `available_documents()` after feeds become stale, even while the UI says the board was last verified at an earlier turn. |
+| B3 | **Done.** Banner, status panel, stale treatments, degraded root styling, and memo copy shipped. Component accessibility checks pass. The planned trim remains: no natural degraded/critical Playwright journey exists. |
+| B4 | **Done.** Allocation validation, fingerprinting, `TurnResult.powered_subsystem`, capability gates, and the chooser shipped. The provisional-allocation drafting seam was added during implementation, not planned here. It is exploitable as a two-subsystem turn: a persistent memo can be drafted under provisional `MODEL_ACCESS`, then submitted under binding `LIVE_DATA` with citations. Switching allocation only clears citations; it does not invalidate the draft. `COMMUNICATIONS` replaces the authoritative recorded explanation memory with a dark line instead of withholding it at presentation. The choice is not restored on a pre-submit refresh. Most importantly, no authored route reaches CRITICAL: the lowest observed and analytically minimal power is **28** (`hot_summer` while ignoring load shedding), above the `<=14` gate. |
+
+The completion label therefore means the eight implementation batches merged
+and are green. It does not mean every authored branch or degradation mechanic is
+reachable in ordinary play; those are balance/content defects for a follow-up,
+not reasons to rewrite this historical plan.
 
 ---
 
