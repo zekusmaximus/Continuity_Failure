@@ -569,6 +569,13 @@ class SystemStatusModel(BaseModel):
     staff_capacity: int = Field(ge=0, le=100)
     ai_available: bool = False
     model_status: str = "AI assist present — off by default (returns system drafts)"
+    # --- Deterministic degradation (engine/degradation.py) ---
+    degradation_band: str = Field(
+        default="NOMINAL", pattern=r"^(NOMINAL|STRAINED|DEGRADED|CRITICAL)$"
+    )
+    live_feeds: bool = True
+    last_live_turn: int = Field(default=0, ge=0)
+    requires_power_allocation: bool = False
 
 
 class CurrentTurnModel(BaseModel):

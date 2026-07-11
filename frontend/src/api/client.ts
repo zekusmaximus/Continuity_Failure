@@ -369,6 +369,10 @@ export interface SystemStatus {
   staff_capacity: number;
   ai_available: boolean;
   model_status: string;
+  degradation_band: "NOMINAL" | "STRAINED" | "DEGRADED" | "CRITICAL";
+  live_feeds: boolean;
+  last_live_turn: number;
+  requires_power_allocation: boolean;
 }
 
 export interface CurrentTurn {

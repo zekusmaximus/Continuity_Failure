@@ -22,6 +22,7 @@ from typing import Optional
 import uuid
 
 from engine import content
+from engine import degradation as degradation_engine
 from engine import dossier as dossier_engine
 from engine import endings as endings_engine
 from engine import seed_data, turn as turn_engine
@@ -56,6 +57,19 @@ def _require_campaign(campaign_id: str) -> Campaign:
     if campaign is None:
         raise KeyError(campaign_id)
     return campaign
+
+
+def _ai_offline_reason(campaign: Campaign) -> Optional[str]:
+    """The diegetic gate on the model stack, if any (engine.degradation).
+
+    Non-None means the drafter must take the deterministic fallback path
+    regardless of deployment configuration -- below the degraded threshold
+    the desk cannot sustain model access at all.
+    """
+    status = degradation_engine.assess_degradation(campaign)
+    if status.ai_operational:
+        return None
+    return f"grid power {status.power} below sustaining threshold"
 
 
 def _summary(campaign: Campaign) -> schemas.CampaignSummaryModel:
@@ -101,36 +115,47 @@ def _debt_ledger(campaign: Campaign) -> list[schemas.PrecedentEntryModel]:
 def _system_status(campaign: Campaign) -> schemas.SystemStatusModel:
     """Derive diegetic infrastructure status from world state (deterministic).
 
-    ``ai_available`` reflects whether a live model provider is actually
-    configured, so the workstation indicator stays honest: when AI is off (the
-    default), the memo drafter still works but returns a deterministic fallback.
+    ``ai_available`` is honest twice over: it requires a live model provider
+    (deployment state) AND enough grid margin for the model stack
+    (``engine.degradation``). Either way the memo drafter keeps working -- it
+    just returns deterministic system drafts.
     """
     settings = get_settings()
     v = campaign.world_state.variables
-    power = v.get("power_stability", 50)
+    status = degradation_engine.assess_degradation(campaign)
+    power = status.power
     staff = v.get("staff_capacity", 50)
     info = v.get("information_integrity", 50)
     # Data freshness degrades as staff/information capacity drops -- a strained
     # operations floor stops keeping feeds current. Kept as a simple blend.
     data_freshness = (info + staff) // 2
     comms = min(power, info + 10)
-    # AI assist is present and reachable; it is "available" only when a live
-    # provider is configured. Otherwise the layer stays dormant and the memo
-    # drafter returns a deterministic fallback.
     ai_live = settings.ai_live
     provider = get_provider(settings) if ai_live else None
-    model_status = (
-        f"Live AI assist active ({getattr(provider, 'name', 'unknown')} provider)"
-        if ai_live and provider is not None
-        else "AI assist present — off by default (returns system drafts)"
-    )
+    if not status.ai_operational:
+        # The diegetic gate outranks deployment state: below the degraded
+        # threshold the desk cannot sustain the model stack at all.
+        model_status = (
+            "Model access offline — grid power below sustaining threshold "
+            "(deterministic system drafts only)"
+        )
+    elif ai_live and provider is not None:
+        model_status = (
+            f"Live AI assist active ({getattr(provider, 'name', 'unknown')} provider)"
+        )
+    else:
+        model_status = "AI assist present — off by default (returns system drafts)"
     return schemas.SystemStatusModel(
         power=power,
         comms=comms,
         data_freshness=data_freshness,
         staff_capacity=staff,
-        ai_available=ai_live,
+        ai_available=ai_live and status.ai_operational,
         model_status=model_status,
+        degradation_band=status.band,
+        live_feeds=status.live_feeds,
+        last_live_turn=status.last_live_turn,
+        requires_power_allocation=status.requires_power_allocation,
     )
 
 
@@ -218,15 +243,31 @@ def _current_model(campaign: Campaign) -> schemas.CurrentTurnModel:
             asdict(campaign.turn_history[-1])
         )
 
+    system_status = _system_status(campaign)
+    world_state = _world_state(campaign)
+    if not system_status.live_feeds:
+        # Live feeds are down: the freshness label carries the stale stamp.
+        # Presentation-only -- the engine's own last_verified is untouched.
+        anchor = (
+            f"turn {system_status.last_live_turn} close-out"
+            if system_status.last_live_turn > 0
+            else "engagement intake"
+        )
+        world_state = world_state.model_copy(update={
+            "last_verified": (
+                f"LAST VERIFIED — {anchor} · live feed lost (deterministic)"
+            )
+        })
+
     return schemas.CurrentTurnModel(
         summary=_summary(campaign),
-        world_state=_world_state(campaign),
+        world_state=world_state,
         client_call=client_call,
         advice_options=advice_options,
         documents=_documents(campaign),
         open_threads=_open_threads(campaign),
         debt_ledger=_debt_ledger(campaign),
-        system_status=_system_status(campaign),
+        system_status=system_status,
         last_turn=last_turn,
         caller_disposition=_caller_disposition(campaign),
     )
@@ -633,6 +674,7 @@ def create_memo(
                 input_summary=f"turn {campaign.turn_number}: {option.label}",
                 campaign_id=campaign.id,
                 turn_number=campaign.turn_number,
+                unavailable_reason=_ai_offline_reason(campaign),
             )
             content = _memo_content_text(artifact.content)
 
@@ -755,6 +797,7 @@ def draft_memo(
         input_summary=f"turn {campaign.turn_number}: {option.label}",
         campaign_id=campaign.id,
         turn_number=campaign.turn_number,
+        unavailable_reason=_ai_offline_reason(campaign),
     )
     return schemas.MemoDraftModel(
         status=artifact.status,

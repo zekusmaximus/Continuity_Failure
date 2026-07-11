@@ -100,8 +100,15 @@ def run_artifact(
     settings=None,
     prompts_dir: Optional[Path] = None,
     store=None,
+    unavailable_reason: Optional[str] = None,
 ) -> AiArtifact:
-    """Produce a validated artifact, falling back deterministically on any failure."""
+    """Produce a validated artifact, falling back deterministically on any failure.
+
+    ``unavailable_reason`` is the diegetic in-world gate (e.g. grid power below
+    the model stack's sustaining threshold): when set, the runner behaves as if
+    AI were off -- straight to the deterministic fallback, no provider call --
+    and the ModelRun log records why.
+    """
     from app.config import get_settings
 
     settings = settings or get_settings()
@@ -111,21 +118,27 @@ def run_artifact(
         store.add(run)
         return AiArtifact(status=status, content=content, run=run)
 
-    # --- AI off: straight to deterministic fallback, no provider call. ---
-    if not settings.ai_live:
+    # --- AI off (deployment) or offline (diegetic gate): straight to the
+    # deterministic fallback, no provider call. ---
+    if not settings.ai_live or unavailable_reason:
+        label = "offline" if unavailable_reason else "disabled"
+        summary = (
+            f"{input_summary} [offline: {unavailable_reason}]"
+            if unavailable_reason else input_summary
+        )
         content = fallback(input_payload)
         run = ModelRun(
             prompt_name=prompt_name,
             prompt_version=prompt_version,
-            model_name="disabled",
+            model_name=label,
             validation_status=ValidationStatus.FALLBACK,
-            input_summary=input_summary,
+            input_summary=summary,
             parsed_output=content.model_dump(),
             retry_count=0,
             latency_ms=0,
             campaign_id=campaign_id,
             turn_number=turn_number,
-            provider="disabled",
+            provider=label,
         )
         return _log_and_return(ArtifactStatus.FALLBACK, content, run)
 

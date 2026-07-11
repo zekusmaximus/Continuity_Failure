@@ -409,7 +409,7 @@
     }
   ],
   "summary": {
-    "created_at": "2026-07-11T14:01:15.242227+00:00",
+    "created_at": "2026-07-11T14:10:56.589421+00:00",
     "failure_reason": null,
     "id": "test-campaign",
     "max_turns": 10,
@@ -424,8 +424,12 @@
     "ai_available": false,
     "comms": 72,
     "data_freshness": 56,
+    "degradation_band": "NOMINAL",
+    "last_live_turn": 1,
+    "live_feeds": true,
     "model_status": "AI assist present — off by default (returns system drafts)",
     "power": 72,
+    "requires_power_allocation": false,
     "staff_capacity": 50
   },
   "world_state": {
