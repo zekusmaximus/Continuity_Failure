@@ -1,6 +1,6 @@
 import { useRef, type KeyboardEvent } from "react";
 import type { CampaignSummary, WorldState } from "../api/client";
-import type { Phase } from "../domain";
+import type { Phase, ReviewMode } from "../domain";
 import { PHASE_LABEL, TURN_STEPS, STEP_SHORT } from "../domain";
 import KeyStateIndicators from "./KeyStateIndicators";
 
@@ -9,6 +9,10 @@ interface Props {
   worldState: WorldState | null;
   phase: Phase;
   maxReachedIndex: number;
+  // The active turn spine: guided or expedited (Wave 3 C2). Defaults to the
+  // guided steps so existing callers/tests are unchanged.
+  steps?: Phase[];
+  reviewMode?: ReviewMode;
   onGoto: (phase: Phase) => void;
   onOpenCaseFile: () => void;
   onOpenGuide: () => void;
@@ -26,6 +30,8 @@ export default function ContinuityHeader({
   worldState,
   phase,
   maxReachedIndex,
+  steps = TURN_STEPS,
+  reviewMode = "guided",
   onGoto,
   onOpenCaseFile,
   onOpenGuide,
@@ -36,11 +42,11 @@ export default function ContinuityHeader({
     ? `${Math.min(summary.turn_number, summary.max_turns)} / ${summary.max_turns}`
     : "— / —";
   const status = summary?.status ?? "INIT";
-  const activeIndex = TURN_STEPS.indexOf(phase);
+  const activeIndex = steps.indexOf(phase);
   const stepRefs = useRef<Array<HTMLButtonElement | null>>([]);
 
   const moveStep = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
-    const enabled = TURN_STEPS.map((_, i) => i).filter((i) => i <= maxReachedIndex);
+    const enabled = steps.map((_, i) => i).filter((i) => i <= maxReachedIndex);
     if (enabled.length === 0) return;
     const position = enabled.indexOf(index);
     let nextPosition = position;
@@ -51,7 +57,7 @@ export default function ContinuityHeader({
     else return;
     event.preventDefault();
     const next = enabled[nextPosition];
-    onGoto(TURN_STEPS[next]);
+    onGoto(steps[next]);
     stepRefs.current[next]?.focus();
   };
 
@@ -97,8 +103,12 @@ export default function ContinuityHeader({
       </div>
 
       <div className="cd-header-bottom">
-        <div className="cd-stepper" role="tablist" aria-label="Turn phases">
-          {TURN_STEPS.map((step, i) => {
+        <div
+          className="cd-stepper"
+          role="tablist"
+          aria-label={`Turn phases · ${reviewMode} review`}
+        >
+          {steps.map((step, i) => {
             const state =
               i < maxReachedIndex ? "done" : i === activeIndex ? "active" : "todo";
             const disabled = i > maxReachedIndex;

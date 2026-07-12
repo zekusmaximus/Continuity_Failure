@@ -18,6 +18,7 @@ export const TELEMETRY_PHASES = [
   "CALL",
   "BRIEF",
   "EVIDENCE",
+  "REVIEW",
   "ADVICE",
   "CLIENT_DECISION",
   "CONSEQUENCES",

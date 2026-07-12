@@ -8,6 +8,9 @@ interface Props {
   variants?: ScenarioVariant[];
   selectedVariant?: string;
   onVariantChange?: (variantId: string) => void;
+  /** Local presentation hint (Wave 3 C3): a completed engagement makes the
+   * alternate conditions more prominent. Grants nothing; may be absent. */
+  completedBefore?: boolean;
 }
 
 /**
@@ -22,8 +25,8 @@ export default function IntroScreen({
   variants = [],
   selectedVariant = "",
   onVariantChange,
+  completedBefore = false,
 }: Props) {
-  const activeVariant = variants.find((v) => v.id === selectedVariant);
   return (
     <main id="main-content" className="cd-intro" tabIndex={-1}>
       <div className="cd-intro-card">
@@ -55,28 +58,48 @@ export default function IntroScreen({
         </div>
 
         {variants.length > 0 && (
-          <div className="cd-intro-variant">
-            <label className="cd-intro-variant-label" htmlFor="intro-variant">
-              Opening conditions
+          // Wave 3 C3: baseline is the clear first-run recommendation; the
+          // authored variants sit beneath it as alternate intake conditions.
+          // Framing only — every variant remains available from the start.
+          <fieldset className="cd-intro-variant">
+            <legend className="cd-intro-variant-label">Opening conditions</legend>
+            <label className="cd-intro-baseline">
+              <input
+                type="radio"
+                name="intro-variant"
+                value=""
+                checked={selectedVariant === ""}
+                onChange={() => onVariantChange?.("")}
+                disabled={loading}
+              />
+              <span>
+                <strong>Baseline engagement</strong> — recommended first case
+                <small>
+                  The Northbridge water crisis as authored: the town as the
+                  record first describes it.
+                </small>
+              </span>
             </label>
-            <select
-              id="intro-variant"
-              className="cd-intro-variant-select"
-              value={selectedVariant}
-              onChange={(e) => onVariantChange?.(e.target.value)}
-              disabled={loading}
-            >
-              <option value="">Baseline engagement</option>
+            <details className="cd-intro-alternates" open={completedBefore || selectedVariant !== ""}>
+              <summary>Alternate intake conditions</summary>
               {variants.map((variant) => (
-                <option key={variant.id} value={variant.id}>
-                  {variant.name}
-                </option>
+                <label key={variant.id} className="cd-intro-alternate">
+                  <input
+                    type="radio"
+                    name="intro-variant"
+                    value={variant.id}
+                    checked={selectedVariant === variant.id}
+                    onChange={() => onVariantChange?.(variant.id)}
+                    disabled={loading}
+                  />
+                  <span>
+                    <strong>{variant.name}</strong>
+                    <small>{variant.description}</small>
+                  </span>
+                </label>
               ))}
-            </select>
-            {activeVariant && (
-              <p className="cd-intro-variant-desc">{activeVariant.description}</p>
-            )}
-          </div>
+            </details>
+          </fieldset>
         )}
 
         <button
