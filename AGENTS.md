@@ -307,19 +307,24 @@ When making changes:
 
 The deterministic Northbridge MVP is implemented, playable, and tested (531
 Python tests as of this commit — always re-derive the count with `pytest -q`
-rather than trusting this number; plus 111 vitest and 28 Playwright tests). A
+rather than trusting this number; plus 129 vitest and 29 Playwright tests). A
 dormant, validation-gated AI-assist layer (memo drafter + `ModelRun` logging)
 is wired end to end and off by default. Durable SQLite persistence and atomic,
 idempotent turn resolution are in place. The Wave 2 balance pass (ruleset "3")
 made the marquee mechanics truthful in ordinary play: the CRITICAL band and
 its one-subsystem auxiliary-power choice are reachable and binding, the turn-4
 contractor ultimatum is live, and every completed-campaign verdict has a
-pinned witness sequence (`tests/test_ending_reachability.py`). Wave 3 batches
-A1–A2 added a browser-only playtest telemetry layer under
+pinned witness sequence (`tests/test_ending_reachability.py`). Wave 3 (complete: A1–C3) added: a browser-only playtest telemetry layer under
 `frontend/src/telemetry/` (closed event vocabulary, bounded local store,
-explicit export/clear controls in the Case File); it is observational only,
-defaults off outside local development builds, and is test-proven never to
-enter engine, backend, or campaign state. Build out the
+explicit export/clear controls in the Case File — observational only,
+defaults off outside local development builds, and test-proven never to
+enter engine, backend, or campaign state); the deterministic causal lead and
+future hook on every resolved turn (`engine/experience.py`, frozen with the
+presentation and surfaced in the UI hierarchy and dossier); progressive
+contextual teaching (`frontend/src/guide/`); optional expedited review from
+turn 3 (presentation-only REVIEW spine); and intake/terminal replay framing.
+The Wave-4 human playtest protocol in `docs/wave-3-implementation-plan.md`
+§13 is now unblocked. Build out the
 remaining read-only AI tools before implementing autonomous multi-agent
 behavior.
 

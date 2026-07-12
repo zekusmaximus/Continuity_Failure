@@ -1,20 +1,25 @@
 import { useEffect, useRef } from "react";
 import type {
   PowerAllocation, AdviceMemo, CurrentTurn, TurnHistory, TurnResult } from "../api/client";
-import type { Phase } from "../domain";
-import { TURN_STEPS } from "../domain";
+import type { Phase, ReviewMode } from "../domain";
+import { stepsForMode } from "../domain";
 import CallPhase from "./CallPhase";
 import BriefPhase from "./BriefPhase";
 import EvidencePhase from "./EvidencePhase";
+import ReviewPhase from "./ReviewPhase";
 import AdvicePhase from "./AdvicePhase";
 import ClientDecisionPhase from "./ClientDecisionPhase";
 import ConsequencesPhase from "./ConsequencesPhase";
 import ArchivePhase from "./ArchivePhase";
 import CampaignDossier from "./CampaignDossier";
 import PrimaryAction from "./PrimaryAction";
+import ReplayInvitation from "./ReplayInvitation";
 
 interface Props {
   phase: Phase;
+  // Guided or expedited (Wave 3 C2): decides the REVIEW composition and which
+  // spine the resolved-turn guard measures against. Defaults to guided.
+  reviewMode?: ReviewMode;
   campaignId: string | null;
   current: CurrentTurn | null;
   lastResult: TurnResult | null;
@@ -34,6 +39,9 @@ interface Props {
   onNextCall: () => void;
   onOpenDossier: () => void;
   onRestart: () => void;
+  // Returns to intake with an alternate variant preselected (Wave 3 C3);
+  // creates nothing until the player explicitly begins intake.
+  onReopenIntake: () => void;
   onOpenCaseFile: () => void;
   memo: AdviceMemo | null;
   memoLoading: boolean;
@@ -52,6 +60,7 @@ interface Props {
 export default function GuidedTurn(props: Props) {
   const {
     phase,
+    reviewMode = "guided",
     campaignId,
     current,
     lastResult,
@@ -70,6 +79,7 @@ export default function GuidedTurn(props: Props) {
     onNextCall,
     onOpenDossier,
     onRestart,
+    onReopenIntake,
     onOpenCaseFile,
     memo,
     memoLoading,
@@ -81,6 +91,7 @@ export default function GuidedTurn(props: Props) {
   } = props;
 
   const call = current?.client_call ?? null;
+  const steps = stepsForMode(reviewMode);
   const mainRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
@@ -127,6 +138,31 @@ export default function GuidedTurn(props: Props) {
           onClick={() => onGoto("EVIDENCE")}
           secondaryLabel="Skip to Advice"
           onSecondary={() => onGoto("ADVICE")}
+        />
+      );
+      break;
+
+    case "REVIEW":
+      panel = current ? (
+        <ReviewPhase
+          current={current}
+          onOpenCaseFile={onOpenCaseFile}
+          // A resolved turn is read-only review; no commitment from there.
+          onCommitPower={lastResult ? undefined : onCommitPower}
+          busy={submitting}
+        />
+      ) : null;
+      action = call ? (
+        <PrimaryAction
+          label="Compose Advice"
+          hint="The full package is above. Weigh your recommendation options."
+          onClick={() => onGoto("ADVICE")}
+        />
+      ) : (
+        <PrimaryAction
+          label="View Campaign Dossier"
+          onClick={onOpenDossier}
+          busy={submitting}
         />
       );
       break;
@@ -238,7 +274,17 @@ export default function GuidedTurn(props: Props) {
       break;
 
     case "DOSSIER":
-      panel = <CampaignDossier campaignId={campaignId} />;
+      panel = (
+        <>
+          <CampaignDossier campaignId={campaignId} />
+          <ReplayInvitation
+            campaignId={campaignId}
+            summary={current?.summary ?? null}
+            history={history}
+            onReopenIntake={onReopenIntake}
+          />
+        </>
+      );
       action = (
         <PrimaryAction
           label="New Engagement"
@@ -253,7 +299,7 @@ export default function GuidedTurn(props: Props) {
       panel = null;
   }
 
-  if (lastResult && TURN_STEPS.indexOf(phase) < TURN_STEPS.indexOf("CLIENT_DECISION")) {
+  if (lastResult && steps.indexOf(phase) < steps.indexOf("CLIENT_DECISION")) {
     action = (
       <PrimaryAction
         label="Return to Client Decision"
@@ -269,8 +315,8 @@ export default function GuidedTurn(props: Props) {
         ref={mainRef}
         id="main-content"
         className="cd-stage"
-        role={TURN_STEPS.includes(phase) ? "tabpanel" : undefined}
-        aria-labelledby={TURN_STEPS.includes(phase) ? `cd-phase-tab-${phase.toLowerCase()}` : undefined}
+        role={steps.includes(phase) ? "tabpanel" : undefined}
+        aria-labelledby={steps.includes(phase) ? `cd-phase-tab-${phase.toLowerCase()}` : undefined}
         tabIndex={0}
       >
         <div className="cd-stage-inner">{panel}</div>

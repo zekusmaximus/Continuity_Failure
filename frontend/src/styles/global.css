@@ -1520,3 +1520,49 @@ body {
 .cd-guide-topic-strip .cd-guide-topic { margin-top: 8px; }
 .cd-evidence-prompt { margin: 0 0 12px; }
 .cd-guide-promises li { margin: 6px 0; }
+
+/* Review-mode selector (Wave 3 C2): a compact presentation preference strip. */
+.cd-review-mode {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: baseline;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  margin: 8px 20px 0;
+  padding: 6px 12px;
+}
+.cd-review-mode-k {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-dim);
+}
+.cd-review-mode-option { display: flex; gap: 6px; align-items: baseline; cursor: pointer; }
+.cd-review-phase { display: grid; gap: 14px; }
+.cd-review-note { margin: 0; }
+
+/* Intake framing and terminal replay invitation (Wave 3 C3). */
+.cd-intro-variant { border: 1px solid var(--border); border-radius: 4px; padding: 10px 12px; text-align: left; }
+.cd-intro-baseline, .cd-intro-alternate {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  cursor: pointer;
+  margin: 6px 0;
+}
+.cd-intro-baseline small, .cd-intro-alternate small { display: block; color: var(--text-dim); }
+.cd-intro-alternates { margin-top: 8px; }
+.cd-intro-alternates > summary { cursor: pointer; color: var(--text-dim); }
+.cd-replay-invitation {
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 12px 14px;
+  margin-top: 14px;
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+}
+.cd-replay-facts { display: grid; gap: 6px; margin: 0; }
+.cd-replay-facts dt { font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-dim); }
+.cd-replay-facts dd { margin: 1px 0 0; color: var(--text-bright); }

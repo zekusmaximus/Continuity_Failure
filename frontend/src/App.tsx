@@ -10,8 +10,13 @@ import type {
   RecentCampaign,
   ScenarioVariant,
 } from "./api/client";
-import type { Phase } from "./domain";
-import { PHASE_LABEL, TURN_STEPS } from "./domain";
+import type { Phase, ReviewMode } from "./domain";
+import { PHASE_LABEL, stepsForMode, phaseForMode } from "./domain";
+import { readReviewMode, writeReviewMode } from "./guide/reviewMode";
+import {
+  readHasCompletedEngagement,
+  writeHasCompletedEngagement,
+} from "./guide/completion";
 import IntroScreen from "./components/IntroScreen";
 import ContinuityHeader from "./components/ContinuityHeader";
 import GuidedTurn from "./components/GuidedTurn";
@@ -79,6 +84,12 @@ function hasCompletedDeskGuide(): boolean {
 export default function App() {
   const [phase, setPhase] = useState<Phase>("INTRO");
   const [maxReachedIndex, setMaxReachedIndex] = useState(0);
+  // Review mode is a local presentation preference (Wave 3 C2). It becomes
+  // effective only after two acknowledged turns — the complete reveal/archive
+  // ritual has been experienced twice — and never changes resolution.
+  const [reviewMode, setReviewMode] = useState<ReviewMode>(() => readReviewMode());
+  const reviewModeRef = useRef(reviewMode);
+  reviewModeRef.current = reviewMode;
   const [campaignId, setCampaignId] = useState<string | null>(null);
   const [summary, setSummary] = useState<CampaignSummary | null>(null);
   const [current, setCurrent] = useState<CurrentTurn | null>(null);
@@ -94,6 +105,11 @@ export default function App() {
   const [recentCampaigns, setRecentCampaigns] = useState<RecentCampaign[]>([]);
   const [variants, setVariants] = useState<ScenarioVariant[]>([]);
   const [selectedVariant, setSelectedVariant] = useState<string>("");
+  // Local presentation hint (Wave 3 C3): a returning player sees alternate
+  // intake conditions more prominently. Grants no game state.
+  const [hasCompletedBefore, setHasCompletedBefore] = useState(
+    () => readHasCompletedEngagement(),
+  );
 
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -130,9 +146,23 @@ export default function App() {
     if (powerCommitment) setPoweredSubsystem(powerCommitment);
   }, [powerCommitment]);
 
+  // The effective mode follows the preference only once two turns have been
+  // acknowledged; before that the guided spine teaches the complete loop.
+  const resolveEffectiveMode = useCallback(
+    (turnNumber: number): ReviewMode =>
+      reviewModeRef.current === "expedited" && turnNumber >= 3
+        ? "expedited"
+        : "guided",
+    [],
+  );
+
+  // The spine gotoPhase indexes against. Fetch paths set it from fresh data
+  // before navigating; the render below keeps it aligned with `summary`.
+  const effectiveStepsRef = useRef<Phase[]>(stepsForMode("guided"));
+
   const gotoPhase = useCallback((next: Phase, announcement?: string) => {
     setPhase(next);
-    const index = TURN_STEPS.indexOf(next);
+    const index = effectiveStepsRef.current.indexOf(next);
     if (index >= 0) setMaxReachedIndex((currentMax) => Math.max(currentMax, index));
     setLiveMessage(announcement ?? `${PHASE_LABEL[next]} phase.`);
   }, []);
@@ -198,7 +228,11 @@ export default function App() {
       setMemo(
         memoRecords.find((item) => item.id === result.sent_memo?.memo_id) ?? null,
       );
-      setMaxReachedIndex(TURN_STEPS.indexOf("CLIENT_DECISION"));
+      // A resolved frozen presentation always reopens at Client Decision,
+      // regardless of review mode (Wave 3 C2 navigation guarantee).
+      const steps = stepsForMode(resolveEffectiveMode(frozen.summary.turn_number));
+      effectiveStepsRef.current = steps;
+      setMaxReachedIndex(steps.indexOf("CLIENT_DECISION"));
       gotoPhase(
         "CLIENT_DECISION",
         `Turn ${result.turn_number} remains resolved. Review it before loading the next call.`,
@@ -211,8 +245,10 @@ export default function App() {
       setCitedDocs([]);
       setPoweredSubsystem(null);
       setMemo(null);
+      const steps = stepsForMode(resolveEffectiveMode(cur.summary.turn_number));
+      effectiveStepsRef.current = steps;
       setMaxReachedIndex(0);
-      gotoPhase("CALL", `Turn ${cur.summary.turn_number} incoming call loaded.`);
+      gotoPhase(steps[0], `Turn ${cur.summary.turn_number} incoming call loaded.`);
       showFirstTurnGuide(cur.summary.turn_number);
     } else {
       setCurrent(cur);
@@ -222,11 +258,11 @@ export default function App() {
       setCitedDocs([]);
       setPoweredSubsystem(null);
       setMemo(null);
-      setMaxReachedIndex(TURN_STEPS.length - 1);
+      setMaxReachedIndex(effectiveStepsRef.current.length - 1);
       gotoPhase("DOSSIER", "Campaign dossier loaded.");
     }
     saveCampaignId(id);
-  }, [gotoPhase, showFirstTurnGuide]);
+  }, [gotoPhase, showFirstTurnGuide, resolveEffectiveMode]);
 
   useEffect(() => {
     const savedId = readSavedCampaignId();
@@ -313,6 +349,9 @@ export default function App() {
       setMemoError(null);
       const [cur] = await Promise.all([refreshCurrent(created.id), refreshHistory(created.id)]);
       setMemos([]);
+      // A fresh campaign always begins guided: expedited unlocks only after
+      // this campaign's first two turns have been acknowledged.
+      effectiveStepsRef.current = stepsForMode("guided");
       setMaxReachedIndex(0);
       reportTelemetry({
         event_type: "campaign_started",
@@ -579,9 +618,61 @@ export default function App() {
     [reportTelemetry],
   );
 
+  const handleReopenIntake = useCallback(() => {
+    // Wave 3 C3: back to intake with an alternate opening preselected. This
+    // creates nothing — only an explicit Begin Intake starts a new campaign.
+    const played = summary?.variant_id ?? "";
+    const alternate = variants.find((variant) => variant.id !== played)?.id ?? "";
+    handleVariantChange(alternate);
+    setPhase("INTRO");
+    setLiveMessage("Intake reopened with alternate conditions preselected.");
+  }, [summary?.variant_id, variants, handleVariantChange]);
+
   const resolvedStatus = lastResult?.status_after ?? summary?.status;
   const terminalReason = lastResult?.failure_reason ?? summary?.failure_reason;
   const terminal = resolvedStatus === "COMPLETED" || resolvedStatus === "FAILED";
+
+  // Wave 3 C2: expedited review is offered only after two acknowledged turns.
+  // Reaching a fresh turn-3 call package implies turns 1 and 2 were resolved
+  // AND released via Next Call — the ritual was experienced twice.
+  const expeditedUnlocked = (summary?.turn_number ?? 0) >= 3;
+  const effectiveMode = resolveEffectiveMode(summary?.turn_number ?? 0);
+  const activeSteps = stepsForMode(effectiveMode);
+  effectiveStepsRef.current = activeSteps;
+
+  const handleReviewModeChange = useCallback(
+    (mode: ReviewMode) => {
+      if (mode === reviewModeRef.current) return;
+      // Presentation only: persist the local preference, remap the current
+      // phase into the new spine, and never call the backend. Selection,
+      // citations, memo, and allocation state are untouched.
+      const previousSteps = effectiveStepsRef.current;
+      setReviewMode(mode);
+      reviewModeRef.current = mode;
+      writeReviewMode(mode);
+      reportTelemetry({ event_type: "review_mode_changed", mode });
+      const nextEffective = resolveEffectiveMode(summary?.turn_number ?? 0);
+      const steps = stepsForMode(nextEffective);
+      effectiveStepsRef.current = steps;
+      setPhase((currentPhase) => {
+        const mapped = phaseForMode(currentPhase, nextEffective);
+        setMaxReachedIndex((currentMax) => {
+          const reachedPhase =
+            previousSteps[Math.min(currentMax, previousSteps.length - 1)] ??
+            currentPhase;
+          const mappedReached = phaseForMode(reachedPhase, nextEffective);
+          return Math.max(steps.indexOf(mapped), steps.indexOf(mappedReached), 0);
+        });
+        return mapped;
+      });
+      setLiveMessage(
+        mode === "expedited"
+          ? "Expedited review active. The full call package now shares one screen."
+          : "Guided review active.",
+      );
+    },
+    [reportTelemetry, resolveEffectiveMode, summary?.turn_number],
+  );
 
   useEffect(() => {
     if (
@@ -593,6 +684,10 @@ export default function App() {
     }
     terminalReported.current.add(campaignId);
     reportTelemetry({ event_type: "campaign_terminal", outcome: resolvedStatus });
+    // Completion remains authoritative in SQLite; this local flag only makes
+    // alternate intake conditions more prominent on the next visit.
+    writeHasCompletedEngagement();
+    setHasCompletedBefore(true);
   }, [campaignId, resolvedStatus, reportTelemetry]);
   const headerSummary =
     summary && lastResult && phase === "ARCHIVE"
@@ -617,6 +712,7 @@ export default function App() {
             variants={variants}
             selectedVariant={selectedVariant}
             onVariantChange={handleVariantChange}
+            completedBefore={hasCompletedBefore}
           />
           {error && (
             <div className="cd-banner-alert cd-alert cd-alert-error" role="alert">
@@ -647,6 +743,8 @@ export default function App() {
         worldState={current?.world_state ?? null}
         phase={phase}
         maxReachedIndex={maxReachedIndex}
+        steps={activeSteps}
+        reviewMode={effectiveMode}
         onGoto={gotoPhase}
         onOpenCaseFile={() => setCaseFileOpen(true)}
         onOpenGuide={openGuide}
@@ -655,6 +753,32 @@ export default function App() {
       />
 
       <DegradationBanner status={systemStatus} />
+
+      {expeditedUnlocked &&
+        !lastResult &&
+        !terminal &&
+        (phase === "CALL" || phase === "BRIEF" || phase === "EVIDENCE" || phase === "REVIEW") && (
+          <fieldset className="cd-review-mode">
+            <legend className="cd-sr-only">Review mode</legend>
+            <span className="cd-review-mode-k" aria-hidden>Review mode</span>
+            {(["guided", "expedited"] as const).map((mode) => (
+              <label key={mode} className="cd-review-mode-option">
+                <input
+                  type="radio"
+                  name="review-mode"
+                  value={mode}
+                  checked={reviewMode === mode}
+                  onChange={() => handleReviewModeChange(mode)}
+                />
+                <span>{mode === "guided" ? "Guided review" : "Expedited review"}</span>
+              </label>
+            ))}
+            <span className="cd-muted cd-small">
+              Presentation only — resolution, evidence, and the record are
+              identical in both modes.
+            </span>
+          </fieldset>
+        )}
       {systemStatus && systemStatus.degradation_band !== "NOMINAL" && (
         <div className="cd-guide-topic-strip">
           <GuideTopic topic="stale_feed" />
@@ -683,6 +807,7 @@ export default function App() {
 
       <GuidedTurn
         phase={phase}
+        reviewMode={effectiveMode}
         campaignId={campaignId}
         current={current}
         lastResult={lastResult}
@@ -701,6 +826,7 @@ export default function App() {
         onNextCall={handleNextCall}
         onOpenDossier={handleOpenDossier}
         onRestart={handleRestart}
+        onReopenIntake={handleReopenIntake}
         onOpenCaseFile={() => setCaseFileOpen(true)}
         memo={memo}
         memoLoading={memoLoading}

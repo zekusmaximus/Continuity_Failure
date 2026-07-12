@@ -182,6 +182,7 @@ export type Phase =
   | "CALL"
   | "BRIEF"
   | "EVIDENCE"
+  | "REVIEW"
   | "ADVICE"
   | "CLIENT_DECISION"
   | "CONSEQUENCES"
@@ -193,6 +194,7 @@ export const PHASE_LABEL: Record<Phase, string> = {
   CALL: "Incoming Call",
   BRIEF: "Situation Brief",
   EVIDENCE: "Evidence Review",
+  REVIEW: "Review",
   ADVICE: "Advisory",
   CLIENT_DECISION: "Client Decision",
   CONSEQUENCES: "Consequences",
@@ -216,12 +218,43 @@ export const STEP_SHORT: Record<Phase, string> = {
   CALL: "Call",
   BRIEF: "Brief",
   EVIDENCE: "Evidence",
+  REVIEW: "Review",
   ADVICE: "Advice",
   CLIENT_DECISION: "Decision",
   CONSEQUENCES: "Fallout",
   ARCHIVE: "Archive",
   DOSSIER: "Dossier",
 };
+
+// --- Review modes (Wave 3 C2) --------------------------------------------------
+// Expedited review is presentation only: the REVIEW phase composes the same
+// call/brief/evidence package into one screen. Resolution, advice gating,
+// idempotent submission, and the frozen presentation are identical in both
+// modes — switching modes never calls the backend.
+
+export type ReviewMode = "guided" | "expedited";
+
+export const EXPEDITED_STEPS: Phase[] = [
+  "REVIEW",
+  "ADVICE",
+  "CLIENT_DECISION",
+  "CONSEQUENCES",
+  "ARCHIVE",
+];
+
+export function stepsForMode(mode: ReviewMode): Phase[] {
+  return mode === "expedited" ? EXPEDITED_STEPS : TURN_STEPS;
+}
+
+/** The equivalent phase when switching modes mid-review. */
+export function phaseForMode(phase: Phase, mode: ReviewMode): Phase {
+  if (mode === "expedited") {
+    return phase === "CALL" || phase === "BRIEF" || phase === "EVIDENCE"
+      ? "REVIEW"
+      : phase;
+  }
+  return phase === "REVIEW" ? "CALL" : phase;
+}
 
 // --- Evidence prioritization --------------------------------------------------
 // Group documents into Critical / Relevant / Background without any AI. Priority
